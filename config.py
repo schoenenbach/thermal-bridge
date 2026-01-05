@@ -46,21 +46,63 @@ class SpacerType:
     STAINLESS_STEEL = 2
     ALUMINUM = 3
 
+
+@dataclass
+class WindowConfig:
+    """Window-specific dimensions for different window types.
+    
+    Allows easy configuration of different window types without
+    modifying core geometry code.
+    """
+    frame_depth_mm: int = 70
+    frame_width_mm: int = 70
+    
+    # Sash configuration
+    sash_overlap_mm: int = 10
+    sash_depth_mm: int = 70
+    sash_width_mm: int = 70
+    sash_recess_mm: int = 30
+    
+    # Glass configuration
+    glass_thickness_mm: int = 24
+    
+    # U-values for reference calculations
+    u_frame: float = 1.3
+    u_glass: float = 1.1
+
+
 @dataclass
 class CalculationConfig:
+    """Main configuration for thermal bridge calculations."""
+    
+    # Wall/Insulation geometry
     wall_thickness_mm: int
     insulation_thick_max_mm: int
     insulation_thick_min_mm: int
     reveal_insulation_mm: int
     taper_length_mm: int
     
-    # Advanced Settings
-    frame_depth_mm: int = 70
-    frame_width_mm: int = 70 
+    # Window positioning
     window_position_from_exterior_masonry_mm: int = 0
     masonry_rebate_overlap_mm: int = 0
     uninsulated_reveal: bool = False
     
-    # Simulation Fidelity
+    # Window configuration (use defaults or provide custom)
+    window_config: WindowConfig = None
+    
+    # Legacy frame dimensions (for backward compatibility)
+    frame_depth_mm: int = 70
+    frame_width_mm: int = 70
+    
+    # Simulation settings
     grid_size_mm: float = 2.5
     spacer_type: int = SpacerType.SWISS_ULTIMATE
+    
+    def __post_init__(self):
+        """Initialize window config if not provided."""
+        if self.window_config is None:
+            self.window_config = WindowConfig(
+                frame_depth_mm=self.frame_depth_mm,
+                frame_width_mm=self.frame_width_mm
+            )
+

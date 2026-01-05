@@ -1,122 +1,38 @@
 #!/usr/bin/env python3
 """
-ISO 10211 Test Runner (Refactored)
+ISO 10211 Test Runner
 
-Uses the new geometry/mesh module structure for cleaner, reusable code.
+Uses the unified geometry/mesh/solver module structure for clean, reusable code.
 
 Usage:
-    python3 run_iso_tests_v2.py [1|2|all]
+    python3 run_iso_tests.py [1|2|all]
 """
 
 import argparse
 import sys
-import os
-import ctypes
-import numpy as np
-import matplotlib.pyplot as plt
 import time
+import numpy as np
 
 # Local imports
 from geometry import build_material_grid
 from mesh import UniformMesh
 from geometries.iso_case1 import ISOCase1Geometry
 from geometries.iso_case2 import ISOCase2Geometry
-from thermal_solver import plot_temperature_map
-
-# Load C++ Library
-SO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "thermal_solver_core.so"))
-lib = None
-
-
-def load_solver():
-    """Load the C++ solver library."""
-    global lib
-    try:
-        lib = ctypes.CDLL(SO_PATH)
-        lib.solve_general_conductance.argtypes = [
-            ctypes.POINTER(ctypes.c_double),  # temp
-            ctypes.POINTER(ctypes.c_double),  # Gh
-            ctypes.POINTER(ctypes.c_double),  # Gv
-            ctypes.POINTER(ctypes.c_int),     # fixed_mask
-            ctypes.POINTER(ctypes.c_double),  # fixed_values
-            ctypes.c_int,  # rows
-            ctypes.c_int,  # cols
-            ctypes.c_int,  # iterations
-            ctypes.c_double  # omega
-        ]
-        lib.solve_general_conductance.restype = ctypes.c_double
-        print("[INFO] C++ Solver core loaded successfully.")
-    except Exception as e:
-        print(f"[ERROR] Failed to load solver library at {SO_PATH}: {e}")
-        sys.exit(1)
+from solver import (
+    get_solver_lib,
+    calculate_conductances_uniform,
+    solve,
+    plot_temperature_map
+)
 
 
-def calculate_conductances(cond: np.ndarray, dx: float, dy: float):
-    """
-    Calculate horizontal and vertical conductance matrices.
-    
-    Args:
-        cond: 2D array of thermal conductivities
-        dx, dy: Cell sizes in mm (converted to m internally)
-        
-    Returns:
-        Tuple of (Gh, Gv) conductance matrices
-    """
-    dx_m = dx / 1000.0
-    dy_m = dy / 1000.0
-    
-    # Horizontal conductance (between j and j+1)
-    k_right = np.roll(cond, -1, axis=1)
-    k_harm_h = 2 * cond * k_right / (cond + k_right + 1e-12)
-    Gh = k_harm_h * dy_m / dx_m
-    
-    # Vertical conductance (between i and i+1)
-    k_down = np.roll(cond, -1, axis=0)
-    k_harm_v = 2 * cond * k_down / (cond + k_down + 1e-12)
-    Gv = k_harm_v * dx_m / dy_m
-    
-    return Gh, Gv
-
-
-def solve_cpp(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, omega=1.90, batch=5000, verbose=True):
-    """
-    Solve using C++ accelerated solver.
-    
-    Args:
-        temp: Initial temperature field (modified in place)
-        Gh, Gv: Conductance matrices
-        mask: Fixed node mask (1 = fixed, 0 = free)
-        values: Fixed node values
-        max_iter, tol, omega, batch: Solver parameters
-        verbose: Print progress
-        
-    Returns:
-        Final temperature field
-    """
-    temp_c = np.ascontiguousarray(temp, dtype=np.float64)
-    gh_c = np.ascontiguousarray(Gh, dtype=np.float64)
-    gv_c = np.ascontiguousarray(Gv, dtype=np.float64)
-    mask_c = np.ascontiguousarray(mask, dtype=np.int32)
-    val_c = np.ascontiguousarray(values, dtype=np.float64)
-    
-    rows, cols = temp.shape
-    p_temp = temp_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gh = gh_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gv = gv_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-    p_val = val_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    
-    start_t = time.time()
-    for k in range(0, max_iter, batch):
-        diff = lib.solve_general_conductance(p_temp, p_gh, p_gv, p_mask, p_val, rows, cols, batch, omega)
-        if verbose and k % 10000 == 0:
-            print(f"  Iter {k+batch:6d}: Diff {diff:.2e}")
-        if diff < tol:
-            if verbose:
-                print(f"Converged in {k+batch} iterations ({time.time()-start_t:.2f}s)")
-            break
-    
-    return temp_c
+def calculate_conductances(cond, dx_mm, dy_mm):
+    """Wrapper for uniform grid conductances with unit scaling."""
+    dx_m = dx_mm / 1000.0
+    dy_m = dy_mm / 1000.0
+    Gh, Gv = calculate_conductances_uniform(cond)
+    # Scale by geometric factor for non-unity dx/dy
+    return Gh * dy_m / dx_m, Gv * dx_m / dy_m
 
 
 def run_case_1():
@@ -162,7 +78,7 @@ def run_case_1():
     temp[mask == 1] = values[mask == 1]
     
     # Solve
-    temp = solve_cpp(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, batch=5000)
+    temp = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, batch_size=5000)
     
     # Check reference point (150, 300) -> 5.25°C
     ix = int(150 / mesh.grid_size_mm)
@@ -239,7 +155,7 @@ def run_case_2():
     temp = np.linspace(20, 0, ny_p)[:, None] * np.ones((1, nx))
     
     # Solve
-    temp = solve_cpp(temp, Gh, Gv, mask, values, max_iter=500000, tol=1e-7, batch=10000)
+    temp = solve(temp, Gh, Gv, mask, values, max_iter=500000, tol=1e-7, batch_size=10000)
     
     # Calculate heat flux at interior surface
     flux_in = 0.0
@@ -275,7 +191,8 @@ if __name__ == "__main__":
                         help='Test case to run (1, 2, or all)')
     args = parser.parse_args()
     
-    load_solver()
+    # Initialize solver (lazy loading handled by get_solver_lib)
+    get_solver_lib()
     
     results = {}
     

@@ -1,33 +1,17 @@
+"""
+Simulation Engine for Thermal Bridge Calculations
+
+Provides scenario definitions and solving workflow for window reveal geometries.
+"""
 
 import os
-import ctypes
 import numpy as np
 import matplotlib.pyplot as plt
-import time
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
 from geometry import build_material_grid, MaterialID
 from geometries.window_reveal import WindowRevealGeometry
 from mesh import UniformMesh
-
-# --- C++ Solver Loading ---
-SO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "thermal_solver_core.so"))
-lib = None
-
-def load_solver():
-    global lib
-    if lib is not None:
-        return
-    try:
-        lib = ctypes.CDLL(SO_PATH)
-        lib.solve_general_conductance.argtypes = [
-            ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
-            ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double),
-            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double
-        ]
-        lib.solve_general_conductance.restype = ctypes.c_double
-    except Exception as e:
-        print(f"[ERROR] Failed to load solver: {e}")
-        raise
+from solver import get_solver_lib, solve, calculate_conductances_uniform
 
 # --- Scenarios ---
 def get_scenarios():
@@ -104,6 +88,7 @@ def get_scenarios():
 
 # --- Solver Core ---
 def solve_scenario(scenario_def):
+    """Solve a thermal bridge scenario and return results."""
     print(f"\nrunning {scenario_def['name']}...")
     cfg = scenario_def['cfg']
     suffix = scenario_def['file_suffix']
@@ -116,28 +101,20 @@ def solve_scenario(scenario_def):
     # 2. Material Grid & Conductivity
     grid_map, cond = build_material_grid(geom, mesh.xc, mesh.yc)
     
-    # 3. Boundary Conditions (Explicit polygon logic from WindowRevealGeometry)
+    # 3. Boundary Conditions
     mask_int = (grid_map == MaterialID.AIR_INT)
     mask_ext = (grid_map == MaterialID.AIR_EXT)
     
     # K_eff for Surface Resistance
     dx_m = mesh.grid_size_mm / 1000.0
-    k_eff_int = dx_m / (2 * RSI_WALL) # 0.13
-    k_eff_ext = dx_m / (2 * RSE)      # 0.04
+    k_eff_int = dx_m / (2 * RSI_WALL)
+    k_eff_ext = dx_m / (2 * RSE)
     
     cond[mask_int] = k_eff_int
     cond[mask_ext] = k_eff_ext
     
-    # 4. Conductance Matrices
-    # H
-    k_right = np.roll(cond, -1, axis=1)
-    k_harm_h = 2 * cond * k_right / (cond + k_right + 1e-12)
-    Gh = k_harm_h # uniform dx=dy implies G = k * 1
-    
-    # V
-    k_down = np.roll(cond, -1, axis=0)
-    k_harm_v = 2 * cond * k_down / (cond + k_down + 1e-12)
-    Gv = k_harm_v
+    # 4. Conductance Matrices (uniform grid: G = k_harmonic)
+    Gh, Gv = calculate_conductances_uniform(cond)
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
     mask = mask_int | mask_ext
@@ -149,32 +126,10 @@ def solve_scenario(scenario_def):
     temp[mask_int] = TEMP_INT
     temp[mask_ext] = TEMP_EXT
     
-    # C++ Call
-    temp_c = np.ascontiguousarray(temp, dtype=np.float64)
-    gh_c = np.ascontiguousarray(Gh, dtype=np.float64)
-    gv_c = np.ascontiguousarray(Gv, dtype=np.float64)
-    mask_c = np.ascontiguousarray(mask, dtype=np.int32)
-    val_c = np.ascontiguousarray(values, dtype=np.float64)
+    temp_res = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, 
+                     batch_size=5000, verbose=False)
     
-    MAX_ITER = 100000
-    batch = 5000
-    rows, cols = temp.shape
-    p_temp = temp_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gh = gh_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gv = gv_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-    p_val = val_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    
-    for k in range(0, MAX_ITER, batch):
-        diff = lib.solve_general_conductance(p_temp, p_gh, p_gv, p_mask, p_val, rows, cols, batch, 1.90)
-        if diff < 1e-7:
-            print(f"  Converged in {k+batch} iters.")
-            break
-            
-    temp_res = temp_c
-    
-    # 6. Calculate Results
-    # Total Flux L2D (Sum flows from AirInt to Non-AirInt)
+    # 6. Calculate Results - Total Flux L2D
     dt_h = temp_res[:, :-1] - temp_res[:, 1:]
     flow_h = Gh[:, :-1] * dt_h
     m_curr = mask_int[:, :-1]
@@ -190,11 +145,6 @@ def solve_scenario(scenario_def):
     l2d = flux / (TEMP_INT - TEMP_EXT)
     
     # Reference Flow
-    # L_wall = height where wall exists (up to 250mm typically)
-    # But wait, WindowRevealGeometry OFF_Y=250.
-    # Total Height is OFF_Y + 250 = 500mm.
-    # Wall Leg = 250mm. Window Leg = 250mm.
-    # l_wall = 0.25. l_win = 0.25.
     l_wall = 0.25
     l_win = 0.25
     l_frame = cfg.frame_width_mm / 1000.0
@@ -203,11 +153,6 @@ def solve_scenario(scenario_def):
     # Wall U-Value (1D)
     r_wall_1d = RSI_WALL + (cfg.wall_thickness_mm/1000.0)/MAT_WALL + RSE
     if cfg.insulation_thick_max_mm > 0:
-        # Assuming we check the MAX insulation section for Reference U-value?
-        # Usually Ref Flow is based on the Unperturbed U-Values of the flanking elements.
-        # Wall side: U_wall (with full insulation if applicable, or as specified).
-        # Since Geometry includes Taper, the "Wall Leg" includes full insulation at the bottom?
-        # "Insulation Max" start at y_bottom. Yes.
         r_wall_1d += (cfg.insulation_thick_max_mm/1000.0)/MAT_INSULATION
     
     u_wall_1d = 1.0 / r_wall_1d
@@ -218,58 +163,38 @@ def solve_scenario(scenario_def):
     psi = l2d - ref_flow
     
     # fRsi Pass (Rsi=0.25)
-    # Recalculate K_eff_int with 0.25
-    k_eff_int_rsi25 = dx_m / (2 * RSI_CORNER) # 0.25
+    k_eff_int_rsi25 = dx_m / (2 * RSI_CORNER)
     cond_frsi = cond.copy()
     cond_frsi[mask_int] = k_eff_int_rsi25
     
-    # Update G
-    k_right = np.roll(cond_frsi, -1, axis=1)
-    Gh_frsi = 2 * cond_frsi * k_right / (cond_frsi + k_right + 1e-12)
+    Gh_frsi, Gv_frsi = calculate_conductances_uniform(cond_frsi)
     
-    k_down = np.roll(cond_frsi, -1, axis=0)
-    Gv_frsi = 2 * cond_frsi * k_down / (cond_frsi + k_down + 1e-12)
+    temp_frsi = temp_res.copy()
+    temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
+                      tol=1e-7, batch_size=5000, verbose=False)
     
-    # Solve fRsi
-    temp_frsi = temp_res.copy() # warm start
-    temp_c_frsi = np.ascontiguousarray(temp_frsi, dtype=np.float64)
-    gh_c_frsi = np.ascontiguousarray(Gh_frsi, dtype=np.float64)
-    gv_c_frsi = np.ascontiguousarray(Gv_frsi, dtype=np.float64)
-    # Mask/Val same
-    p_temp_frsi = temp_c_frsi.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gh_frsi = gh_c_frsi.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    p_gv_frsi = gv_c_frsi.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    
-    for k in range(0, MAX_ITER, batch):
-        diff = lib.solve_general_conductance(p_temp_frsi, p_gh_frsi, p_gv_frsi, p_mask, p_val, rows, cols, batch, 1.90)
-        if diff < 1e-7:
-            break
-            
-    # Min Temp
-    # Helper to find min surface temp
+    # Minimum surface temperature
     def get_min_surf(t_field, k_field, rsi_used):
-        # Boundary nodes: Solid nodes with neighbor AirInt
         padded = np.pad(mask_int, 1)
-        boundary = (padded[:-2, 1:-1] | padded[2:, 1:-1] | padded[1:-1, :-2] | padded[1:-1, 2:]) & (~mask_int) & (grid_map != MaterialID.AIR_EXT)
+        boundary = (padded[:-2, 1:-1] | padded[2:, 1:-1] | 
+                    padded[1:-1, :-2] | padded[1:-1, 2:]) & (~mask_int) & (grid_map != MaterialID.AIR_EXT)
         y, x = np.where(boundary)
-        if len(y) == 0: return TEMP_INT
-        k_solid = k_field[y, x] # This is actual conductivity of solid cell from cond (or cond_frsi)
-        # Wait, cond_frsi has k_eff for AIR cells. For SOLID cells it has k_mat.
-        # But wait, did I overwrite solid cells? No.
+        if len(y) == 0: 
+            return TEMP_INT
+        k_solid = k_field[y, x]
         t_node = t_field[y, x]
-        # T_si = (Ti*r1 + t_node*r2) / (r1+r2)
         r1 = dx_m / (2*k_solid)
         r2 = rsi_used
         t_si = (TEMP_INT * r1 + t_node * r2) / (r1 + r2)
         return np.min(t_si)
 
-    min_temp = get_min_surf(temp_c_frsi, cond_frsi, RSI_CORNER)
+    min_temp = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER)
     frsi = (min_temp - TEMP_EXT) / (TEMP_INT - TEMP_EXT)
     
     print(f"  Psi: {psi:.4f} W/mK")
     print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")
     
-    # Plot (Psi run)
+    # Plot
     plt.figure(figsize=(10, 10))
     plt.imshow(temp_res, cmap='jet', origin='lower')
     plt.title(f"{scenario_def['name']}\nPsi={psi:.3f}, fRsi={frsi:.3f}, MinT={min_temp:.1f}C")
@@ -284,8 +209,12 @@ def solve_scenario(scenario_def):
         "MinT": min_temp
     }
 
+
 def run_all():
-    load_solver()
+    """Run all scenarios and print summary."""
+    # Ensure solver is loaded
+    get_solver_lib()
+    
     scenarios = get_scenarios()
     results = []
     
@@ -299,5 +228,7 @@ def run_all():
     for r in results:
         print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f}")
 
+
 if __name__ == "__main__":
     run_all()
+
