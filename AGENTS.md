@@ -39,7 +39,18 @@ python3 run_iso_tests.py all
 ```
 
 ### Extending the Project
-- **New Geometries:** Create a new file in `geometries/` inheriting from `SketchGeometry`. Define shape using `add_point()` and `add_shape()`.
+- **New Element Library:** Use `elements.py` to create geometries by composing simple building blocks.
+  ```python
+  from elements import ElementBasedGeometry, add_wall, add_insulation
+  
+  def build_my_scenario(sketch):
+      add_wall(sketch, x=0, y=0, width=360, height=250)
+      add_insulation(sketch, x=360, y=0, width=200, height=250)
+      
+  geom = ElementBasedGeometry([build_my_scenario], canvas_bounds=(0, 600, 0, 500))
+  ```
+
+- **New Geometries (Legacy):** Create a new file in `geometries/` inheriting from `SketchGeometry`. Define shape using `add_point()` and `add_shape()`.
 - **New Window Types:** Update `WindowConfig` in `config.py` or pass a custom `WindowConfig` object to `CalculationConfig`.
 - **Solver Improvements:** Modify `solver.py`. Ensure backward compatibility with `run_iso_tests.py`.
 - **Making changes:** The project is git versioned. Before making changes you can have a look at the git history to see what changes were made in the past. After your changes are accepted you should wrap up into a git commit and push it to the repository. Adhere to Chris Beams commit message guidelines and describe the "why" of your changes.
