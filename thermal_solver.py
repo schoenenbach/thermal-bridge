@@ -23,6 +23,19 @@ try:
         ctypes.c_int  # iterations
     ]
     lib.solve_optimized.restype = ctypes.c_double
+
+    # solve_red_black(double* temp, const double* cond, const int* fixed_mask, const double* fixed_values, int rows, int cols, int iterations, double omega)
+    lib.solve_red_black.argtypes = [
+        ctypes.POINTER(ctypes.c_double), # temp (in/out)
+        ctypes.POINTER(ctypes.c_double), # cond
+        ctypes.POINTER(ctypes.c_int),    # fixed_mask
+        ctypes.POINTER(ctypes.c_double), # fixed_values
+        ctypes.c_int, # rows
+        ctypes.c_int, # cols
+        ctypes.c_int,  # iterations
+        ctypes.c_double # omega
+    ]
+    lib.solve_red_black.restype = ctypes.c_double
     USE_CPP = True
     print("[INFO] C++ Accelerated Solver Loaded.")
 except Exception as e:
@@ -369,7 +382,7 @@ class ThermalSolver:
         # Boundaries handled in solve loop
         
 
-    def solve(self, max_iter=60000, tol=1e-5):
+    def solve(self, max_iter=60000, tol=1e-5, omega=1.85):
         # Explicit or Iterative solver (Jacobi/SOR)
         
         # Identify Fixed Nodes (Dirichlet)
@@ -426,7 +439,8 @@ class ThermalSolver:
             batch_size = 1000
             
             for k in range(0, max_iter, batch_size):
-                diff = lib.solve_optimized(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size)
+                # diff = lib.solve_optimized(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size)
+                diff = lib.solve_red_black(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size, omega)
                 
                 if diff < tol:
                     print(f"Converged in {k + batch_size} iterations (Diff: {diff:.6f})")

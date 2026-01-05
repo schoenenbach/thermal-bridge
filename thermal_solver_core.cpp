@@ -251,4 +251,121 @@ double solve_optimized(double *temp, const double *cond, const int *fixed_mask,
   }
   return max_diff;
 }
+
+/**
+ * Red-Black Gauss-Seidel Solver with SOR (Successive Over-Relaxation)
+ *
+ * @param temp Pointer to temperature grid (Input/Output)
+ * @param cond Pointer to conductivity grid
+ * @param fixed_mask Pointer to integer mask (1 = Fixed/Dirichlet, 0 = Variable)
+ * @param fixed_values Pointer to values to enforce where mask is 1
+ * @param rows Number of rows
+ * @param cols Number of columns
+ * @param iterations Number of iterations to perform
+ * @param omega Relaxation factor (1.0 = Gauss-Seidel, 1.0 < omega < 2.0 = SOR)
+ */
+double solve_red_black(double *temp, const double *cond, const int *fixed_mask,
+                       const double *fixed_values, int rows, int cols,
+                       int iterations, double omega) {
+  double max_diff = 0.0;
+
+  auto harm = [](double k1, double k2) {
+    return 2.0 * k1 * k2 / (k1 + k2 + 1e-12);
+  };
+
+  for (int iter = 0; iter < iterations; ++iter) {
+    max_diff = 0.0;
+
+    // We do two passes: Red ((r+c)%2 == 0) and Black ((r+c)%2 == 1)
+    for (int color = 0; color < 2; ++color) {
+
+#pragma omp parallel for reduction(max : max_diff)
+      for (int r = 1; r < rows - 1; ++r) {
+        int c_start = 1;
+        // Adjust start to match color
+        // If (r + c_start) % 2 != color, move to next
+        if ((r + c_start) % 2 != color) {
+          c_start++;
+        }
+
+        for (int c = c_start; c < cols - 1; c += 2) {
+          int idx = r * cols + c;
+
+          // Skip if fixed
+          if (fixed_mask[idx]) {
+            continue;
+          }
+
+          int idx_up = (r - 1) * cols + c;
+          int idx_dn = (r + 1) * cols + c;
+          int idx_lf = r * cols + (c - 1);
+          int idx_rt = r * cols + (c + 1);
+
+          double kc = cond[idx];
+          double g_up = harm(kc, cond[idx_up]);
+          double g_dn = harm(kc, cond[idx_dn]);
+          double g_lf = harm(kc, cond[idx_lf]);
+          double g_rt = harm(kc, cond[idx_rt]);
+          double g_sum = g_up + g_dn + g_lf + g_rt;
+
+          double val_gauss = (g_up * temp[idx_up] + g_dn * temp[idx_dn] +
+                              g_lf * temp[idx_lf] + g_rt * temp[idx_rt]) /
+                             (g_sum + 1e-12);
+
+          // SOR Update
+          double val_new = (1.0 - omega) * temp[idx] + omega * val_gauss;
+
+          double diff = std::abs(val_new - temp[idx]);
+          if (diff > max_diff)
+            max_diff = diff;
+
+          temp[idx] = val_new;
+        }
+      }
+    }
+
+    // Apply Boundaries (Adiabatic or Dirichlet)
+    // Dirkchlet (Fixed) are skipped above, so they retain values?
+    // Wait, if we initialize with something else, we need to enforce
+    // fixed_values. But usually `temp` already has them. Let's enforce fixed
+    // values just in case to avoid drift if user passed bad temp. Actually,
+    // enforcing them inside the loop is expensive if we do it separately. We
+    // skipped them in the update, so they shouldn't change. BUT, we need to
+    // handle Adiabatic boundaries (Outer edges).
+
+    // Left (c=0)
+    for (int r = 0; r < rows; ++r) {
+      int idx = r * cols + 0;
+      if (!fixed_mask[idx])
+        temp[idx] = temp[r * cols + 1];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+    // Right (c=cols-1)
+    for (int r = 0; r < rows; ++r) {
+      int idx = r * cols + (cols - 1);
+      if (!fixed_mask[idx])
+        temp[idx] = temp[r * cols + (cols - 2)];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+    // Bottom (r=0)
+    for (int c = 0; c < cols; ++c) {
+      int idx = 0 * cols + c;
+      if (!fixed_mask[idx])
+        temp[idx] = temp[1 * cols + c];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+    // Top (r=rows-1)
+    for (int c = 0; c < cols; ++c) {
+      int idx = (rows - 1) * cols + c;
+      if (!fixed_mask[idx])
+        temp[idx] = temp[(rows - 2) * cols + c];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+  }
+  return max_diff;
+}
 }

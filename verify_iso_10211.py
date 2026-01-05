@@ -13,13 +13,14 @@ TOLERANCE = 1e-7
 try:
     if not os.path.exists(SO_PATH): raise FileNotFoundError
     lib = ctypes.CDLL(SO_PATH)
-    lib.solve_optimized.argtypes = [
+    # solve_red_black(double* temp, const double* cond, const int* fixed_mask, const double* fixed_values, int rows, int cols, int iterations, double omega)
+    lib.solve_red_black.argtypes = [
         ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
         ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double),
-        ctypes.c_int, ctypes.c_int, ctypes.c_int
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double
     ]
-    lib.solve_optimized.restype = ctypes.c_double
-    print(f"[INFO] Loaded C++ Solver", flush=True)
+    lib.solve_red_black.restype = ctypes.c_double
+    print(f"[INFO] Loaded C++ Solver (Red-Black SOR)", flush=True)
 except: lib=None
 
 def run_solver(temp, cond, fixed_mask, fixed_values, max_iter=MAX_ITER, tol=TOLERANCE):
@@ -35,11 +36,13 @@ def run_solver(temp, cond, fixed_mask, fixed_values, max_iter=MAX_ITER, tol=TOLE
     p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
     p_fval = fval_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
     
-    batch=20000
+    batch=5000
+    omega = 1.90 # Optimal for this grid
     start_t = time.time()
     for k in range(0, max_iter, batch):
-        diff = lib.solve_optimized(p_temp, p_cond, p_mask, p_fval, rows, cols, batch)
-        print(f"    Iter {k+batch:6d}: Diff {diff:.2e} (T={time.time()-start_t:.1f}s)", flush=True)
+        diff = lib.solve_red_black(p_temp, p_cond, p_mask, p_fval, rows, cols, batch, omega)
+        if k % 10000 == 0:
+            print(f"    Iter {k+batch:6d}: Diff {diff:.2e} (T={time.time()-start_t:.1f}s)", flush=True)
         if diff < tol:
             print(f"  -> Converged in {k+batch} iters", flush=True)
             return temp_c
@@ -71,7 +74,7 @@ def test_case_2():
     print("\n--- Running ISO 10211 Test Case 2 (Full Metal Bottom) ---", flush=True)
     # Materials
     MAT_CONC=1.15; MAT_WOOD=0.12; MAT_INS=0.029; MAT_ALU=230.0
-    GRID_MM=0.5; W_mm=500.0; H_mm=47.5
+    GRID_MM=0.25; W_mm=500.0; H_mm=47.5
     nx=int(W_mm/GRID_MM)+1; ny=int(H_mm/GRID_MM)+1; dx=GRID_MM/1000.0
     
     cond = np.full((ny, nx), MAT_INS) # Background 0.029
