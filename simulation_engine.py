@@ -233,13 +233,32 @@ def solve_scenario(scenario_def):
                       tol=1e-7, batch_size=5000, verbose=False)
     
     # Minimum surface temperature
-    def get_min_surf(t_field, k_field, rsi_used):
+    def get_min_surf(t_field, k_field, rsi_used, material_filter=None):
         padded = np.pad(mask_int, 1)
+        
         boundary = (padded[:-2, 1:-1] | padded[2:, 1:-1] | 
                     padded[1:-1, :-2] | padded[1:-1, 2:]) & (~mask_int) & (grid_map != MaterialID.AIR_EXT)
+        
         y, x = np.where(boundary)
         if len(y) == 0: 
             return TEMP_INT
+            
+        # Filter by material if requested
+        if material_filter is not None:
+            # grid_map[y, x] gives materials of the boundary solid nodes
+            mats = grid_map[y, x]
+            
+            if isinstance(material_filter, (list, tuple)):
+                # Vectorizedisin verification
+                keep = np.isin(mats, material_filter)
+            else:
+                keep = (mats == material_filter)
+                
+            y = y[keep]
+            x = x[keep]
+            if len(y) == 0:
+                return None # No surface nodes for this material
+        
         k_solid = k_field[y, x]
         t_node = t_field[y, x]
         
@@ -253,10 +272,29 @@ def solve_scenario(scenario_def):
         return np.min(t_si)
 
     min_temp = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER)
+    
+    # Calculate specific minimum temperatures
+    # Wall Materials: Wall, Insulation, Reveal Ins, Concrete, Wood
+    # Note: Wall might be bare (2) or insulated (3, 4)
+    wall_mats = [MaterialID.WALL, MaterialID.INSULATION, MaterialID.REVEAL_INS, MaterialID.CONCRETE, MaterialID.WOOD]
+    min_temp_wall = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=wall_mats)
+    
+    # MaterialID.FRAME = 5
+    # MaterialID.GLASS = 6
+    min_temp_frame = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=5)
+    min_temp_glass = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=6) 
+    
     frsi = (min_temp - TEMP_EXT) / (TEMP_INT - TEMP_EXT)
     
     print(f"  Psi: {psi:.4f} W/mK")
     print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")
+    if min_temp_wall is not None:
+        print(f"    Wall MinT: {min_temp_wall:.2f}C")
+    if min_temp_frame is not None:
+        print(f"    Frame MinT: {min_temp_frame:.2f}C")
+    if min_temp_glass is not None:
+        print(f"    Glass MinT: {min_temp_glass:.2f}C")
+        
     
     # Plot
     plot_temperature_map(temp_frsi, 
@@ -273,7 +311,10 @@ def solve_scenario(scenario_def):
         "name": scenario_def['name'],
         "Psi": psi,
         "fRsi": frsi,
-        "MinT": min_temp
+        "MinT": min_temp,
+        "MinT_Wall": min_temp_wall,
+        "MinT_Frame": min_temp_frame,
+        "MinT_Glass": min_temp_glass
     }
 
 
@@ -290,10 +331,13 @@ def run_all():
         results.append(res)
         
     print("\n--- Final Summary ---")
-    print(f"{'Scenario':<40} | {'Psi (W/mK)':<10} | {'fRsi':<10} | {'MinT (C)':<10}")
-    print("-" * 80)
+    print(f"{'Scenario':<40} | {'Psi (W/mK)':<10} | {'fRsi':<10} | {'MinT (C)':<10} | {'Wall T':<10} | {'Frame T':<10} | {'Glass T':<10}")
+    print("-" * 115)
     for r in results:
-        print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f}")
+        wall_t = f"{r['MinT_Wall']:.2f}" if r.get('MinT_Wall') is not None else "N/A"
+        frame_t = f"{r['MinT_Frame']:.2f}" if r.get('MinT_Frame') is not None else "N/A"
+        glass_t = f"{r['MinT_Glass']:.2f}" if r.get('MinT_Glass') is not None else "N/A"
+        print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f} | {wall_t:<10} | {frame_t:<10} | {glass_t:<10}")
 
 
 def generate_geometries():
