@@ -311,8 +311,13 @@ def plot_temperature_map(temp_grid: np.ndarray,
         im = plt.pcolormesh(X, Y, temp_grid, cmap='jet', shading='flat')
     else:
         # Uniform Mesh: Use imshow
+        # We need to correctly set extent if coordinates are shifted
+        x_min, y_min = 0, 0
+        if x_coords is not None and y_coords is not None:
+             x_min, y_min = x_coords[0], y_coords[0]
+             
         im = plt.imshow(temp_grid, cmap='jet', origin='lower',
-                        extent=[0, width_mm, 0, height_mm])
+                        extent=[x_min, x_min + width_mm, y_min, y_min + height_mm])
                         
     plt.colorbar(im, label='Temperature [°C]')
     
@@ -424,8 +429,13 @@ def plot_temperature_map(temp_grid: np.ndarray,
     plt.ylabel('Facade Length [mm]')
     
     # Set axis limits to match domain (pcolormesh doesn't auto-set tight??)
-    plt.xlim(0, width_mm)
-    plt.ylim(0, height_mm)
+    # Set axis limits to match domain
+    if x_coords is not None and y_coords is not None:
+        plt.xlim(x_coords[0], x_coords[-1])
+        plt.ylim(y_coords[0], y_coords[-1])
+    else:
+        plt.xlim(0, width_mm)
+        plt.ylim(0, height_mm)
     
     plt.savefig(filename, dpi=150)
     plt.close()
@@ -474,10 +484,17 @@ def plot_geometry(grid_map: np.ndarray,
         X, Y = np.meshgrid(x_coords, y_coords)
         im = plt.pcolormesh(X, Y, grid_normalized, cmap=cmap, shading='flat', 
                            vmin=0, vmax=max(n_materials-1, 1))
+        
+        # Set limits based on coords
+        plt.xlim(x_coords[0], x_coords[-1])
+        plt.ylim(y_coords[0], y_coords[-1])
     else:
         im = plt.imshow(grid_normalized, cmap=cmap, origin='lower',
                         extent=[0, width_mm, 0, height_mm], 
                         interpolation='nearest', vmin=0, vmax=max(n_materials-1, 1))
+        # Default limits
+        plt.xlim(0, width_mm)
+        plt.ylim(0, height_mm)
     
     # Create colorbar with actual material IDs as labels
     cbar = plt.colorbar(im, label='Material ID')
@@ -492,8 +509,7 @@ def plot_geometry(grid_map: np.ndarray,
     plt.xlabel('Depth [mm]')
     plt.ylabel('Facade Length [mm]')
     
-    plt.xlim(0, width_mm)
-    plt.ylim(0, height_mm)
+
     
     plt.grid(True, color='white', alpha=0.3)
     plt.tight_layout()
