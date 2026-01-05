@@ -283,14 +283,38 @@ with tab_editor:
     active_data = None
     active_name = "Custom"
     
-    try:
-        active_data = yaml.safe_load(yaml_input)
+    # Import Validation Logic
+    from ui_validation import validate_scenario_yaml, get_element_hints
+    
+    # Run Validation
+    validation_res = validate_scenario_yaml(yaml_input)
+    
+    if validation_res.is_valid:
+        active_data = validation_res.data
         active_name = active_data.get('name', "Custom")
-        # st.sidebar.success("YAML Valid") # Less noise
-    except Exception as e:
-        st.sidebar.error(f"YAML Error: {e}")
-        active_data = None
+        st.sidebar.success("✅ Scenario Valid")
+    else:
+        st.sidebar.error(f"❌ {len(validation_res.errors)} Validation Errors")
         active_name = "Invalid"
+        
+        # Show errors in main area
+        st.error(f"Found {len(validation_res.errors)} issues in your configuration.")
+        for err in validation_res.errors:
+            loc_str = " -> ".join(str(l) for l in err.loc)
+            st.warning(f"Line {err.line}: {err.message} ({loc_str})")
+            
+        # Hints
+        st.info("ℹ️ checks: Ensure 'canvas' and 'elements' are defined. 'grid' must be > 0.")
+        
+        # Element Hints
+        with st.expander("📝 Element Parameter Hints"):
+            for etype in ["rect", "wall", "window_detail", "insulation_tapered", "polygon"]:
+                hints = get_element_hints(etype)
+                st.markdown(f"**{etype}**: {', '.join(hints)}")
+        
+        # Try to use partial data if available (e.g. for variable extraction roughly)
+        if validation_res.data:
+            active_data = validation_res.data
     
     # Dynamic Variable Extraction
     if active_data:

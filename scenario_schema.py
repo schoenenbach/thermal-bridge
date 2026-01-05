@@ -27,17 +27,18 @@ class MaterialDef(BaseModel):
 
 class CanvasConfig(BaseModel):
     """Simulation canvas settings."""
-    bounds: List[float] = Field(..., min_length=4, max_length=4, description="[x_min, x_max, y_min, y_max]")
-    grid: float = Field(..., gt=0, description="Grid resolution in mm")
+    # Bounds can contain variables too
+    bounds: List[Union[float, str]] = Field(..., min_length=4, max_length=4, description="[x_min, x_max, y_min, y_max]")
+    grid: Union[float, str] = Field(..., description="Grid resolution in mm")
 
     @property
-    def x_min(self) -> float: return self.bounds[0]
+    def x_min(self) -> Union[float, str]: return self.bounds[0]
     @property
-    def x_max(self) -> float: return self.bounds[1]
+    def x_max(self) -> Union[float, str]: return self.bounds[1]
     @property
-    def y_min(self) -> float: return self.bounds[2]
+    def y_min(self) -> Union[float, str]: return self.bounds[2]
     @property
-    def y_max(self) -> float: return self.bounds[3]
+    def y_max(self) -> Union[float, str]: return self.bounds[3]
 
 
 # --- Element Param Schemas ---

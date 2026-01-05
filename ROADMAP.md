@@ -152,7 +152,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 
 ---
 
-## 12. UI Validation Layer [TODO]
+## 12. UI Validation Layer [DONE]
 
 **Objective:** Provide real-time schema validation feedback in the Streamlit editor.
 
@@ -179,7 +179,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 - [ ] Generate OpenAPI spec from Pydantic + FastAPI
 - [ ] Implement WebSocket for simulation progress updates
 - [ ] Use JSON Schema for dynamic form generation
-- [ ] Evaluate React vs. Angular based on team expertise
+- [ ] Evaluate React vs. Angular as alternative frontend frameworks
 
 **Note:** This is a significant undertaking requiring architectural changes. Consider as a separate project phase.
 
