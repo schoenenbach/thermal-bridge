@@ -1,7 +1,8 @@
 import numpy as np
 import sys
 # Import the class/config from main script
-from calculate_psi import ThermalSolver, CalculationConfig
+from config import CalculationConfig
+from thermal_solver import ThermalSolver
 
 def print_ascii_art():
     # Setup Case 3 Config
