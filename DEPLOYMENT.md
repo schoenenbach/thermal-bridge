@@ -49,6 +49,11 @@ Create a file `packages.txt`:
 ```text
 g++
 libgomp1
+libpango-1.0-0
+libpangoft2-1.0-0
+libcairo2
+libgdk-pixbuf-2.0-0
+shared-mime-info
 ```
 And ensure the solver is built. Since we can't easily run a build step in their pipeline, we can check in `app.py`:
 
