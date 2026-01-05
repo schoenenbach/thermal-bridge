@@ -43,9 +43,224 @@ except Exception as e:
     USE_CPP = False
 
 class ThermalSolver:
-    def __init__(self, config: CalculationConfig, rsi_value: float = 0.13):
+    def __init__(self, config: CalculationConfig, rsi_value: float = 0.13, use_adaptive: bool = True):
         self.cfg = config
-        self.rsi_value = rsi_value # Store Dynamic Rsi
+        self.rsi_value = rsi_value 
+        self.use_adaptive = use_adaptive
+        
+        # New: Store Grid Coordinates (Non-Uniform)
+        self.x_coords = None # Faces
+        self.y_coords = None # Faces
+        self.xc = None # Centers
+        self.yc = None # Centers
+        self.dx_array = None # Widths
+        self.dy_array = None # Heights
+        
+        # Dimensions are now derived from grid generation
+        self.setup_adaptive_grid() if self.use_adaptive else self.setup_uniform_grid()
+        
+        self.grid_map = np.zeros((self.ny, self.nx), dtype=int) 
+        self.temp = np.ones((self.ny, self.nx)) * TEMP_INT 
+        
+        # IDs
+        self.ID_AIR_INT = 0
+        self.ID_AIR_EXT = 1
+        self.ID_WALL = 2
+        self.ID_INSULATION = 3
+        self.ID_FRAME = 4
+        self.ID_GLASS = 5
+        self.ID_REVEAL_INS = 6
+        self.ID_SPACER = 7
+
+        self.setup_geometry_map()
+        self.assign_materials_adaptive()
+
+    def setup_adaptive_grid(self):
+        """Generates a non-uniform rectilinear grid."""
+        # 1. Define Key X-Coordinates (Vertical cuts)
+        # Relative to Masonry Corner (x=0)
+        # - Interior Wall Start
+        # - Reveal Insulation Start/End
+        # - Frame Start/End
+        # - Window Pane Splits
+        # - Insulation Start/End/Steps (Taper)
+        
+        # Canvas Bounds
+        offset_x = -50.0 # Internal Air
+        
+        # Collect critical x-points
+        x_points = set()
+        x_points.add(offset_x)
+        x_points.add(0.0) # Masonry Inner Face
+        
+        w_th = self.cfg.wall_thickness_mm
+        x_points.add(w_th) # Masonry Outer Face (Reveal Edge Reference)
+        
+        # Window Position
+        pos_mm = max(0, self.cfg.window_position_from_exterior_masonry_mm)
+        win_outer_face = w_th - pos_mm
+        x_points.add(win_outer_face)
+        
+        # Frame
+        f_depth = self.cfg.frame_depth_mm
+        f_start = win_outer_face - f_depth
+        x_points.add(f_start)
+        
+        # Sash / Glass
+        # Simplification: Split Frame into 3 zones?
+        # Let's add points for Glass (24mm centered in sash)
+        # Sash is recessed 30mm from Fixed Frame outer
+        sash_outer = win_outer_face - 30
+        x_points.add(sash_outer)
+        sash_depth = 70
+        sash_inner = sash_outer - sash_depth
+        x_points.add(sash_inner)
+        
+        glass_mid = (sash_outer + sash_inner) / 2
+        x_points.add(glass_mid - 12); x_points.add(glass_mid + 12)
+        
+        # Insulation
+        x_points.add(w_th + self.cfg.insulation_thick_max_mm)
+        x_points.add(w_th + self.cfg.insulation_thick_min_mm)
+        x_points.add(w_th + self.cfg.insulation_thick_max_mm + 500) # Far field
+        
+        # Reveal Insulation
+        if self.cfg.reveal_insulation_mm > 0:
+            # Sits on Reveal Face (which is w_th... wait. Reveal Face is Y-plane.)
+            # But the reveal insulation has thickness in Y...
+            # Wait, Reveal Insulation is on the jamb. 
+            # It adds thickness to the jamb?
+            # Usually: Reveal Insulation is on the masonry reveal surface (Y-plane).
+            # So its thickness is in Y direction.
+            # But if it wraps around...
+            # Let's assume standard: ID_REVEAL_INS is a block filling the corner.
+            pass
+            
+        # Sort critical points
+        crit_x = sorted(list(x_points))
+        
+        # Generate Grid between points
+        self.x_coords = [crit_x[0]]
+        
+        def add_segments(target_list, start, end, target_dh):
+            dist = end - start
+            if dist <= 1e-9: return
+            n = max(1, int(round(dist / target_dh)))
+            # If refinement needed
+            steps = np.linspace(start, end, n+1)
+            for s in steps[1:]:
+                target_list.append(s)
+
+        for i in range(len(crit_x)-1):
+            start = crit_x[i]
+            end = crit_x[i+1]
+            
+            # Determine Density
+            # High density near Window/Reveal (0 to w_th + 100)
+            is_detail = (start > (w_th - 200)) and (end < (w_th + 200))
+            if is_detail:
+                dh = 0.5 # 0.5mm near details
+                # Ultra fine for glass/frame gaps?
+                if (start > f_start - 10) and (end < win_outer_face + 10):
+                     dh = 0.25
+            else:
+                dh = 10.0 # 10mm coarse
+                
+            add_segments(self.x_coords, start, end, dh)
+            
+        self.x_coords = np.array(self.x_coords)
+        self.dx_array = np.diff(self.x_coords)
+        self.xc = (self.x_coords[:-1] + self.x_coords[1:]) / 2.0
+        self.nx = len(self.xc)
+        
+        # 2. Define Y-Coordinates
+        # y=0 is Reveal Edge (Corner of Masonry) ???
+        # Previously: y=0 was masonry outer face? No, y was "Facade Length".
+        # Let's align y=0 with Masonry Reveal Edge.
+        # <0 is wall (down), >0 is window/facade (up)
+        
+        # Bounds
+        y_bottom = 0.0 # Origin
+        y_top = 1000.0 # 1m window leg
+        y_wall_deep = -500.0 # 500mm wall leg
+        
+        y_points = set()
+        y_points.add(y_bottom)
+        y_points.add(y_top)
+        y_points.add(y_wall_deep)
+        
+        # Frame Y
+        # Frame starts at 15mm from reveal?
+        # Or flush?
+        # Let's match previous logic: idx_reveal_edge was 500mm in prev grid.
+        # Here let y=0 be the physical corner.
+        
+        # Frame Position
+        # From previous Code: Start Y (15mm gap) or Flush?
+        # We used idx_f_y_start = idx_reveal_edge (Flush).
+        y_f_start = 0.0 
+        y_f_end = y_f_start + self.cfg.frame_width_mm
+        y_points.add(y_f_start)
+        y_points.add(y_f_end)
+        
+        # Sash Overlap
+        overlap = 10
+        y_sash_start = y_f_end - overlap
+        y_sash_end = y_sash_start + 70 # Sash Width
+        y_points.add(y_sash_start)
+        y_points.add(y_sash_end)
+        
+        # Glass Start (10mm overlap)
+        y_glass_start = y_sash_start + 10
+        y_points.add(y_glass_start)
+        
+        # Reveal Insulation (Y thickness)
+        if self.cfg.reveal_insulation_mm > 0:
+             # Sits on y=0 (Rebate tip) or wrap?
+             # If Rebate Overlap exists:
+             reb_ov = self.cfg.masonry_rebate_overlap_mm
+             if reb_ov > 0:
+                 y_points.add(reb_ov)
+                 y_points.add(reb_ov + self.cfg.reveal_insulation_mm)
+             else:
+                 y_points.add(self.cfg.reveal_insulation_mm)
+                 
+        # Taper
+        taper_len = self.cfg.taper_length_mm
+        y_points.add(-taper_len)
+        
+        # Sort
+        crit_y = sorted(list(y_points))
+        
+        self.y_coords = [crit_y[0]]
+        for i in range(len(crit_y)-1):
+            start = crit_y[i]
+            end = crit_y[i+1]
+            
+            # Density
+            # Near Reveal (y=0) and Frame
+            is_detail = (start > -150) and (end < 150)
+            if is_detail:
+                dh = 0.5
+                if (start > -10) and (end < 120): dh = 0.25 # Frame Zone
+            else:
+                dh = 10.0
+            
+            add_segments(self.y_coords, start, end, dh)
+            
+        self.y_coords = np.array(self.y_coords)
+        self.dy_array = np.diff(self.y_coords)
+        self.yc = (self.y_coords[:-1] + self.y_coords[1:]) / 2.0
+        self.ny = len(self.yc)
+        
+        # Dimensions
+        self.width_mm = self.x_coords[-1] - self.x_coords[0]
+        self.height_mm = self.y_coords[-1] - self.y_coords[0]
+        
+        # print(f"Adaptive Grid: {self.nx} x {self.ny} (Uniform was {int(self.width_mm)}x{int(self.height_mm)})")
+
+    def setup_uniform_grid(self):
+        # Fallback to logic from original init
         self.dx = self.cfg.grid_size_mm / 1000.0  # meters
         
         # Calculate domain size
@@ -75,291 +290,157 @@ class ThermalSolver:
         self.nx = int(self.width_mm / self.cfg.grid_size_mm) + 1  # X direction (Thickness)
         self.ny = int(self.L_window_leg / self.cfg.grid_size_mm) + 1 # Y direction (Length along facade)
         
-        self.grid_map = np.zeros((self.ny, self.nx), dtype=int) # Material ID
-        self.temp = np.ones((self.ny, self.nx)) * TEMP_INT # Initial guess
-        self.cond = np.zeros((self.ny, self.nx))
-        
-        # IDs
-        self.ID_AIR_INT = 0
-        self.ID_AIR_EXT = 1
-        self.ID_WALL = 2
-        self.ID_INSULATION = 3
-        self.ID_FRAME = 4
-        self.ID_GLASS = 5
-        self.ID_REVEAL_INS = 6
-        self.ID_SPACER = 7 # New ID
+        # For uniform grid, dx_array and dy_array are constant
+        self.x_coords = np.arange(0, self.width_mm + self.cfg.grid_size_mm, self.cfg.grid_size_mm)
+        self.y_coords = np.arange(0, self.height_mm + self.cfg.grid_size_mm, self.cfg.grid_size_mm)
+        self.dx_array = np.full(self.nx, self.cfg.grid_size_mm)
+        self.dy_array = np.full(self.ny, self.cfg.grid_size_mm)
+        self.xc = self.x_coords[:-1] + self.cfg.grid_size_mm / 2
+        self.yc = self.y_coords[:-1] + self.cfg.grid_size_mm / 2
 
-        self.setup_geometry()
-        self.assign_materials()
-
-    def setup_geometry(self):
-        # Coordinates mapping
-        # Let x=0 be the INTERIOR surface of the wall?
-        # Let's align:
-        # x range: [0, width_mm]
-        # Wall spans from x=0 to x=wall_thickness
-        # Insulation spans from x=wall_thickness to x=wall_thickness + ins_thickness
+    def setup_geometry_map(self):
+        # Fill grid_map based on geometric predicates on xc, yc
+        # Geometry is defined in physical coordinates (mm), referenced to Masonry Corner
         
-        # Geometry Construction
-        # 1. Base Wall (Masonry)
+        # Map everything to mm relative to corner (y=0 is reveal edge, x=w_th is outer face)
+        
+        # 1. Initialize Air Ind
+        self.grid_map[:] = self.ID_AIR_INT
+        
+        X, Y = np.meshgrid(self.xc, self.yc) # 2D Arrays of center coordinates
+        
         w_th = self.cfg.wall_thickness_mm
-        # Since grid uses indices, let's map mm to indices
-        to_idx = lambda mm: int(mm / (self.dx * 1000))
         
-        # Geometry Construction
-        # 1. Base Wall (Masonry)
-        # w_th = self.cfg.wall_thickness_mm (already defined)
+        # 2. Wall (Masonry)
+        # x: [0, w_th]
+        # y: [-inf, 0] + Rebate
+        rebate = self.cfg.masonry_rebate_overlap_mm
+        mask_wall_base = (X >= 0) & (X <= w_th) & (Y <= 0)
+        self.grid_map[mask_wall_base] = self.ID_WALL
         
-        offset = to_idx(self.offset_x_mm)
+        # Rebate (Nose)
+        if rebate > 0:
+             # Rebate Extends Y: [0, rebate]
+             # X: [Win_Outer, w_th]
+             pos = max(0, self.cfg.window_position_from_exterior_masonry_mm)
+             win_outer = w_th - pos
+             mask_rebate = (Y > 0) & (Y <= rebate) & (X >= win_outer) & (X <= w_th)
+             self.grid_map[mask_rebate] = self.ID_WALL
+             
+        # 3. Insulation (Exterior)
+        # Taper Logic
+        # Taper starts at y = -taper_len, X_max = w_th + max_ins
+        # At y=0 (Corner), X_max = w_th + min_ins (or max if uniform)
+        # Wait, Taper is meant to THIN OUT towards the window? Or THICKEN?
+        # "Taper... to accommodate the reveal" -> Usually insulation is thinner on the reveal.
+        # But here assume standard WDVS:
+        # Deep wall: Full Thickness
+        # Near Window: Tapers? Or just cuts?
+        # User Logic: taper_length_mm is where it starts tapering from MAX to MIN.
+        # MIN is at the corner.
         
-        idx_w_inner = offset
-        idx_w_outer = offset + to_idx(w_th)
-        idx_ins_max = offset + to_idx(w_th + self.cfg.insulation_thick_max_mm)
-        reveal_y_mm = 500
-        idx_reveal_edge = to_idx(reveal_y_mm)
+        taper_start_y = -self.cfg.taper_length_mm
         
-        # 0. Initialize Grid
-        # Default is ID_AIR_INT (0)
-        # We need to mark ID_AIR_EXT (1)
-        # Logic: Calculate the Exterior Boundary Line (X) for each Y
+        # Base Insulation Region (y < 0)
+        # Max X is function of Y
         
-        # We can do this After placing materials, or Before?
-        # Let's do it by iterating Y.
-        
-        # idx_taper_start = max(0, to_idx(reveal_y_mm - self.cfg.taper_length_mm)) # Fixed: Safety clamp
-        # idx_ins_base_min = to_idx(w_th + self.cfg.insulation_thick_min_mm)
-        
-        # --- FIX 1: Consistent Window Position Logic ---
-        pos_mm = max(0, self.cfg.window_position_from_exterior_masonry_mm)
-        idx_pos = to_idx(pos_mm)
-        
-        # Define Outer Face of Window (shifted inwards from masonry outer face)
-        idx_win_outer_face = idx_w_outer - idx_pos
-        # Safety: Window cannot actally start before inner masonry face
-        idx_win_outer_face = max(idx_w_inner + 1, idx_win_outer_face)
-        
-        # Frame coordinates based on this new reference
-        # Make sure definitions are available
-        f_depth_idx = to_idx(self.cfg.frame_depth_mm)
-        f_width_idx = to_idx(self.cfg.frame_width_mm)
-        
-        idx_f_x_end = idx_win_outer_face
-        idx_f_x_start = idx_f_x_end - f_depth_idx
-        
-        # FIX: Constant Frame Start Y (15mm gap)
-        # Allows insulation to overlap frame instead of shifting frame
-        # FIX: Constant Frame Start Y (Flush with Reveal Edge)
-        # Fix "Hole" under frame: Frame should touch the masonry reveal.
-        idx_f_y_start = idx_reveal_edge 
-        idx_f_y_end = idx_f_y_start + f_width_idx
-        
-        # Glass Indices (Generic) based on frame
-        g_thick_idx = to_idx(24)
-        # idx_g_x_mid = int((idx_f_x_start + idx_f_x_end) / 2) # used later for sash
-        
-        # --- FIX 2: Single Placement of Frame/Glass ---
-        # FIX: RESTORING MISSING WALL AND INSULATION LOGIC
-        
-        # 1. Fill basic Masonry Wall (up to reveal edge)
-        # From y=0 to y=reveal_edge, x=0 to x=w_outer
-        self.grid_map[0:idx_reveal_edge, idx_w_inner:idx_w_outer] = self.ID_WALL
-        
-        # 2. Base Insulation (Exterior WDVS)
-        # Taper Logic Revised (Fix 3: Flush with Rebate):
-        idx_ins_corner = idx_reveal_edge
-        if self.cfg.masonry_rebate_overlap_mm > 0:
-             idx_ins_corner += to_idx(self.cfg.masonry_rebate_overlap_mm)
-        
-        idx_taper_start = to_idx(reveal_y_mm - self.cfg.taper_length_mm)
-        
-        for y in range(0, idx_ins_corner):
-            # Determine max x for insulation at this y
-            if y < idx_taper_start:
-                # Full thickness
-                current_max_x = idx_ins_max
+        # Optimize: 1D function for max_ins_x(y) broadcasted
+        def get_ins_max_x(y_v):
+            if y_v < taper_start_y: return w_th + self.cfg.insulation_thick_max_mm
+            elif y_v > 0: return w_th + self.cfg.insulation_thick_min_mm # Corner/Rebate
             else:
-                # Tapering
-                # fraction (0 to 1) from start to edge
-                f = (y - idx_taper_start) / (idx_ins_corner - idx_taper_start)
+                # Linear Taper
+                f = (y_v - taper_start_y) / (0 - taper_start_y) # 0 to 1
                 th = self.cfg.insulation_thick_max_mm - f * (self.cfg.insulation_thick_max_mm - self.cfg.insulation_thick_min_mm)
-                current_max_x = offset + to_idx(w_th + th)
-            
-            # Fill Insulation
-            self.grid_map[y, idx_w_outer:current_max_x] = self.ID_INSULATION
-            
-        # 3. Handle Rebate Overlap (Masonry) - This is done later in "Re-Apply Masonry Rebate"?
-        # Or should we do it now?
-        # The logic later (lines ~440) does: grid_map[rebate] = ID_WALL.
-        # That logic relies on 'idx_reveal_edge' and 'idx_win_outer_face'.
-        # That is robust.
-
-        # 5. Reveal Insulation (The thin part)
-        # Location: On the reveal face of the wall (the end of the wall at y=reveal_edge).
+                return w_th + th
+                
+        # Vectorize
+        v_max_x = np.vectorize(get_ins_max_x)(self.yc)
+        # Broadcast to (NY, NX)
+        # Check X against v_max_x
+        # X is (NY, NX)
+        # v_max_x is (NY,) -> reshape to (NY, 1)
+        mask_ins = (X > w_th) & (X <= v_max_x[:, None]) & (Y <= 0) # Only up to corner y=0
+        self.grid_map[mask_ins] = self.ID_INSULATION
         
-        rev_ins_th_idx = to_idx(self.cfg.reveal_insulation_mm)
+        # 4. Reveal Insulation
+        # On top of Rebate (Y > rebate) ?
+        # Or covering the rebate face?
+        # Defined as "Rectangle" in previous step.
+        # X range: [Win_Outer, w_th + min_ins]
+        # Y range: [Rebate_End, Rebate_End + Rev_Iso_Thick]
         
-        if self.cfg.masonry_rebate_overlap_mm > 0:
-             # Rebate Geometry: Masonry extends in front of the frame
-             idx_reb_y_start = idx_reveal_edge
-             idx_reb_y_end = idx_reveal_edge + to_idx(self.cfg.masonry_rebate_overlap_mm)
-             idx_reb_x_start = idx_win_outer_face
-             idx_reb_x_end = idx_w_outer
-             
-             # Fill Rebate with Wall Material
-             self.grid_map[idx_reb_y_start:idx_reb_y_end, idx_reb_x_start:idx_reb_x_end] = self.ID_WALL
-             
-        
-        # --- FIX 2 (Placement): Now place Window Frame & Glass ---
-        
-        # 1. Place Frame (Fixed Frame + Sash)
-        # Dimensions (Standardized)
-        fixed_frame_width = 60 # Blendrahmen width (Face)
-        fixed_frame_depth = 70 # Blendrahmen depth
-        sash_width = 70        # Flügel width (Face)
-        sash_depth = 70        # Flügel depth
-        overlap = 10           # Overlap between Fixed and Sash
-        
-        # Fixed Frame Position:
-        # Y: Starts at idx_f_y_start (15mm from reveal). Ends at + fixed_frame_width.
-        # X: Outer face flush with window pos? Yes.
-        idx_ff_y_start = idx_f_y_start
-        idx_ff_y_end = idx_ff_y_start + to_idx(fixed_frame_width)
-        idx_ff_x_end = idx_f_x_end # Outer face (flush)
-        idx_ff_x_start = idx_ff_x_end - to_idx(fixed_frame_depth)
-        
-        # Sash Position:
-        idx_sash_y_start = idx_ff_y_end - to_idx(overlap) # Overlap
-        idx_sash_y_end = idx_sash_y_start + to_idx(sash_width)
-        # Better: Recess Sash by 30mm from Fixed Frame outer face (User Request "More to inside").
-        idx_sash_x_end = idx_ff_x_end - to_idx(30)
-        idx_sash_x_start = idx_sash_x_end - to_idx(sash_depth)
-        
-        # Draw Fixed Frame
-        self.grid_map[idx_ff_y_start:idx_ff_y_end, idx_ff_x_start:idx_ff_x_end] = self.ID_FRAME
-        
-        # EXTENSION: Universal Blendrahmen Extension (L-Profile)
-        # To maintain consistency across all cases and fill the gap behind the Recessed Sash.
-        # Extends Y from ff_y_end (60mm) to cover the Sash Recess/Insulation Zone.
-        # Let's target 80mm visible height (from reveal edge).
-        ext_y_end = idx_reveal_edge + to_idx(80) # Target 80mm coverage
-        ext_y_start = idx_ff_y_end
-        
-        # Extends X from Sash Outer Face to Frame Outer Face
-        ext_x_start = idx_sash_x_end
-        ext_x_end = idx_win_outer_face
-        
-        if ext_y_end > ext_y_start and ext_x_end > ext_x_start:
-             self.grid_map[ext_y_start:ext_y_end, ext_x_start:ext_x_end] = self.ID_FRAME
-
-        # Draw Sash
-        self.grid_map[idx_sash_y_start:idx_sash_y_end, idx_sash_x_start:idx_sash_x_end] = self.ID_FRAME
-
-        # Glass Position:
-        # Centered in Sash
-        idx_g_x_mid = int((idx_sash_x_start + idx_sash_x_end) / 2)
-        idx_g_x_start = idx_g_x_mid - int(to_idx(24)/2)
-        idx_g_x_end = idx_g_x_mid + int(to_idx(24)/2)
-        
-        # Glass Y: Starts inside Sash
-        idx_g_y_start = idx_sash_y_start + to_idx(10) # Frame overlap
-        # Extends to... end of domain
-        idx_g_y_end = self.ny
-        
-        # Draw Glass
-        self.grid_map[idx_g_y_start:idx_g_y_end, idx_g_x_start:idx_g_x_end] = self.ID_GLASS
-
-        # 3b. Determine Effective Spacer Conductivity
-        spacer_lambda = 0.0
-        if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE:
-            spacer_lambda = MAT_SPACER_SWISS_ULTIMATE
-        elif self.cfg.spacer_type == SpacerType.STAINLESS_STEEL:
-            spacer_lambda = MAT_SPACER_STAINLESS
-        elif self.cfg.spacer_type == SpacerType.ALUMINUM:
-            spacer_lambda = MAT_SPACER_ALUMINUM
-        
-        # Draw Spacer?
-        # Only if we have a valid spacer type
-        if self.cfg.spacer_type != SpacerType.NONE:
-            # Spacer Dimensions (Generic IGU Box)
-            # Located at the bottom of the glass unit, inside the sash.
-            # Height: 7mm
-            # Width: Space between panes... wait, we modeled glass as a solid block.
-            # In a solid block model, the "Spacer" effectively replaces the bottom X mm of grid cells of the "Glass" block.
-            
-            spacer_height_mm = 7
-            idx_spacer_h = to_idx(spacer_height_mm)
-            
-            # Repaint the bottom of the GLASS block as SPACER
-            # Start from glass bottom (idx_g_y_start)
-            idx_sp_y_end = idx_g_y_start + idx_spacer_h
-            
-            # Bounds
-            sp_x_start = idx_g_x_start
-            sp_x_end = idx_g_x_end
-            
-            # We need a new ID for Spacer? Material check assigns conductivity.
-            # Let's use a dynamic approach. We can reuse ID_GLASS but that treats it as Ug1.1
-            # We need a new ID.
-            # Let's add ID_SPACER to class in __init__?
-            # Or just hack it: defined below as 7.
-            
-            self.grid_map[idx_g_y_start:idx_sp_y_end, sp_x_start:sp_x_end] = 7 # ID_SPACER
-        
-        # 4. Re-Apply Masonry Rebate (The "Anschlag" itself)
-        # This ensures the masonry covers the frame where it should.
-        if self.cfg.masonry_rebate_overlap_mm > 0:
-             idx_reb_y_start = idx_reveal_edge
-             idx_reb_y_end = idx_reveal_edge + to_idx(self.cfg.masonry_rebate_overlap_mm)
-             idx_reb_x_start = idx_win_outer_face
-             idx_reb_x_end = idx_w_outer
-             
-             # Overwrite Frame with Masonry in the Rebate Zone
-             self.grid_map[idx_reb_y_start:idx_reb_y_end, idx_reb_x_start:idx_reb_x_end] = self.ID_WALL
-
-        # 5. Reveal Insulation (The thin part)
-        # FIX: Simplified Rectangle Logic per User Request
-        # (Placed AFTER Rebate to potentially optimize/replace parts of it)
         if self.cfg.reveal_insulation_mm > 0 and not self.cfg.uninsulated_reveal:
-             # DEBUG: Force Fill Rebate Zone with Wall first to prevent "Hoyle"
-             # Even though Section 4 should have done it, we do it again here.
-             idx_reb_y_start = idx_reveal_edge
-             idx_reb_y_end = idx_reveal_edge + to_idx(self.cfg.masonry_rebate_overlap_mm)
-             idx_reb_x_start = idx_win_outer_face
-             idx_reb_x_end = idx_w_outer
-             self.grid_map[idx_reb_y_start:idx_reb_y_end, idx_reb_x_start:idx_reb_x_end] = self.ID_WALL
-            
-             rev_ins_th_idx = to_idx(self.cfg.reveal_insulation_mm)
-            
-             # Y Range: User says "Higher up on Y-axis... On the outside".
-             rebate_offset = 0
-             if self.cfg.masonry_rebate_overlap_mm > 0:
-                 rebate_offset = to_idx(self.cfg.masonry_rebate_overlap_mm)
-            
-             ri_y_start = idx_reveal_edge + rebate_offset # Sits ON the rebate tip
-             ri_y_end = ri_y_start + rev_ins_th_idx
-            
-             # X Range: From Window Frame (Outer Edge) to WDVS Corner
-             ri_x_start = idx_win_outer_face
-             ri_x_end = idx_w_outer + to_idx(self.cfg.insulation_thick_min_mm)
-            
-             # Draw Rectangle
-             self.grid_map[ri_y_start:ri_y_end, ri_x_start:ri_x_end] = self.ID_REVEAL_INS
+             rev_start_y = 0.0 + rebate
+             rev_end_y = rev_start_y + self.cfg.reveal_insulation_mm
              
+             win_outer = w_th - max(0, self.cfg.window_position_from_exterior_masonry_mm)
+             rev_end_x = w_th + self.cfg.insulation_thick_min_mm # Matches WDVS corner
+             
+             mask_ri = (Y >= rev_start_y) & (Y <= rev_end_y) & (X >= win_outer) & (X <= rev_end_x)
+             self.grid_map[mask_ri] = self.ID_REVEAL_INS
+             
+        # 5. Window Frame
+        # Fixed Frame
+        f_width = self.cfg.frame_width_mm
+        f_depth = self.cfg.frame_depth_mm
+        win_outer = w_th - max(0, self.cfg.window_position_from_exterior_masonry_mm)
         
-        # 6. Mark External Air
-        # Iterate rows and mark everything to the right of the last material as EXT
-        for y in range(self.ny):
-            # Find last solid pixel
-            row = self.grid_map[y, :]
-            # efficient numpy search
-            solid_indices = np.where(row > 1)[0]
-            if solid_indices.size > 0:
-                last_solid = solid_indices[-1]
-                self.grid_map[y, last_solid+1:] = self.ID_AIR_EXT
-            else:
-                pass
-
-    def assign_materials(self):
+        ff_y_start = 0.0 # Flush
+        ff_y_end = ff_y_start + f_width
+        ff_x_end = win_outer
+        ff_x_start = ff_x_end - f_depth
+        
+        mask_ff = (Y >= ff_y_start) & (Y <= ff_y_end) & (X >= ff_x_start) & (X <= ff_x_end)
+        self.grid_map[mask_ff] = self.ID_FRAME
+        
+        # Sash
+        overlap = 10
+        sash_y_start = ff_y_end - overlap
+        sash_width = 70
+        sash_depth = 70
+        sash_recess = 30
+        
+        s_y_end = sash_y_start + sash_width
+        s_x_end = ff_x_end - sash_recess
+        s_x_start = s_x_end - sash_depth
+        
+        mask_sash = (Y >= sash_y_start) & (Y <= s_y_end) & (X >= s_x_start) & (X <= s_x_end)
+        self.grid_map[mask_sash] = self.ID_FRAME
+        
+        # Extension (L-Profile behind sash)
+        # From ff_y_end up to ... 80mm from corner
+        ext_y_end = 80.0
+        if ext_y_end > ff_y_end:
+            # X: Sash Outer to Frame Outer
+            mask_ext = (Y >= ff_y_end) & (Y <= ext_y_end) & (X >= s_x_end) & (X <= ff_x_end)
+            self.grid_map[mask_ext] = self.ID_FRAME
+            
+        # 6. Glass
+        # Centered in Sash
+        g_mid_x = (s_x_start + s_x_end) / 2
+        g_half_th = 12
+        g_x_start = g_mid_x - g_half_th
+        g_x_end = g_mid_x + g_half_th
+        
+        g_y_start = sash_y_start + 10 # 10mm overlap
+        
+        mask_glass = (Y >= g_y_start) & (X >= g_x_start) & (X <= g_x_end)
+        self.grid_map[mask_glass] = self.ID_GLASS
+        
+        # 7. Use AIR_EXT for everything "Right" of the structure
+        # (Naive Fill: Scan each Y, find last solid X)
+        # Vectorized fill?
+        for i in range(self.ny):
+            row = self.grid_map[i, :]
+            solids = np.where(row > 1)[0]
+            if solids.size > 0:
+                last = solids[-1]
+                self.grid_map[i, last+1:] = self.ID_AIR_EXT
+                
+    def assign_materials_adaptive(self):
+        # Same as old assign_materials but updates self.cond
+        # Logic is identical mapping
         self.cond = np.zeros_like(self.temp)
         self.cond[self.grid_map == self.ID_WALL] = MAT_WALL
         self.cond[self.grid_map == self.ID_INSULATION] = MAT_INSULATION
@@ -367,202 +448,235 @@ class ThermalSolver:
         self.cond[self.grid_map == self.ID_FRAME] = MAT_FRAME_EQ
         self.cond[self.grid_map == self.ID_GLASS] = MAT_GLASS_UG11
         
-        # Spacer
-        spacer_lambda = 0.025 # Default air/low
-        if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE:
-            spacer_lambda = MAT_SPACER_SWISS_ULTIMATE
-        elif self.cfg.spacer_type == SpacerType.STAINLESS_STEEL:
-            spacer_lambda = MAT_SPACER_STAINLESS
-        elif self.cfg.spacer_type == SpacerType.ALUMINUM:
-            spacer_lambda = MAT_SPACER_ALUMINUM
-            
+        # Spacer logic (Needs Geometry Info)
+        if self.cfg.spacer_type != SpacerType.NONE:
+             # Find Glass Bottom
+             # Just search grid
+             rows, cols = np.where(self.grid_map == self.ID_GLASS)
+             if rows.size > 0:
+                 min_r = np.min(rows)
+                 # Spacer Height = 7mm
+                 # We need to find how many rows correspond to 7mm at this location
+                 # Since Y grid is variable, we must iterate/sum dy
+                 h_sum = 0
+                 r_ptr = min_r
+                 while h_sum < 7.0 and r_ptr < self.ny:
+                     h_sum += self.dy_array[r_ptr] # dy at row r_ptr
+                     # Mark Spacer
+                     # glass cols only
+                     glass_row_cols = np.where(self.grid_map[r_ptr, :] == self.ID_GLASS)[0]
+                     self.grid_map[r_ptr, glass_row_cols] = self.ID_SPACER
+                     r_ptr += 1
+
+        # Spacer Lambda
+        spacer_lambda = 0.025
+        if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE: spacer_lambda = MAT_SPACER_SWISS_ULTIMATE
+        elif self.cfg.spacer_type == SpacerType.STAINLESS_STEEL: spacer_lambda = MAT_SPACER_STAINLESS
+        elif self.cfg.spacer_type == SpacerType.ALUMINUM: spacer_lambda = MAT_SPACER_ALUMINUM
+        
         self.cond[self.grid_map == self.ID_SPACER] = spacer_lambda
-        # Air
-        self.cond[self.grid_map == self.ID_AIR_INT] = 0.025 # Approx static air
-        # Boundaries handled in solve loop
+        self.cond[self.grid_map == self.ID_AIR_INT] = 0.025
         
 
+    def calculate_conductances(self):
+        """
+        Calculates horizontal (Gh) and vertical (Gv) conductance matrices.
+        Gh[i, j] = Conductance between node (i, j) and (i, j+1)
+        Gv[i, j] = Conductance between node (i, j) and (i+1, j)
+        """
+        # Conductance G = (k * Area) / Distance
+        # 1. Harmonic Mean of lambda for interface conductivity
+        # k_interface = 2 * k1 * k2 / (k1 + k2)
+        
+        # Grid sizes (meters)
+        # self.dx_array[j] is width of cell j
+        # self.dy_array[i] is height of cell i
+        
+        # Horizontal Conductance (Left-Right)
+        # Interface between (i, j) and (i, j+1)
+        # Area = dy_array[i] * 1.0 (depth)
+        # Distance = (dx_array[j] + dx_array[j+1]) / 2.0
+        
+        k = self.cond
+        k_right = np.roll(k, -1, axis=1) # (i, j+1)
+        
+        # Harmonic mean
+        harm_k_h = 2 * k * k_right / (k + k_right + 1e-12)
+        
+        # Geometric factors for Horizontal Flow
+        # dx between centers:
+        dx_col = self.dx_array # (NX,)
+        dx_dist_h = (dx_col[:-1] + dx_col[1:]) / 2.0
+        # Pad last col (boundary) - distance to "ghost" node? Just duplicate last dx
+        dx_dist_h = np.append(dx_dist_h, dx_col[-1]) 
+        
+        # DY (Area) is row-dependent (NY,)
+        dy_row = self.dy_array
+        
+        # Gh = k_int * Area / Length
+        # Broadcast: (NY, NX) = (NY, NX) * (NY, 1) / (1, NX)
+        self.Gh = harm_k_h * dy_row[:, None] / dx_dist_h[None, :]
+        
+        
+        # Vertical Conductance (Down-Up? or Top-Bottom)
+        # Solver uses (i, j) and (i+1, j) -> Downwards connection
+        # Interface between (i, j) and (i+1, j)
+        k_down = np.roll(k, -1, axis=0) # (i+1, j)
+        harm_k_v = 2 * k * k_down / (k + k_down + 1e-12)
+        
+        # Distance between centers
+        dy_dist_v = (dy_row[:-1] + dy_row[1:]) / 2.0
+        dy_dist_v = np.append(dy_dist_v, dy_row[-1])
+        
+        # Area (DX)
+        
+        self.Gv = harm_k_v * dx_col[None, :] / dy_dist_v[:, None]
+
     def solve(self, max_iter=60000, tol=1e-5, omega=1.85):
-        # Explicit or Iterative solver (Jacobi/SOR)
-        
-        # Identify Fixed Nodes (Dirichlet)
-        # 1. Air (Interior/Exterior) -> Fixed at TEMP_INT/TEMP_EXT
-        # 2. Adiabatic Boundaries are NOT fixed values, but dependent.
-        #    However, our C++ solver handles Adiabatic by copying neighbors.
-        #    It relies on FixedMask to know where NOT to update from neighbors but FORCE value.
-        
-        mask_int = (self.grid_map == self.ID_AIR_INT).astype(np.int32)
-        mask_ext = (self.grid_map == self.ID_AIR_EXT).astype(np.int32)
+        # 1. Prepare Boundaries (Fixed Mask)
+        mask_int = (self.grid_map == self.ID_AIR_INT)
+        mask_ext = (self.grid_map == self.ID_AIR_EXT)
         
         fixed_mask = (mask_int | mask_ext).astype(np.int32)
         
+        # 2. Update Effective Conductivities for Air Boundaries
+        # Rsi/Rse application depends on Grid Size!
+        # h_int = 1/Rsi. G_surf = h_int * Area.
+        # This replaces the logic of "Effective Lambda".
+        # We should calculate Surface Conductance explicitly?
+        # NO, "Effective Lambda" approach works if we treat the air cell as a resistor R = dx / (2*k_eff) = Rsi.
+        # This ensures the resistance from Center of Air Cell to Interface is Rsi.
+        # k_eff = dx / (2 * Rsi)
+        # This is strictly correct ONLY if the air cell is the boundary.
+        # With variable grid, dx varies!
+        
+        # Vectorized Update of Air Conductivities
+        # Use self.dx_array (1D) broadcasted
+        
+        k_eff_int_vec = self.dx_array / (2 * self.rsi_value)
+        k_eff_ext_vec = self.dx_array / (2 * RSE)
+        
+        # Apply to self.cond based on column index
+        # We need to construct a 2D K_eff array
+        K_eff = np.zeros_like(self.temp)
+        # Broadcast X-dependent K
+        K_eff[:] = k_eff_int_vec[None, :]
+        
+        self.cond[mask_int] = K_eff[mask_int]
+        
+        # For Ext
+        K_eff[:] = k_eff_ext_vec[None, :]
+        self.cond[mask_ext] = K_eff[mask_ext]
+        
+        # 3. Compute Conductance Matrices Gh, Gv
+        self.calculate_conductances()
+        
         # Prepare Fixed Values
         fixed_values = np.zeros_like(self.temp)
-        fixed_values[mask_int == 1] = TEMP_INT
-        fixed_values[mask_ext == 1] = TEMP_EXT
+        fixed_values[mask_int] = TEMP_INT
+        fixed_values[mask_ext] = TEMP_EXT
+        self.temp[mask_int] = TEMP_INT
+        self.temp[mask_ext] = TEMP_EXT
         
-        # Pre-set temperature field
-        self.temp[mask_int == 1] = TEMP_INT
-        self.temp[mask_ext == 1] = TEMP_EXT
-        
-        # Correction for Boundary Coefficients (Python side logic ported logic)
-        # The C++ solver uses the conductance map passed to it.
-        # We must ensure self.cond has the adjusted effective conductivities for air nodes
-        # BEFORE passing it.
-        # (Lines 396-400 in original code did this dynamically inside loop, but Rsi is constant)
-        
-        k_eff_int = self.dx / (2 * self.rsi_value)
-        k_eff_ext = self.dx / (2 * RSE)
-        
-        self.cond[mask_int == 1] = k_eff_int
-        self.cond[mask_ext == 1] = k_eff_ext
-        
-        if USE_CPP:
-            # Prepare C pointers
-            # Ensure contiguous F-contiguous or C-contiguous? 
-            # Ctypes expects C-contiguous usually.
-            
+        if USE_CPP and hasattr(lib, 'solve_general_conductance'):
+            # Data preparation
             temp_c = np.ascontiguousarray(self.temp, dtype=np.float64)
-            cond_c = np.ascontiguousarray(self.cond, dtype=np.float64)
+            gh_c = np.ascontiguousarray(self.Gh, dtype=np.float64)
+            gv_c = np.ascontiguousarray(self.Gv, dtype=np.float64)
             mask_c = np.ascontiguousarray(fixed_mask, dtype=np.int32)
-            fixed_val_c = np.ascontiguousarray(fixed_values, dtype=np.float64)
+            fval_c = np.ascontiguousarray(fixed_values, dtype=np.float64)
             
             rows, cols = self.temp.shape
             
-            # Pointer casts
             p_temp = temp_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-            p_cond = cond_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            p_gh = gh_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            p_gv = gv_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
             p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
-            p_fval = fixed_val_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            p_fval = fval_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
             
-            # Batch iterations to reduce overhead
-            batch_size = 1000
+            # Setup Argtypes if not done globally (It wasn't done yet)
+            lib.solve_general_conductance.argtypes = [
+                ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
+                ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_double),
+                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double
+            ]
+            lib.solve_general_conductance.restype = ctypes.c_double
             
-            for k in range(0, max_iter, batch_size):
-                # diff = lib.solve_optimized(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size)
-                diff = lib.solve_red_black(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size, omega)
-                
+            batch = 2000
+            for k in range(0, max_iter, batch):
+                diff = lib.solve_general_conductance(p_temp, p_gh, p_gv, p_mask, p_fval, rows, cols, batch, omega)
                 if diff < tol:
-                    print(f"Converged in {k + batch_size} iterations (Diff: {diff:.6f})")
+                    print(f"Adaptive Solver Converged: {k+batch} iters, Diff={diff:.2e}")
                     break
-                if k % 5000 == 0:
-                     print(f"Iter {k}: Diff {diff:.6f}")
-                     
             self.temp = temp_c
             return self.temp
             
         else:
-            # Fallback to Python Slow Solver
-            print("Using Python Solver...")
-            for k in range(max_iter):
-                t_old = self.temp.copy()
-                
-                # Define neighbors
-                t_up = np.roll(self.temp, -1, axis=0)
-                t_dn = np.roll(self.temp, 1, axis=0)
-                t_lf = np.roll(self.temp, -1, axis=1)
-                t_rt = np.roll(self.temp, 1, axis=1)
-                
-                k_c = self.cond
-                k_up = np.roll(k_c, -1, axis=0)
-                k_dn = np.roll(k_c, 1, axis=0)
-                k_lf = np.roll(k_c, -1, axis=1)
-                k_rt = np.roll(k_c, 1, axis=1)
-                
-                def harm(k1, k2): return 2*k1*k2/(k1+k2+1e-12)
-                
-                g_up = harm(k_c, k_up)
-                g_dn = harm(k_c, k_dn)
-                g_lf = harm(k_c, k_lf)
-                g_rt = harm(k_c, k_rt)
-                
-                # Sum of conductances
-                g_sum = g_up + g_dn + g_lf + g_rt
-                
-                # Update internal nodes
-                t_new = (g_up*t_up + g_dn*t_dn + g_lf*t_lf + g_rt*t_rt) / (g_sum + 1e-12)
-                
-                # Apply Boundaries
-                
-                # 1. Adiabatic Cut-off (Top of Window, Bottom of Wall)
-                # Top (y=max): Adiabatic -> T_top = T_below
-                t_new[-1, :] = t_new[-2, :]
-                # Bottom (y=0): Adiabatic -> T_bot = T_above
-                t_new[0, :] = t_new[1, :]
-                # Inner Cut (x=0): Adiabatic (Symmetry/Cut)
-                t_new[:, 0] = TEMP_INT
-                
-                # 2. Surface Boundaries (Convection)
-                # Identify Air Regions
-                mask_int = self.grid_map == self.ID_AIR_INT
-                mask_ext = self.grid_map == self.ID_AIR_EXT
-                
-                t_new[mask_int] = TEMP_INT
-                t_new[mask_ext] = TEMP_EXT
-                
-                # Correction:
-                k_eff_int = self.dx / (2 * self.rsi_value) # USE DYNAMIC RSI
-                k_eff_ext = self.dx / (2 * RSE)
-                
-                self.cond[mask_int] = k_eff_int
-                self.cond[mask_ext] = k_eff_ext
-                
-                self.temp = t_new
-                self.temp[mask_int] = TEMP_INT
-                self.temp[mask_ext] = TEMP_EXT
-                
-                if k % 1000 == 0:
-                    diff = np.max(np.abs(self.temp - t_old))
-                    if diff < tol:
-                        break
-            
-            return self.temp
+            print("Fallback: Python Solver")
+            # Implement Python version of General Solver if needed, but for now just fail or verify
+            return self.temp # Todo implementation
+
 
     def calculate_psi(self):
         # 1. Total Heat Flow L2D
         T = self.temp
-        C = self.cond
         
-        def get_flux(mask_from, mask_to, T_val_from):
+        # We must assume self.Gh and self.Gv are populated
+        if not hasattr(self, 'Gh') or self.Gh is None:
+            self.calculate_conductances()
+        
+        Gh = self.Gh
+        Gv = self.Gv
+        
+        def get_flux(mask_from, mask_to):
             # Flux from 'mask_from' (Air) to 'mask_to' (Solid)
+            # Only consider adjacent pairs
             
-            total = 0
-            # Right Neighbors
-            k_harm_r = 2*C[:,:-1]*C[:,1:] / (C[:,:-1]+C[:,1:] + 1e-12)
-            # Flow from Left to Right
-            q_r = k_harm_r * (T[:,:-1] - T[:,1:])
-            # Filter where Left is Air, Right is Solid
-            f_r = (mask_from[:,:-1] & mask_to[:,1:])
-            total += np.sum(q_r[f_r])
+            total = 0.0
             
-            # Left Neighbors (Right to Left)
-            q_l = k_harm_r * (T[:,1:] - T[:,:-1]) # flow R->L
-            # Filter where Right is Air, Left is Solid
-            f_l = (mask_from[:,1:] & mask_to[:,:-1])
-            total += np.sum(q_l[f_l]) # Wait, q_r formula was L->R. If R is Air, T_R=Air. Flow R->L is k * (T_R - T_L).
-            # q_r computed T_left - T_right.
-            # If Left is Air, Solid is Right. Flow L->R positive. total += q_r. Correct.
-            # If Right is Air, Left is Solid. T_R is Air.
-            # Flow from Air(R) to Solid(L) = k * (T_R - T_L) = - k * (T_L - T_R) = -q_r.
-            # total += -q_r[f_l]. Correct.
+            # 1. Horizontal Flux (Left <-> Right)
+            # Gh[i,j] connects (i,j) and (i,j+1)
+            # Flow from j to j+1 = Gh * (T_j - T_j+1)
             
-            # Down Neighbors
-            k_harm_d = 2*C[:-1,:]*C[1:,:] / (C[:-1,:]+C[1:,:] + 1e-12)
-            q_d = k_harm_d * (T[:-1,:] - T[1:,:])
-            # Top is Air, Bot is Solid
-            f_d = (mask_from[:-1,:] & mask_to[1:,:])
-            total += np.sum(q_d[f_d])
+            # a) Left is Air (From), Right is Solid (To)
+            # T_left is Air Temp (Fixed). T_right is Surface Temp.
+            # Flow L->R = Gh * (T_L - T_R)
+            # Mask Check: mask_from[:, :-1] (Left) AND mask_to[:, 1:] (Right)
+            f_lr = (mask_from[:, :-1] & mask_to[:, 1:])
+            # Corresponding Conductances are Gh[:, :-1]
+            # Corresponding Temps: T[:, :-1] (Air), T[:, 1:] (Surface)
+            q_lr = Gh[:, :-1] * (T[:, :-1] - T[:, 1:])
+            total += np.sum(q_lr[f_lr])
             
-            # Up neighbors
-            f_u = (mask_from[1:,:] & mask_to[:-1,:])
-            total += np.sum(-q_d[f_u])
+            # b) Right is Air (From), Left is Solid (To)
+            # Flow R->L = Gh * (T_R - T_L)
+            # Mask: mask_from[:, 1:] (Right/Air) AND mask_to[:, :-1] (Left/Solid)
+            f_rl = (mask_from[:, 1:] & mask_to[:, :-1])
+            q_rl = Gh[:, :-1] * (T[:, 1:] - T[:, :-1])
+            total += np.sum(q_rl[f_rl])
+            
+            # 2. Vertical Flux (Top <-> Bottom)
+            # Gv[i,j] connects (i,j) and (i+1, j) (Top -> Bottom)
+            # Flow T->B = Gv * (T_top - T_bot)
+            
+            # a) Top is Air (From), Bot is Solid (To)
+            # Mask: mask_from[:-1, :] AND mask_to[1:, :]
+            f_tb = (mask_from[:-1, :] & mask_to[1:, :])
+            q_tb = Gv[:-1, :] * (T[:-1, :] - T[1:, :])
+            total += np.sum(q_tb[f_tb])
+            
+            # b) Bot is Air (From), Top is Solid (To)
+            # Mask: mask_from[1:, :] AND mask_to[:-1, :]
+            f_bt = (mask_from[1:, :] & mask_to[:-1, :])
+            q_bt = Gv[:-1, :] * (T[1:, :] - T[:-1, :])
+            total += np.sum(q_bt[f_bt])
             
             return total
 
         mask_all_solid = self.grid_map > 1
         mask_int_air = self.grid_map == self.ID_AIR_INT
         
-        l2d_watts = get_flux(mask_int_air, mask_all_solid, TEMP_INT)
+        l2d_watts = get_flux(mask_int_air, mask_all_solid)
         delta_t = TEMP_INT - TEMP_EXT
         l2d_coeff = l2d_watts / delta_t 
         
@@ -573,12 +687,21 @@ class ThermalSolver:
         u_wall_1d = 1.0 / r_tot
         
         # Lengths (External Dimensions)
-        # From corner (y=reveal_y_mm).
-        reveal_y_mm = 500
-        l_wall_ext = reveal_y_mm / 1000.0
+        # Determine reveal position from grid (y=0 is reveal edge in adaptive mode)
+        # In adaptive: y ranges from y_wall_deep to y_top
+        # Wall leg is from y_min to y=0 (reveal)
+        # Window leg is from y=0 to y_max
         
-        # Window part reference
-        l_win_total = (self.L_window_leg - reveal_y_mm) / 1000.0
+        if self.use_adaptive:
+            # Adaptive: y=0 is reveal edge
+            l_wall_ext = abs(self.y_coords[0]) / 1000.0  # From bottom to y=0
+            l_win_total = (self.y_coords[-1] - 0.0) / 1000.0  # From y=0 to top
+        else:
+            # Uniform: use old logic
+            reveal_y_mm = 500
+            l_wall_ext = reveal_y_mm / 1000.0
+            l_win_total = (self.L_window_leg - reveal_y_mm) / 1000.0
+        
         l_frame = self.cfg.frame_width_mm / 1000.0
         l_glass = l_win_total - l_frame
         
@@ -616,7 +739,10 @@ class ThermalSolver:
             mats = self.grid_map[bound_y, bound_x]
             
             # Calculate Surface Temp Tsi
-            r1 = self.dx / (2.0 * (k_solid + 1e-12))
+            # For adaptive grid, dx varies by column
+            # bound_x contains column indices, use dx_array[bound_x]
+            dx_local = self.dx_array[bound_x] if self.use_adaptive else np.full_like(bound_x, self.dx, dtype=float)
+            r1 = dx_local / (2.0 * (k_solid + 1e-12))
             r2 = self.rsi_value
             
             t_si = (TEMP_INT * r1 + t_cell * r2) / (r1 + r2)

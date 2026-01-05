@@ -368,4 +368,117 @@ double solve_red_black(double *temp, const double *cond, const int *fixed_mask,
   }
   return max_diff;
 }
+
+/**
+ * General Solver with Pre-Calculated Conductances
+ *
+ * This version does NOT calculate conductances from a material map.
+ * Instead, it takes two matrices:
+ * - cond_h: Conductance between (r,c) and (r,c+1). Size: rows x (cols-1) or
+ * similar.
+ * - cond_v: Conductance between (r,c) and (r+1,c). Size: (rows-1) x cols.
+ *
+ * To keep indexing simple, we assume:
+ * - cond_h has size rows * cols. cond_h[idx] is conductance from (r,c) to
+ * (r,c+1). Last column is unused (or boundary).
+ * - cond_v has size rows * cols. cond_v[idx] is conductance from (r,c) to
+ * (r+1,c). Last row is unused.
+ *
+ * @param temp Pointer to temperature grid (Input/Output)
+ * @param cond_h Pointer to Horizontal Conductance (r,c) -> (r,c+1)
+ * @param cond_v Pointer to Vertical Conductance (r,c) -> (r+1,c)
+ */
+double solve_general_conductance(double *temp, const double *cond_h,
+                                 const double *cond_v, const int *fixed_mask,
+                                 const double *fixed_values, int rows, int cols,
+                                 int iterations, double omega) {
+  double max_diff = 0.0;
+
+  for (int iter = 0; iter < iterations; ++iter) {
+    max_diff = 0.0;
+
+    // Red-Black Sweep
+    for (int color = 0; color < 2; ++color) {
+
+#pragma omp parallel for reduction(max : max_diff)
+      for (int r = 1; r < rows - 1; ++r) {
+        // Adjust start for checkerboard
+        int c_start = 1;
+        if ((r + c_start) % 2 != color)
+          c_start++;
+
+        for (int c = c_start; c < cols - 1; c += 2) {
+          int idx = r * cols + c;
+
+          if (fixed_mask[idx])
+            continue;
+
+          // Neighbors
+          int idx_up = (r - 1) * cols + c;
+          int idx_dn = (r + 1) * cols + c;
+          int idx_lf = r * cols + (c - 1);
+          int idx_rt = r * cols + (c + 1);
+
+          // Conductances
+          // G_right = cond_h[idx]
+          // G_left  = cond_h[idx_lf]
+          // G_down  = cond_v[idx]
+          // G_up    = cond_v[idx_up]
+
+          double g_rt = cond_h[idx];
+          double g_lf = cond_h[idx_lf];
+          double g_dn = cond_v[idx];
+          double g_up = cond_v[idx_up];
+
+          double g_sum = g_rt + g_lf + g_dn + g_up;
+
+          double val_gauss = (g_up * temp[idx_up] + g_dn * temp[idx_dn] +
+                              g_lf * temp[idx_lf] + g_rt * temp[idx_rt]) /
+                             (g_sum + 1e-12);
+
+          double val_new = (1.0 - omega) * temp[idx] + omega * val_gauss;
+
+          double diff = std::abs(val_new - temp[idx]);
+          if (diff > max_diff)
+            max_diff = diff;
+
+          temp[idx] = val_new;
+        }
+      }
+    }
+
+    // Boundaries (Adiabatic)
+    // Left
+    for (int r = 0; r < rows; ++r) {
+      if (!fixed_mask[r * cols])
+        temp[r * cols] = temp[r * cols + 1];
+      else
+        temp[r * cols] = fixed_values[r * cols];
+    }
+    // Right
+    for (int r = 0; r < rows; ++r) {
+      int idx = r * cols + cols - 1;
+      if (!fixed_mask[idx])
+        temp[idx] = temp[idx - 1];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+    // Bottom
+    for (int c = 0; c < cols; ++c) {
+      if (!fixed_mask[c])
+        temp[c] = temp[c + cols];
+      else
+        temp[c] = fixed_values[c];
+    }
+    // Top
+    for (int c = 0; c < cols; ++c) {
+      int idx = (rows - 1) * cols + c;
+      if (!fixed_mask[idx])
+        temp[idx] = temp[idx - cols];
+      else
+        temp[idx] = fixed_values[idx];
+    }
+  }
+  return max_diff;
+}
 }
