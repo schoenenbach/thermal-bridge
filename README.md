@@ -11,6 +11,7 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
 -   **Adaptive Meshing**: Automatically refines the grid in critical areas (e.g., thermal breaks, thin layers) to ensure accuracy while maintaining performance.
 -   **ISO 10211 Verified**: Validated against Test Cases 1 and 2 from the DIN EN ISO 10211 standard.
 -   **Visual Output**: Generates temperature maps (with isotherms) and concise result summaries (Psi-values, fRsi factors).
+-   **Web App**: Interactive Interface using Streamlit for easy sharing and parameter exploration.
 
 ## Installation
 
@@ -57,6 +58,20 @@ python3 simulation_engine.py --scenario-file scenarios/my_custom_geometry.yaml
 To check your geometry definitions without running the full thermal simulation, use the `--geometries-only` flag. This will generate material map images (`geometry_check_*.png`) for visual inspection.
 ```bash
 python3 simulation_engine.py --geometries-only
+```
+
+### Running the Web Interface
+To start the interactive web application:
+```bash
+streamlit run app.py
+```
+Open `http://localhost:8501` in your browser.
+
+### Docker Support
+Build and run the containerized application:
+```bash
+docker build -t thermal-sim .
+docker run -p 8501:8501 thermal-sim
 ```
 
 ### Running ISO Verification Tests
