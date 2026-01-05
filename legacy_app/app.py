@@ -559,26 +559,26 @@ with tab_opt:
             # Use 'st.session_state.get' to find results if we decide to store them
             results_for_report = st.session_state.get('last_simulation_results', {})
             
-            pdf_path = f"report_{active_name.replace(' ', '_')}.pdf"
+            pdf_filename = f"report_{active_name.replace(' ', '_')}.pdf"
             
             # Rewind buffer just in case
             if hasattr(img_buf, 'seek'): img_buf.seek(0)
             
-            success, msg = generate_pdf_report(
+            # Generate PDF in-memory (no disk write for multi-user safety)
+            success, result = generate_pdf_report(
                 project_name=rep_project_name,
                 author=rep_author,
                 description=rep_desc,
                 results=results_for_report,
                 image_path=img_buf, 
-                output_path=pdf_path
+                output_path=None  # In-memory mode
             )
             
             if success:
-                st.success(f"Report Generated: {pdf_path}")
-                with open(pdf_path, "rb") as f:
-                    st.download_button("Download Report PDF", data=f, file_name=pdf_path, mime="application/pdf")
+                st.success("Report Generated!")
+                st.download_button("Download Report PDF", data=result, file_name=pdf_filename, mime="application/pdf")
             else:
-                st.error(msg)
+                st.error(result)
         else:
             st.warning("Please run the simulation first to generate results.")
 
@@ -945,7 +945,7 @@ with tab_import:
             
             with col_dxf_act2:
                 if st.session_state.dxf_yaml_preview:
-                    if st.button("Load into Editor", width="stretch"):
+                    if st.button("Load into Editor"):
                          st.session_state.yaml_editor = st.session_state.dxf_yaml_preview
                          st.success("Loaded into Editor! Switch to 'Scenario Studio' tab.")
             
@@ -955,8 +955,7 @@ with tab_import:
                         "Download YAML", 
                         data=st.session_state.dxf_yaml_preview,
                         file_name=f"imported_{dxf_file.name.replace('.dxf', '')}.yaml",
-                        mime="text/yaml",
-                        width="stretch"
+                        mime="text/yaml"
                     )
                         
             # Show YAML Preview if available

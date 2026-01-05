@@ -150,9 +150,12 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def generate_pdf_report(project_name, author, description, results, image_path, output_path):
+def generate_pdf_report(project_name, author, description, results, image_path, output_path=None):
     """
     Generates a PDF report from simulation results.
+    
+    If output_path is None, returns (True, BytesIO buffer) instead of writing to disk.
+    If output_path is provided, writes to disk and returns (True, "success message").
     """
     
     import base64
@@ -186,10 +189,17 @@ def generate_pdf_report(project_name, author, description, results, image_path, 
     template = Template(HTML_TEMPLATE)
     html_content = template.render(context)
     
-    # 3. Write PDF
+    # 3. Write PDF (to file or in-memory buffer)
     try:
-        HTML(string=html_content).write_pdf(output_path)
-        return True, "Report generated successfully."
+        if output_path is None:
+            # Return in-memory buffer (for multi-user / cloud hosting safety)
+            pdf_buffer = BytesIO()
+            HTML(string=html_content).write_pdf(pdf_buffer)
+            pdf_buffer.seek(0)
+            return True, pdf_buffer
+        else:
+            HTML(string=html_content).write_pdf(output_path)
+            return True, "Report generated successfully."
     except Exception as e:
         return False, f"Failed to generate report: {str(e)}"
 
