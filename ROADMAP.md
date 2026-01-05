@@ -78,21 +78,17 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
   - [x] Integrate into Streamlit App (Configuration & Visualization).
 - **Status**: Completed. Implemented Implicit Euler solver, added material density/capacity, GIF generation, and Streamlit UI controls.
 
-## 7. Mold & Condensation Risk Map
+## 7. Mold & Condensation Risk Map [DONE]
 
-**Objective:** Provide advanced post-processing to identify areas at risk of mold growth, compliant with ISO 13788.
+- **Goal**: Enable ISO 13788 check for mold growth risk.
+- **Tasks**:
+  - [x] Implement Saturation Pressure (Magnus Formula).
+  - [x] Implement Surface RH Calculation ($\phi_{surf} = p_v / p_{sat, surf}$).
+  - [x] Visualization: "Traffic Light" Color Map (Green/Yellow/Red) + Isoline at $\phi=0.8$.
+  - [x] Integrate into Streamlit App (New "Mold & Condensation Risk" panel).
+- **Status**: Completed. Added `mold_analysis.py`, unit tests, and Streamlit integration.
 
-**Implementation Strategy:**
-*   **Input:** Indoor Air Temperature ($T_i$) and Relative Humidity ($\phi_i$).
-*   **Calculation:**
-    *   Compute surface saturation pressure $p_{sat}(T_{surf})$.
-    *   Compute surface partial pressure $p_{surf}$ (assuming constant vapor pressure or solving vapor diffusion).
-    *   Calculate Surface Relative Humidity $\phi_{surf}$.
-*   **Visualization:**
-    *   **Traffic Light Map:** Green (<70% RH), Yellow (70-80% RH), Red (>80% RH - Mold Risk).
-    *   **Isolines:** Specifically plot the $\phi = 0.8$ limitation line (the "mold isotherm").
-
-## 8. Side-by-Side Scenario Comparison
+## 8. Side-by-Side Scenario Comparison [DONE]
 
 **Objective:** Facilitate decision-making by visually comparing two design variants.
 
@@ -103,7 +99,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   **Delta Map:** Compute $T_{diff} = T_{proposed} - T_{reference}$ and plot the difference field to highlight heat flow changes.
     *   **Table:** Side-by-side comparison of Psi-values and fRsi factors with % improvement calculation.
 
-## 9. DXF/CAD Import Integration
+## 9. DXF/CAD Import Integration [WIP]
 
 **Objective:** Integrate with existing CAD workflows by allowing import of geometry from DXF files.
 
@@ -117,6 +113,8 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   Extract polylines/polygons from layers.
     *   Convert to internal `Polygon` representation in `geometry.py`.
     *   (Optional) Simplify geometry (douglass-peucker) to remove excessive detail (e.g., screw threads) that complicates meshing.
+
+*   **Note on DWG:** Direct DWG support requires external converters (e.g., ODA or LibreDWG). Current solution supports native DXF. Convert DWG to DXF before import.
 
 ## 10. Cloud & CI/CD Readiness
 

@@ -11,6 +11,7 @@ import sys
 sys.path.append(os.getcwd())
 
 from declarative_geometry import DeclarativeGeometry
+from dxf_importer import DXFImporter
 from simulation_engine import solve_scenario
 from solver import get_solver_lib
 from solver import get_solver_lib
@@ -91,7 +92,7 @@ grid_override = st.sidebar.number_input("Override Grid Size (mm)",
 
 # --- Main Editor Area ---
 # --- Main Area Tabs ---
-tab_editor, tab_builder, tab_opt, tab_compare = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization", "Compare"])
+tab_editor, tab_builder, tab_opt, tab_compare, tab_import = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization", "Compare", "Import DXF"])
 
 with tab_builder:
     st.header("Interactive Geometry Builder")
@@ -878,3 +879,77 @@ with tab_compare:
 
 
 
+
+with tab_import:
+    st.header("Import from DXF")
+    
+    dxf_file = st.file_uploader("Upload DXF File", type=["dxf"])
+    
+    # Session state for generated yaml to persist across reruns
+    if "dxf_yaml_preview" not in st.session_state:
+        st.session_state.dxf_yaml_preview = ""
+
+    if dxf_file:
+        try:
+            # Instantiate Importer (loads file)
+            # Streamlit file_uploader returns BytesIO, our updated importer handles it via tempfile
+            importer = DXFImporter(dxf_file)
+            layers = importer.get_layers()
+            
+            st.success(f"Loaded DXF. Found {len(layers)} layers.")
+            
+            # Layer Mapping UI
+            st.subheader("Layer to Material Mapping")
+            st.caption("Map DXF layers to Simulation Materials. Leave empty to ignore a layer.")
+            
+            # Common Materials
+            common_mats = ["", "WALL", "INSULATION", "FRAME", "GLASS", "AIR_INT", "AIR_EXT", "CONCRETE", "ALUMINUM", "REVEAL_INS"]
+            
+            mapping = {}
+            
+            # Grid layout for mapping
+            cols = st.columns(3)
+            for i, layer in enumerate(layers):
+                with cols[i % 3]:
+                    # Intelligent default based on name
+                    default_idx = 0
+                    u_layer = layer.upper()
+                    if "WALL" in u_layer or "MAUER" in u_layer: default_idx = common_mats.index("WALL")
+                    elif "INS" in u_layer or "DAEMM" in u_layer: default_idx = common_mats.index("INSULATION")
+                    elif "FRAME" in u_layer or "RAHMEN" in u_layer: default_idx = common_mats.index("FRAME")
+                    elif "GLAS" in u_layer: default_idx = common_mats.index("GLASS")
+                    elif "LUFT" in u_layer or "AIR" in u_layer: default_idx = common_mats.index("AIR_EXT")
+                    
+                    selection = st.selectbox(f"{layer}", common_mats, index=default_idx, key=f"map_{layer}")
+                    if selection:
+                        mapping[layer] = selection
+            
+            st.markdown("---")
+            col_dxf_act1, col_dxf_act2 = st.columns(2)
+            
+            with col_dxf_act1:
+                if st.button("Convert to Scenario", type="primary"):
+                    if mapping:
+                        scen_dict = importer.extract_scenario(mapping)
+                        yaml_str = yaml.dump(scen_dict, sort_keys=False)
+                        st.session_state.dxf_yaml_preview = yaml_str
+                        st.toast("Conversion Successful!", icon="✅")
+                    else:
+                        st.warning("Please map at least one layer to a material.")
+                        
+            # Show Preview if available
+            if st.session_state.dxf_yaml_preview:
+                st.subheader("Generated YAML Preview")
+                st.code(st.session_state.dxf_yaml_preview, language='yaml')
+                
+                with col_dxf_act2:
+                    st.write("") # Spacer
+                    st.write("")
+                    if st.button("Load into Editor Tab"):
+                        st.session_state.yaml_editor = st.session_state.dxf_yaml_preview
+                        # Reset selector to avoid overwrite
+                        # st.session_state.template_selector = "(New Empty)" 
+                        st.success("Loaded into Editor! Switch to 'Scenario Editor' tab to view.")
+                        
+        except Exception as e:
+            st.error(f"Failed to process DXF: {e}")

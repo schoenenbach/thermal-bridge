@@ -55,6 +55,23 @@ You can run any custom YAML geometry file:
 python3 simulation_engine.py --scenario-file scenarios/my_custom_geometry.yaml
 ```
 
+### Importing DXF/CAD
+The application supports importing 2D geometry from **DXF** files. It extracts geometry from:
+- **Polylines** (LWPOLYLINE, POLYLINE)
+- **Hatches** (HATCH boundaries)
+- **Lines** (Automatically stitches connected lines into closed loops)
+
+1.  Open the Web Interface.
+
+2.  Go to the **"Import DXF"** tab.
+3.  Upload your `.dxf` file.
+4.  Map the DXF Layers to Simulation Materials (e.g., `Layer_0` -> `WALL`).
+5.  Click "Convert to Scenario".
+6.  Load the generated scenario into the Editor to fine-tune or run simulations.
+
+> **Note:** Binary **DWG** files are not directly supported. Please convert them to DXF first using a tool like *ODA File Converter* or *LibreDWG*.
+
+
 ### Debugging Geometries
 To check your geometry definitions without running the full thermal simulation, use the `--geometries-only` flag. This will generate material map images (`geometry_check_*.png`) for visual inspection.
 ```bash
@@ -75,6 +92,12 @@ The web interface includes a "Transient Simulation" mode:
 3.  Check **"Enable Transient"**.
 4.  Configure **Duration** (hours) and **Time Step** (seconds).
 5.  Click "Run Simulation". The result will be displayed as an animated GIF.
+
+#### Side-by-Side Comparison
+The **Compare** tab allows you to select two different scenarios (Reference vs. Proposed) and compare their results directly.
+- **Metrics Table**: Shows differences in Psi-value and fRsi factor.
+- **Side-by-Side Maps**: Visual comparison of temperature fields.
+- **Delta Map**: Plots the temperature difference ($T_{prop} - T_{ref}$) to highlight areas of improvement (requires identical grid dimensions).
 
 ### Docker Support
 Build and run the containerized application:
