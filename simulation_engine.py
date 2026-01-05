@@ -228,19 +228,23 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     suffix = scenario_def['file_suffix']
     
     # Load Geometry
+    # Load Geometry
     if isinstance(cfg, str) and cfg.endswith('.yaml'):
          # Load Declarative
          with open(cfg, 'r') as f:
              data = yaml.safe_load(f)
-         geom = DeclarativeGeometry(data)
-         # Extract grid size from resolved data in geom
-         grid_sz = 2.5
-         if 'canvas' in geom.data and 'grid' in geom.data['canvas']:
-             grid_sz = float(geom.data['canvas']['grid'])
-         cfg_grid_size = grid_sz
-         wall_thick_mm = geom.data.get('variables', {}).get('wall_thick', 360)
+    elif isinstance(cfg, dict):
+        data = cfg
     else:
-        raise ValueError(f"Unsupported config type: {type(cfg)}. Expected YAML file path.")
+        raise ValueError(f"Unsupported config type: {type(cfg)}. Expected YAML file path or dict.")
+
+    geom = DeclarativeGeometry(data)
+    # Extract grid size from resolved data in geom
+    grid_sz = 2.5
+    if 'canvas' in geom.data and 'grid' in geom.data['canvas']:
+        grid_sz = float(geom.data['canvas']['grid'])
+    cfg_grid_size = grid_sz
+    wall_thick_mm = geom.data.get('variables', {}).get('wall_thick', 360)
     
     if use_adaptive_mesh:
         from mesh import AdaptiveMesh

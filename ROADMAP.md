@@ -41,7 +41,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   **Validation:** Signature block or disclaimer.
 *   **Integration:** Add an "Export PDF" button in Streamlit that triggers the generation and offers a file download.
 
-## 4. Parametric Parameter Sweeps
+## 4. Parametric Parameter Sweeps [DONE]
 
 **Objective:** Allow users to optimize designs by simulating a range of values for a specific variable.
 
