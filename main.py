@@ -2,170 +2,83 @@ from config import CalculationConfig
 from thermal_solver import ThermalSolver
 
 if __name__ == "__main__":
-    # Define Calculation Configurations (Final Consolidation: 6 Scenarios)
-    # All scenarios have Masonry Rebate (Fensteranschlag) ~50mm.
-    # Window Position: 150mm depth.
-    
-    configs = [
-        # --- Wall 36 cm ---
-        
-        # 1. Baseline (No Insulation)
-        # Altbau status quo.
-        CalculationConfig(
-            wall_thickness_mm=360,
-            insulation_thick_max_mm=0,
-            insulation_thick_min_mm=0,
-            reveal_insulation_mm=0,
-            taper_length_mm=0,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=True 
-        ),
-        
-        # 2. Renovated (Wall Insulated, NO Reveal Ins)
-        # "Forgot the reveal".
-        CalculationConfig(
-            wall_thickness_mm=360,
-            insulation_thick_max_mm=200,
-            insulation_thick_min_mm=100,
-            reveal_insulation_mm=0,
-            taper_length_mm=150,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=True
-        ),
-        
-        # 3. Renovated (Wall + Reveal Ins)
-        # Correct execution.
-        CalculationConfig(
-            wall_thickness_mm=360,
-            insulation_thick_max_mm=200,
-            insulation_thick_min_mm=100,
-            reveal_insulation_mm=30,
-            taper_length_mm=150,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=False
-        ),
-        
-        # --- Wall 45 cm ---
-        
-        # 4. Baseline (No Insulation)
-        CalculationConfig(
-            wall_thickness_mm=450,
-            insulation_thick_max_mm=0,
-            insulation_thick_min_mm=0,
-            reveal_insulation_mm=0,
-            taper_length_mm=0,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=True
-        ),
-        
-        # 5. Renovated (Wall Insulated, NO Reveal Ins)
-        CalculationConfig(
-            wall_thickness_mm=450,
-            insulation_thick_max_mm=200,
-            insulation_thick_min_mm=100,
-            reveal_insulation_mm=0,
-            taper_length_mm=150,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=True
-        ),
-        
-        # 6. Renovated (Wall + Reveal Ins)
-        CalculationConfig(
-            wall_thickness_mm=450,
-            insulation_thick_max_mm=200,
-            insulation_thick_min_mm=100,
-            reveal_insulation_mm=30,
-            taper_length_mm=150,
-            window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50,
-            uninsulated_reveal=False
-        )
+    from config import SpacerType
+
+    # Define High-Fidelity Configurations for Verification
+    # Case A: 36cm Wall, No Insulation, Old Window (Stainless Spacer) - Baseline
+    config_old = CalculationConfig(
+        wall_thickness_mm=360,
+        insulation_thick_max_mm=0,
+        insulation_thick_min_mm=0,
+        reveal_insulation_mm=0,
+        taper_length_mm=0,
+        window_position_from_exterior_masonry_mm=150,
+        masonry_rebate_overlap_mm=50,
+        uninsulated_reveal=True,
+        grid_size_mm=2.0,           # High Res (adjusted for speed)
+        spacer_type=SpacerType.STAINLESS_STEEL # "Old" (Ug 1.1)
+    )
+
+    # Case B: 36cm Wall, No Insulation, New Window (Swiss Spacer) - Comparison
+    config_new = CalculationConfig(
+        wall_thickness_mm=360,
+        insulation_thick_max_mm=0,
+        insulation_thick_min_mm=0,
+        reveal_insulation_mm=0,
+        taper_length_mm=0,
+        window_position_from_exterior_masonry_mm=150,
+        masonry_rebate_overlap_mm=50,
+        uninsulated_reveal=True,
+        grid_size_mm=2.0,           # High Res (adjusted for speed)
+        spacer_type=SpacerType.SWISS_ULTIMATE 
+    )
+
+    # List of configs to run
+    run_configs = [
+        ("Old Window (Stainless)", config_old),
+        ("New Window (Swiss)", config_new)
     ]
     
     results = []
     
-    print("Starting Thermal Bridge Calculation...")
+    print("Starting High-Fidelity Thermal Bridge Calculation (1mm Grid)...")
     
-    for i, cfg in enumerate(configs):
-        print(f"Calculating Case {i+1}...")
+    for name, cfg in run_configs:
+        print(f"Calculating: {name} (Grid: {cfg.grid_size_mm}mm, Spacer: {cfg.spacer_type})...")
         
         # --- PASS 1: Calculate Psi (Rsi = 0.13) ---
         solver_psi = ThermalSolver(cfg, rsi_value=0.13)
-        
-        # filename_geo = f"geometry_case_{i+1}.png"
-        # solver_psi.plot_geometry(filename_geo)
-        # print(f"Geometry plotted: {filename_geo}")
-        
         solver_psi.solve()
         res_psi = solver_psi.calculate_psi()
-        psi_val = res_psi['Psi']
-        u_wall_val = res_psi['U_Wall']
         
         # --- PASS 2: Calculate fRsi (Rsi = 0.25) ---
         solver_frsi = ThermalSolver(cfg, rsi_value=0.25)
         solver_frsi.solve()
         res_frsi = solver_frsi.calculate_psi()
-        frsi_val = res_frsi['fRsi']
-        mint_val = res_frsi['MinT']
-        mint_wall_val = res_frsi['MinT_Wall']
-        mint_frame_val = res_frsi['MinT_Frame']
         
-        # Plotting (Let's plot the fRsi temperature field as it is critical for mold)
-        # Or Psi field? Standard is usually Psi field.
-        # Let's keep plotting the Psi run (Run 1)
-        
-        case_id = f"wall_{cfg.wall_thickness_mm}"
-        if cfg.window_position_from_exterior_masonry_mm > 0:
-            case_id += f"_pos_{cfg.window_position_from_exterior_masonry_mm}"
-        if cfg.insulation_thick_max_mm == 0:
-            case_id += "_no_ins"
-        elif cfg.uninsulated_reveal:
-            case_id += "_no_rev_ins"
-            
+        # Plotting
+        case_id = name.replace(" ", "_").replace("(", "").replace(")", "").lower()
         fn = f"temp_dist_{case_id}.png"
         solver_psi.plot_results(fn)
         
-        case_name = f"Wall {cfg.wall_thickness_mm}mm"
-        if cfg.window_position_from_exterior_masonry_mm > 0:
-            case_name += f" (Pos {cfg.window_position_from_exterior_masonry_mm}mm)"
-            
-        if cfg.insulation_thick_max_mm == 0:
-            case_name += " (No Ins)"
-        elif cfg.uninsulated_reveal:
-            case_name += " (No Rev Ins)"
-            
         results.append({
-            "CASE": case_name,
-            "Psi": psi_val,
-            "U_Wall": u_wall_val,
-            "fRsi": frsi_val,
-            "MinT": mint_val,
-            "MinT_Wall": mint_wall_val,
-            "MinT_Frame": mint_frame_val,
+            "CASE": name,
+            "Psi": res_psi['Psi'],
+            "fRsi": res_frsi['fRsi'],
+            "MinT_Wall": res_frsi['MinT_Wall'],
+            "MinT_Frame": res_frsi['MinT_Frame'],
             "MinT_Glass": res_frsi['MinT_Glass']
         })
-        if 'MinT_Glass' in res_frsi:
-             print(f"Done. Psi:{res_frsi['Psi']:.3f}, fRsi:{res_frsi['fRsi']:.3f} | Wall:{res_frsi['MinT_Wall']:.1f}C, Frame:{res_frsi['MinT_Frame']:.1f}C, Glass:{res_frsi['MinT_Glass']:.1f}C")
-        else:
-             print(f"Done. Psi:{res_frsi['Psi']:.3f}, fRsi:{res_frsi['fRsi']:.3f} | Wall:{res_frsi['MinT_Wall']:.1f}C, Frame:{res_frsi['MinT_Frame']:.1f}C")
+        
+        print(f"Done. Psi:{res_psi['Psi']:.3f}, fRsi:{res_frsi['fRsi']:.3f}")
+        print(f"Min Temps -> Wall:{res_frsi['MinT_Wall']:.2f}C, Frame:{res_frsi['MinT_Frame']:.2f}C, Glass:{res_frsi['MinT_Glass']:.2f}C")
+        print("-" * 40)
 
     # Generate Report MD
-    with open("calculation_report.md", "w") as f:
-        f.write("# Thermal Bridge Calculation Results\n\n")
-        f.write("| Case | Wall | Insulation | Psi-Value | fRsi | Min Temp |\n")
+    with open("result_comparison_spacers.md", "w") as f:
+        f.write("# Spacer Comparison Results (36cm Wall, No Ins)\n\n")
+        f.write("| Case | Psi-Value | fRsi | MinT Wall | MinT Frame | MinT Glass |\n")
         f.write("|---|---|---|---|---|---|\n")
         for r in results:
-            f.write(f"| {r['CASE']} | {r['CASE'].split()[1]} | 200->100 mm | **{r['Psi']:.3f} W/mK** | {r['fRsi']:.3f} | {r['MinT']:.1f}°C |\n")
-        
-        f.write("\n## Temperature Plots\n")
-        f.write("![36cm](temp_dist_wall_360.png)\n")
-        f.write("![45cm](temp_dist_wall_450.png)\n")
-        f.write("![36cm No Rev](temp_dist_wall_360_no_rev_ins.png)\n")
-        f.write("![45cm No Rev](temp_dist_wall_450_no_rev_ins.png)\n")
-        f.write("![36cm No Ins](temp_dist_wall_360_no_ins.png)\n")
-        f.write("![45cm No Ins](temp_dist_wall_450_no_ins.png)\n")
+            f.write(f"| {r['CASE']} | **{r['Psi']:.3f}** | {r['fRsi']:.3f} | {r['MinT_Wall']:.1f}°C | {r['MinT_Frame']:.1f}°C | {r['MinT_Glass']:.1f}°C |\n")
+

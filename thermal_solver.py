@@ -5,10 +5,10 @@ from typing import List, Tuple, Dict
 from config import *
 
 class ThermalSolver:
-    def __init__(self, config: CalculationConfig, grid_size_mm: int = 5, rsi_value: float = 0.13):
+    def __init__(self, config: CalculationConfig, rsi_value: float = 0.13):
         self.cfg = config
         self.rsi_value = rsi_value # Store Dynamic Rsi
-        self.dx = grid_size_mm / 1000.0  # meters
+        self.dx = self.cfg.grid_size_mm / 1000.0  # meters
         
         # Calculate domain size
         # Wall section needs to be long enough to reach 1D flow (e.g. 1m)
@@ -34,8 +34,8 @@ class ThermalSolver:
         self.width_mm = self.offset_x_mm + self.cfg.wall_thickness_mm + self.cfg.insulation_thick_max_mm + 500 # Extra for boundary
         self.height_mm = self.L_window_leg
         
-        self.nx = int(self.width_mm / grid_size_mm) + 1  # X direction (Thickness)
-        self.ny = int(self.L_window_leg / grid_size_mm) + 1 # Y direction (Length along facade)
+        self.nx = int(self.width_mm / self.cfg.grid_size_mm) + 1  # X direction (Thickness)
+        self.ny = int(self.L_window_leg / self.cfg.grid_size_mm) + 1 # Y direction (Length along facade)
         
         self.grid_map = np.zeros((self.ny, self.nx), dtype=int) # Material ID
         self.temp = np.ones((self.ny, self.nx)) * TEMP_INT # Initial guess
@@ -49,6 +49,7 @@ class ThermalSolver:
         self.ID_FRAME = 4
         self.ID_GLASS = 5
         self.ID_REVEAL_INS = 6
+        self.ID_SPACER = 7 # New ID
 
         self.setup_geometry()
         self.assign_materials()
@@ -228,6 +229,43 @@ class ThermalSolver:
         
         # Draw Glass
         self.grid_map[idx_g_y_start:idx_g_y_end, idx_g_x_start:idx_g_x_end] = self.ID_GLASS
+
+        # 3b. Determine Effective Spacer Conductivity
+        spacer_lambda = 0.0
+        if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE:
+            spacer_lambda = MAT_SPACER_SWISS_ULTIMATE
+        elif self.cfg.spacer_type == SpacerType.STAINLESS_STEEL:
+            spacer_lambda = MAT_SPACER_STAINLESS
+        elif self.cfg.spacer_type == SpacerType.ALUMINUM:
+            spacer_lambda = MAT_SPACER_ALUMINUM
+        
+        # Draw Spacer?
+        # Only if we have a valid spacer type
+        if self.cfg.spacer_type != SpacerType.NONE:
+            # Spacer Dimensions (Generic IGU Box)
+            # Located at the bottom of the glass unit, inside the sash.
+            # Height: 7mm
+            # Width: Space between panes... wait, we modeled glass as a solid block.
+            # In a solid block model, the "Spacer" effectively replaces the bottom X mm of grid cells of the "Glass" block.
+            
+            spacer_height_mm = 7
+            idx_spacer_h = to_idx(spacer_height_mm)
+            
+            # Repaint the bottom of the GLASS block as SPACER
+            # Start from glass bottom (idx_g_y_start)
+            idx_sp_y_end = idx_g_y_start + idx_spacer_h
+            
+            # Bounds
+            sp_x_start = idx_g_x_start
+            sp_x_end = idx_g_x_end
+            
+            # We need a new ID for Spacer? Material check assigns conductivity.
+            # Let's use a dynamic approach. We can reuse ID_GLASS but that treats it as Ug1.1
+            # We need a new ID.
+            # Let's add ID_SPACER to class in __init__?
+            # Or just hack it: defined below as 7.
+            
+            self.grid_map[idx_g_y_start:idx_sp_y_end, sp_x_start:sp_x_end] = 7 # ID_SPACER
         
         # 4. Re-Apply Masonry Rebate (The "Anschlag" itself)
         # This ensures the masonry covers the frame where it should.
@@ -290,6 +328,17 @@ class ThermalSolver:
         self.cond[self.grid_map == self.ID_REVEAL_INS] = MAT_REVEAL_INSULATION
         self.cond[self.grid_map == self.ID_FRAME] = MAT_FRAME_EQ
         self.cond[self.grid_map == self.ID_GLASS] = MAT_GLASS_UG11
+        
+        # Spacer
+        spacer_lambda = 0.025 # Default air/low
+        if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE:
+            spacer_lambda = MAT_SPACER_SWISS_ULTIMATE
+        elif self.cfg.spacer_type == SpacerType.STAINLESS_STEEL:
+            spacer_lambda = MAT_SPACER_STAINLESS
+        elif self.cfg.spacer_type == SpacerType.ALUMINUM:
+            spacer_lambda = MAT_SPACER_ALUMINUM
+            
+        self.cond[self.grid_map == self.ID_SPACER] = spacer_lambda
         # Air
         self.cond[self.grid_map == self.ID_AIR_INT] = 0.025 # Approx static air
         # Boundaries handled in solve loop
@@ -498,7 +547,9 @@ class ThermalSolver:
         plt.figure(figsize=(10, 8))
         plt.imshow(self.temp, cmap='jet', origin='lower', extent=[0, self.width_mm, 0, self.height_mm])
         plt.colorbar(label='Temperature [°C]')
-        plt.title(f'Temperature Distribution (Thick: {self.cfg.wall_thickness_mm}mm)')
+        plt.imshow(self.temp, cmap='jet', origin='lower', extent=[0, self.width_mm, 0, self.height_mm])
+        plt.colorbar(label='Temperature [°C]')
+        plt.title(f'Temperature Distribution (Thick: {self.cfg.wall_thickness_mm}mm, Grid: {self.cfg.grid_size_mm}mm)')
         plt.xlabel('Depth [mm]')
         plt.ylabel('Facade Length [mm]')
         plt.savefig(filename)

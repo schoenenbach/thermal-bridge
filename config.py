@@ -34,15 +34,33 @@ MAT_FRAME_EQ = 0.08 / (1.0/1.3 - RSI_WALL - RSE)
 # Lambda_glass_eq = 0.024 / R_g_mat
 MAT_GLASS_UG11 = 0.024 / (1.0/1.1 - RSI_WALL - RSE)
 
+# Spacers (Effective Lamdba for a solid block simulation of the edge)
+# Values approx from ISO 10077-2 / Passive House Institute Data
+MAT_SPACER_SWISS_ULTIMATE = 0.14
+MAT_SPACER_STAINLESS = 0.60  # Typical stainless steel box
+MAT_SPACER_ALUMINUM = 10.0 # High internal conductivity
+
+class SpacerType:
+    NONE = 0
+    SWISS_ULTIMATE = 1
+    STAINLESS_STEEL = 2
+    ALUMINUM = 3
+
 @dataclass
 class CalculationConfig:
     wall_thickness_mm: int
     insulation_thick_max_mm: int
     insulation_thick_min_mm: int
     reveal_insulation_mm: int
-    taper_length_mm: int  # Length over which insulation tapers
+    taper_length_mm: int
+    
+    # Advanced Settings
     frame_depth_mm: int = 80
-    frame_width_mm: int = 80 # Face width
-    window_position_from_exterior_masonry_mm: int = 0 # 0 = Flush
+    frame_width_mm: int = 80 
+    window_position_from_exterior_masonry_mm: int = 0
     masonry_rebate_overlap_mm: int = 0
     uninsulated_reveal: bool = False
+    
+    # Simulation Fidelity
+    grid_size_mm: float = 1.0
+    spacer_type: int = SpacerType.SWISS_ULTIMATE
