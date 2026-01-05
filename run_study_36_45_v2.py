@@ -319,9 +319,29 @@ def calculate_psi_from_result(result, geometry):
     u_wall = 1.0 / r_wall
     
     # Lengths (from geometry canvas)
-    l_wall = abs(geometry.y_min) / 1000.0  # Wall leg
+    canvas = geometry.get_canvas_config()
+    y_min, y_max = canvas.y_min_mm, canvas.y_max_mm
+    
+    # Check if we are using the new centered coordinate system (0 to 1000)
+    # or the old one (-500 to 1000)
+    # Heuristic: if y_min >= 0, it's likely the new one.
+    
+    if y_min >= 0:
+        # New System: Wall leg is bottom half, Window is top half
+        # Corner is at 500 roughly? 
+        # Actually we should look for the shift. 
+        # geometry.OFF_Y = 500 usually.
+        corner_y = getattr(geometry, 'OFF_Y', 500.0)
+        
+        l_wall = (corner_y - y_min) / 1000.0
+        l_total_window = (y_max - corner_y) / 1000.0
+    else:
+        # Old System: Corner at 0
+        l_wall = abs(y_min) / 1000.0
+        l_total_window = y_max / 1000.0
+        
     l_frame = cfg.frame_width_mm / 1000.0
-    l_glass = (geometry.y_max - cfg.frame_width_mm) / 1000.0
+    l_glass = l_total_window - l_frame
     
     u_frame = 1.3
     u_glass = 1.1
@@ -382,14 +402,23 @@ def calculate_psi_from_result(result, geometry):
 
 
 def plot_geometry(mesh, grid_map, filename):
-    """Save geometry plot."""
+    """Save geometry plot using pcolormesh for adaptive grids."""
     plt.figure(figsize=(12, 10))
     cmap = plt.get_cmap('tab10', 10)
-    plt.imshow(grid_map, cmap=cmap, origin='lower',
-               extent=[mesh.x_coords[0], mesh.x_coords[-1],
-                      mesh.y_coords[0], mesh.y_coords[-1]],
-               interpolation='nearest')
-    plt.colorbar(label='Material ID')
+    
+    dmax = np.max(grid_map)
+    
+    # Use pcolormesh for non-uniform grids
+    # mesh.x_coords and y_coords are cell edges
+    X, Y = np.meshgrid(mesh.x_coords, mesh.y_coords)
+    
+    plt.pcolormesh(X, Y, grid_map, cmap=cmap, shading='flat',
+                   vmin=-0.5, vmax=9.5) # tab10 has 10 colors
+                   
+    plt.gca().set_aspect('equal')
+    
+    plt.colorbar(label='Material ID', ticks=range(10))
+    
     plt.xlabel('X [mm]')
     plt.ylabel('Y [mm]')
     plt.title(filename.replace('.png', ''))
@@ -398,11 +427,14 @@ def plot_geometry(mesh, grid_map, filename):
 
 
 def plot_temperature(mesh, temp, filename, title=""):
-    """Save temperature plot."""
+    """Save temperature plot using pcolormesh."""
     plt.figure(figsize=(12, 10))
-    plt.imshow(temp, cmap='jet', origin='lower',
-               extent=[mesh.x_coords[0], mesh.x_coords[-1],
-                      mesh.y_coords[0], mesh.y_coords[-1]])
+    
+    X, Y = np.meshgrid(mesh.x_coords, mesh.y_coords)
+    
+    plt.pcolormesh(X, Y, temp, cmap='jet', shading='flat')
+    
+    plt.gca().set_aspect('equal')
     plt.colorbar(label='Temperature [°C]')
     plt.xlabel('X [mm]')
     plt.ylabel('Y [mm]')

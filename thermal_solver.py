@@ -63,14 +63,15 @@ class ThermalSolver:
         self.temp = np.ones((self.ny, self.nx)) * TEMP_INT 
         
         # IDs
-        self.ID_AIR_INT = 0
-        self.ID_AIR_EXT = 1
-        self.ID_WALL = 2
-        self.ID_INSULATION = 3
-        self.ID_FRAME = 4
-        self.ID_GLASS = 5
-        self.ID_REVEAL_INS = 6
-        self.ID_SPACER = 7
+        from geometry import MaterialID
+        self.ID_AIR_INT = MaterialID.AIR_INT
+        self.ID_AIR_EXT = MaterialID.AIR_EXT
+        self.ID_WALL = MaterialID.WALL
+        self.ID_INSULATION = MaterialID.INSULATION
+        self.ID_REVEAL_INS = MaterialID.REVEAL_INS
+        self.ID_FRAME = MaterialID.FRAME
+        self.ID_GLASS = MaterialID.GLASS
+        self.ID_SPACER = MaterialID.SPACER
 
         self.setup_geometry_map()
         self.assign_materials_adaptive()
@@ -605,8 +606,13 @@ class ThermalSolver:
             batch = 2000
             for k in range(0, max_iter, batch):
                 diff = lib.solve_general_conductance(p_temp, p_gh, p_gv, p_mask, p_fval, rows, cols, batch, omega)
+                
+                step = k + batch
+                if step % 10000 == 0:
+                     print(f"  Iteration {step}/{max_iter}: Diff={diff:.2e}")
+                     
                 if diff < tol:
-                    print(f"Adaptive Solver Converged: {k+batch} iters, Diff={diff:.2e}")
+                    print(f"Adaptive Solver Converged: {step} iters, Diff={diff:.2e}")
                     break
             self.temp = temp_c
             return self.temp

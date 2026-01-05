@@ -15,17 +15,58 @@ from abc import ABC, abstractmethod
 import numpy as np
 from matplotlib.path import Path
 
-# Material IDs (shared across all geometries)
+# Material IDs (Aligned with Reference Results)
 class MaterialID:
-    AIR_INT = 0
-    AIR_EXT = 1
+    # Based on plot_geometry_36cm_NoIns.png legend/colors
+    # 0 = Air (Interior/Exterior merged? or AirExt?)
+    # Let's keep 0 as default Air
+    AIR_INT = 0 
+    AIR_EXT = 0 # Using 0 for both airs seems to be what reference does (blue background)
+    
+    # Actually, in the reference plot (Step 53), the legend includes "0=AirExt".
+    # And there is "1=..." (Orange).
+    # "2=Wall" (Green).
+    # "3=Ins" (Purple/Pink).
+    # "4=RevIns" (Brown).
+    # "5=Frame" (Pink/Red).
+    # "6=Glass" (Grey).
+    
+    # Let's map them explicitly
+    # Note: If AIR_INT and AIR_EXT are both 0, the solver needs to distinguish boundary conditions via mask/coordinates,
+    # OR we use different IDs for solver but map them to 0 for plotting?
+    # The existing solver uses ID 0 vs 1 to distinguish BCs (20C vs -5C).
+    # So we MUST keep them distinct for simulation.
+    # Maybe the reference plot combined them? 
+    # Let's stick to distinct IDs for physics, but maybe 7 for AirExt?
+    # No, let's stick to 0/1 for Physics, but careful about plotting.
+    # User said "geometries don't match". He probably looks at colors.
+    # If I use 1 for AirExt (Orange) and he expects Blue, that's a mismatch.
+    # I will set AIR_EXT = 7 (Cyan) or something distinct, OOOOR...
+    # Let's look at the Step 53 plot again. 
+    # 0 is Blue. 
+    # 1 is Orange. 
+    # 2 is Green.
+    # If Air Ext was 0 (Blue), then what is 1?
+    # Maybe 1 is Air Int?
+    # Let's try:
+    # AIR_EXT = 0
+    # AIR_INT = 1
+    # WALL = 2
+    # INSULATION = 3
+    # REVEAL_INS = 4
+    # FRAME = 5
+    # GLASS = 6
+    
+    AIR_EXT = 0
+    AIR_INT = 1
     WALL = 2
     INSULATION = 3
-    FRAME = 4
-    GLASS = 5
-    REVEAL_INS = 6
+    REVEAL_INS = 4
+    FRAME = 5
+    GLASS = 6
     SPACER = 7
-    # ISO Test Materials
+    
+    # ISO Test Materials (keep excessive IDs)
     CONCRETE = 10
     WOOD = 11
     ALUMINUM = 12
@@ -192,6 +233,11 @@ class GeometryBuilder(ABC):
             if isinstance(region, PolygonShape):
                 for p in region.points:
                     points.add(p.x)
+                    
+        # Add refinement zone boundaries
+        for zone in self.get_refinement_zones():
+            points.add(zone.x_min)
+            points.add(zone.x_max)
         
         return sorted([p for p in points if config.x_min_mm <= p <= config.x_max_mm])
     
@@ -210,6 +256,11 @@ class GeometryBuilder(ABC):
             if isinstance(region, PolygonShape):
                 for p in region.points:
                     points.add(p.y)
+                    
+        # Add refinement zone boundaries
+        for zone in self.get_refinement_zones():
+            points.add(zone.y_min)
+            points.add(zone.y_max)
         
         return sorted([p for p in points if config.y_min_mm <= p <= config.y_max_mm])
     
@@ -338,7 +389,9 @@ def build_material_grid(geometry: GeometryBuilder,
     grid_map = np.zeros((ny, nx), dtype=int)
     cond = np.zeros((ny, nx), dtype=float)
     
-    # Initialize with air (optional) or 0
+    # Initialize with default value (AIR_EXT = 0)
+    grid_map[:] = MaterialID.AIR_EXT
+    cond[:] = geometry.get_material_conductivity(MaterialID.AIR_EXT)
     
     # Apply regions
     for region in geometry.get_regions():

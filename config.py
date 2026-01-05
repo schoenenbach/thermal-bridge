@@ -22,9 +22,9 @@ RSE = 0.04
 # U_f = 1.3
 # R_f_total = 1 / 1.3 = 0.769 m2K/W
 # R_f_mat = 0.769 - RSI_WALL - RSE = 0.769 - 0.13 - 0.04 = 0.599 m2K/W
-# Frame Depth d = 0.08 m
-# Lambda_frame_eq = d / R_f_mat = 0.08 / 0.599 = 0.133 W/mK
-MAT_FRAME_EQ = 0.08 / (1.0/1.3 - RSI_WALL - RSE) 
+# Frame Depth d = 0.07 m
+# Lambda_frame_eq = d / R_f_mat = 0.07 / 0.599 = 0.117 W/mK
+MAT_FRAME_EQ = 0.07 / (1.0/1.3 - RSI_WALL - RSE) 
 
 # Glass 
 # U_g = 1.1
@@ -55,8 +55,8 @@ class CalculationConfig:
     taper_length_mm: int
     
     # Advanced Settings
-    frame_depth_mm: int = 80
-    frame_width_mm: int = 80 
+    frame_depth_mm: int = 70
+    frame_width_mm: int = 70 
     window_position_from_exterior_masonry_mm: int = 0
     masonry_rebate_overlap_mm: int = 0
     uninsulated_reveal: bool = False

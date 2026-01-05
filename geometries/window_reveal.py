@@ -1,25 +1,15 @@
 """
 Window Reveal Geometry for Thermal Bridge Calculations
 
-Provides a GeometryBuilder implementation for window reveal/jamb thermal bridges
-that wraps the existing CalculationConfig for backward compatibility.
-
-Usage:
-    from config import CalculationConfig
-    from geometries.window_reveal import WindowRevealGeometry
-    
-    config = CalculationConfig(wall_thickness_mm=360, ...)
-    geometry = WindowRevealGeometry(config)
+Refactored to use SketchGeometry (Points + Shapes).
+Wraps CalculationConfig for backward compatibility.
 """
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from geometry import (
-    GeometryBuilder, CanvasConfig, GeometryRegion,
-    RefinementZone, MaterialID
-)
+from geometry import SketchGeometry, RefinementZone, MaterialID
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
@@ -27,299 +17,231 @@ from config import (
 )
 from typing import List
 
-
-class WindowRevealGeometry(GeometryBuilder):
+class WindowRevealGeometry(SketchGeometry):
     """
     Window reveal/jamb geometry for thermal bridge calculations.
     
-    Wraps CalculationConfig for backward compatibility while using
-    the new geometry/mesh module structure.
-    
-    Coordinate system:
-    - x=0: Interior masonry face
-    - x=wall_thickness: Exterior masonry face (reveal corner)
-    - y=0: Reveal edge (masonry corner)
-    - y<0: Wall leg (deep into wall, away from window)
-    - y>0: Window leg (towards window/facade)
+    Refactored to use named Points and PolygonShapes.
+    Matches the coordinate system of valid results (1200x1000).
     """
     
     def __init__(self, config: CalculationConfig):
-        """
-        Args:
-            config: CalculationConfig with wall/insulation/window parameters
-        """
+        super().__init__()
         self.cfg = config
         
-        # Pre-calculate key geometry values
+        # --- Canvas Setup ---
+        # Match dimensions from analyze_images (approx 1200x1000)
+        # Assuming Wall starts at some offset.
+        # Based on ref: Wall is a block approx 360mm wide.
+        # Let's use similar OFF_X, OFF_Y but reduced Y range.
+        
+        self.OFF_X = 50.0  
+        self.OFF_Y = 500.0 
+        
         self.w_th = config.wall_thickness_mm
         self.pos = max(0, config.window_position_from_exterior_masonry_mm)
-        self.win_outer = self.w_th - self.pos  # Window outer face X
         
-        # Frame dimensions
+        # X Coordinates (Absolute)
+        self.x_int_air_left = 0.0
+        self.x_wall_int = self.OFF_X
+        self.x_wall_ext = self.OFF_X + self.w_th
+        self.x_win_outer = self.x_wall_ext - self.pos
+        
+        # Y Coordinates
+        self.y_bottom = 0.0
+        self.y_reveal = self.OFF_Y
+        self.y_top = self.OFF_Y + 500.0 # Total height 1000
+        
+        # Frame
         self.f_depth = config.frame_depth_mm
         self.f_width = config.frame_width_mm
-        self.f_x_end = self.win_outer
-        self.f_x_start = self.f_x_end - self.f_depth
+        self.x_f_end = self.x_win_outer
+        self.x_f_start = self.x_f_end - self.f_depth
         
-        # Sash dimensions
-        self.sash_recess = 30  # mm from window outer face
+        self.y_f_start = self.y_reveal
+        self.y_f_end = self.y_f_start + self.f_width
+        
+        # Sash
+        self.sash_overlap = 10
         self.sash_depth = 70
         self.sash_width = 70
-        self.sash_overlap = 10  # overlap with fixed frame
+        self.sash_recess = 30
         
-        self.sash_x_end = self.f_x_end - self.sash_recess
-        self.sash_x_start = self.sash_x_end - self.sash_depth
+        self.x_sash_end = self.x_f_end - self.sash_recess
+        self.x_sash_start = self.x_sash_end - self.sash_depth
         
-        # Glass (centered in sash, 24mm thick)
+        self.y_sash_start = self.y_f_end - self.sash_overlap
+        self.y_sash_end = self.y_sash_start + self.sash_width
+        
+        # Glass
         self.glass_thick = 24
-        self.glass_mid_x = (self.sash_x_start + self.sash_x_end) / 2
-        self.glass_x_start = self.glass_mid_x - self.glass_thick / 2
-        self.glass_x_end = self.glass_mid_x + self.glass_thick / 2
+        self.glass_mid_x = (self.x_sash_start + self.x_sash_end) / 2
+        self.x_glass_start = self.glass_mid_x - self.glass_thick / 2
+        self.x_glass_end = self.glass_mid_x + self.glass_thick / 2
+        self.y_glass_start = self.y_sash_start + 10
         
-        # Domain bounds
-        self.x_min = -50  # Interior air buffer
-        self.x_max = self.w_th + config.insulation_thick_max_mm + 500  # Far field
-        self.y_min = -500  # Wall leg (500mm)
-        self.y_max = 1000  # Window leg (1m)
         
-    def get_canvas_config(self) -> CanvasConfig:
-        # Use grid_size from config if available, else reasonable default
-        base_grid = getattr(self.cfg, 'grid_size_mm', 2.5)
+        # --- Points Definitions ---
         
-        return CanvasConfig(
-            x_min_mm=self.x_min,
-            x_max_mm=self.x_max,
-            y_min_mm=self.y_min,
-            y_max_mm=self.y_max,
-            default_dx_mm=max(5.0, base_grid * 2),  # Coarse areas
-            default_dy_mm=max(5.0, base_grid * 2),
-            fine_dx_mm=base_grid,  # Detail areas use config grid size
-            fine_dy_mm=base_grid,
-            ultra_dx_mm=max(0.5, base_grid / 2),  # Only for ultra-fine details
-            ultra_dy_mm=max(0.5, base_grid / 2),
-        )
-    
-    def get_regions(self) -> List[GeometryRegion]:
-        """
-        Build regions from background to foreground.
-        Order matters - later regions override earlier ones.
-        """
-        regions = []
+        # 1. Interior Air
+        # Left of wall, up to top
+        self.add_point("AirInt_BL", self.x_int_air_left, self.y_bottom)
+        self.add_point("AirInt_BR", self.x_wall_int, self.y_bottom)
+        self.add_point("AirInt_TR", self.x_wall_int, self.y_top)
+        self.add_point("AirInt_TL", self.x_int_air_left, self.y_top)
         
-        rebate = self.cfg.masonry_rebate_overlap_mm
-        taper_len = self.cfg.taper_length_mm
+        self.add_shape(["AirInt_BL", "AirInt_BR", "AirInt_TR", "AirInt_TL"],
+                       material_id=MaterialID.AIR_INT, lambda_val=0.025,
+                       name="Interior Air")
+
+        # 2. Wall (Masonry LEG)
+        # From bottom to reveal height
+        self.add_point("Wall_BL", self.x_wall_int, self.y_bottom)
+        self.add_point("Wall_BR", self.x_wall_ext, self.y_bottom)
+        self.add_point("Wall_TR", self.x_wall_ext, self.y_reveal)
+        self.add_point("Wall_TL", self.x_wall_int, self.y_reveal)
         
-        # 1. Interior Air (background for y>0, x<0)
-        regions.append(GeometryRegion(
-            name="Interior Air",
-            material_id=MaterialID.AIR_INT,
-            x_min=self.x_min, x_max=0,
-            y_min=self.y_min, y_max=self.y_max,
-            lambda_w_mk=0.025
-        ))
-        
-        # 2. Wall (Masonry) - Base
-        regions.append(GeometryRegion(
-            name="Wall",
-            material_id=MaterialID.WALL,
-            x_min=0, x_max=self.w_th,
-            y_min=self.y_min, y_max=0,
-            lambda_w_mk=MAT_WALL
-        ))
-        
-        # 3. Masonry Rebate (nose) if present
+        self.add_shape(["Wall_BL", "Wall_BR", "Wall_TR", "Wall_TL"],
+                       material_id=MaterialID.WALL, lambda_val=MAT_WALL,
+                       name="Wall")
+                       
+        # 3. Rebate (if present)
+        rebate = config.masonry_rebate_overlap_mm
         if rebate > 0:
-            regions.append(GeometryRegion(
-                name="Rebate",
-                material_id=MaterialID.WALL,
-                x_min=self.win_outer, x_max=self.w_th,
-                y_min=0, y_max=rebate,
-                lambda_w_mk=MAT_WALL
-            ))
-        
-        # 4. Exterior Insulation (ETICS) if present
-        if self.cfg.insulation_thick_max_mm > 0:
-            # Insulation with taper
-            # For simplicity, define as rectangle - taper handled via shape predicate
-            ins_x_max = self.w_th + self.cfg.insulation_thick_max_mm
-            ins_x_min_at_corner = self.w_th + self.cfg.insulation_thick_min_mm
+            y_rebate_end = self.y_reveal + float(rebate)
             
-            def insulation_shape(X, Y):
-                """Tapered insulation shape predicate."""
-                # Below taper start: full thickness
-                full_thick = Y < -taper_len
+            # The rebate sits on top of the wall leg, extending inwards from exterior face
+            # Wait, rebate overlap means it creates a "nose" for the window to sit against.
+            # Usually creates an L-shape wall.
+            # Shape: Rectangle on top of wall corner?
+            # Bounds: x_win_outer to x_wall_ext, y_reveal to y_reveal + rebate
+            
+            self.add_point("Reb_BL", self.x_win_outer, self.y_reveal)
+            self.add_point("Reb_BR", self.x_wall_ext, self.y_reveal)
+            self.add_point("Reb_TR", self.x_wall_ext, y_rebate_end)
+            self.add_point("Reb_TL", self.x_win_outer, y_rebate_end)
+            
+            self.add_shape(["Reb_BL", "Reb_BR", "Reb_TR", "Reb_TL"],
+                           material_id=MaterialID.WALL, lambda_val=MAT_WALL,
+                           name="Rebate")
+
+        # 4. Insulation (External)
+        if config.insulation_thick_max_mm > 0:
+            ins_max = config.insulation_thick_max_mm
+            taper_len = config.taper_length_mm
+            
+            x_ins_start = self.x_wall_ext
+            x_ins_end = x_ins_start + ins_max
+            
+            self.add_point("Ins_BL", x_ins_start, self.y_bottom)
+            self.add_point("Ins_BR", x_ins_end, self.y_bottom)
+            
+            # Taper logic
+            rebate_h = float(config.masonry_rebate_overlap_mm)
+            y_ins_top = self.y_reveal + rebate_h
+            
+            if taper_len > 0:
+                y_taper_start = y_ins_top - float(taper_len)
+                x_ins_min_end = x_ins_start + config.insulation_thick_min_mm # at corner
                 
-                # In taper zone: linear interpolation
-                in_taper = (Y >= -taper_len) & (Y <= 0)
-                if taper_len > 0:
-                    f = (Y + taper_len) / taper_len  # 0 at taper start, 1 at corner
-                    max_x_at_y = self.w_th + self.cfg.insulation_thick_max_mm - \
-                                 f * (self.cfg.insulation_thick_max_mm - self.cfg.insulation_thick_min_mm)
-                    taper_ok = X <= max_x_at_y
-                else:
-                    taper_ok = X <= ins_x_max
-                    
-                return full_thick | (in_taper & taper_ok)
+                self.add_point("Ins_Taper_Start", x_ins_end, y_taper_start)
+                self.add_point("Ins_Top_Corner", x_ins_min_end, y_ins_top)
+                self.add_point("Ins_Top_Inner", x_ins_start, y_ins_top)
+                
+                self.add_shape(["Ins_BL", "Ins_BR", "Ins_Taper_Start", "Ins_Top_Corner", "Ins_Top_Inner"],
+                               material_id=MaterialID.INSULATION, lambda_val=MAT_INSULATION,
+                               name="Insulation")
+            else:
+                 self.add_point("Ins_Top_Outer", x_ins_end, y_ins_top)
+                 self.add_point("Ins_Top_Inner", x_ins_start, y_ins_top)
+                 
+                 self.add_shape(["Ins_BL", "Ins_BR", "Ins_Top_Outer", "Ins_Top_Inner"],
+                                material_id=MaterialID.INSULATION, lambda_val=MAT_INSULATION,
+                                name="Insulation")
+
+        # 5. Reveal Insulation
+        if config.reveal_insulation_mm > 0 and not config.uninsulated_reveal:
+            rev_ins = config.reveal_insulation_mm
+            y_base = self.y_reveal + (float(rebate) if rebate > 0 else 0)
             
-            regions.append(GeometryRegion(
-                name="Insulation",
-                material_id=MaterialID.INSULATION,
-                x_min=self.w_th, x_max=ins_x_max,
-                y_min=self.y_min, y_max=0,
-                lambda_w_mk=MAT_INSULATION,
-                shape_predicate=insulation_shape
-            ))
-        
-        # 5. Reveal Insulation if present
-        if self.cfg.reveal_insulation_mm > 0 and not self.cfg.uninsulated_reveal:
-            rev_y_start = rebate
-            rev_y_end = rebate + self.cfg.reveal_insulation_mm
-            rev_x_end = self.w_th + self.cfg.insulation_thick_min_mm
+            # Assuming reveal insulation wraps the rebate or lines the reveal
+            # Based on standard details: it lines the masonry face perpendicular to window
+            # Here: on top of rebate? Or lining the rebate "vertical" face?
+            # Let's assume on top of rebate/wall shoulder.
             
-            regions.append(GeometryRegion(
-                name="Reveal Insulation",
-                material_id=MaterialID.REVEAL_INS,
-                x_min=self.win_outer, x_max=rev_x_end,
-                y_min=rev_y_start, y_max=rev_y_end,
-                lambda_w_mk=MAT_REVEAL_INSULATION
-            ))
+            x_start = self.x_win_outer
+            x_end = self.x_wall_ext + config.insulation_thick_min_mm
+            
+            # Logic: block above the masonry/rebate
+            
+            self.add_point("Rev_BL", x_start, y_base)
+            self.add_point("Rev_BR", x_end, y_base)
+            self.add_point("Rev_TR", x_end, y_base + rev_ins)
+            self.add_point("Rev_TL", x_start, y_base + rev_ins)
+            
+            self.add_shape(["Rev_BL", "Rev_BR", "Rev_TR", "Rev_TL"],
+                           material_id=MaterialID.REVEAL_INS, lambda_val=MAT_REVEAL_INSULATION,
+                           name="Reveal Insulation")
+
+        # 6. Frame
+        self.add_point("Frame_BL", self.x_f_start, self.y_f_start)
+        self.add_point("Frame_BR", self.x_f_end, self.y_f_start)
+        self.add_point("Frame_TR", self.x_f_end, self.y_f_end)
+        self.add_point("Frame_TL", self.x_f_start, self.y_f_end)
         
-        # 6. Window Frame (Fixed Frame)
-        regions.append(GeometryRegion(
-            name="Fixed Frame",
-            material_id=MaterialID.FRAME,
-            x_min=self.f_x_start, x_max=self.f_x_end,
-            y_min=0, y_max=self.f_width,
-            lambda_w_mk=MAT_FRAME_EQ
-        ))
+        self.add_shape(["Frame_BL", "Frame_BR", "Frame_TR", "Frame_TL"],
+                       material_id=MaterialID.FRAME, lambda_val=MAT_FRAME_EQ,
+                       name="Fixed Frame")
+                       
+        # 7. Sash
+        self.add_point("Sash_BL", self.x_sash_start, self.y_sash_start)
+        self.add_point("Sash_BR", self.x_sash_end, self.y_sash_start)
+        self.add_point("Sash_TR", self.x_sash_end, self.y_sash_end)
+        self.add_point("Sash_TL", self.x_sash_start, self.y_sash_end)
         
-        # 7. Sash (overlaps frame)
-        sash_y_start = self.f_width - self.sash_overlap
-        sash_y_end = sash_y_start + self.sash_width
+        self.add_shape(["Sash_BL", "Sash_BR", "Sash_TR", "Sash_TL"],
+                       material_id=MaterialID.FRAME, lambda_val=MAT_FRAME_EQ,
+                       name="Sash")
+                       
+        # 8. Glass
+        self.add_point("Glass_BL", self.x_glass_start, self.y_glass_start)
+        self.add_point("Glass_BR", self.x_glass_end, self.y_glass_start)
+        self.add_point("Glass_TR", self.x_glass_end, self.y_top)
+        self.add_point("Glass_TL", self.x_glass_start, self.y_top)
         
-        regions.append(GeometryRegion(
-            name="Sash",
-            material_id=MaterialID.FRAME,
-            x_min=self.sash_x_start, x_max=self.sash_x_end,
-            y_min=sash_y_start, y_max=sash_y_end,
-            lambda_w_mk=MAT_FRAME_EQ
-        ))
+        self.add_shape(["Glass_BL", "Glass_BR", "Glass_TR", "Glass_TL"],
+                       material_id=MaterialID.GLASS, lambda_val=MAT_GLASS_UG11,
+                       name="Glass")
+                       
+        # Set Canvas
+        # Everything outside these shapes is AIR_EXT (Default)
+        # But we explicitly defined AIR_INT
+        # So AIR_INT shape overrides AIR_EXT default
+        # WALL overrides AIR_INT where it might overlap? (Usually disjoint)
         
-        # 8. L-Profile extension (back of sash to frame)
-        ext_y_end = 80.0
-        if ext_y_end > self.f_width:
-            regions.append(GeometryRegion(
-                name="Frame Extension",
-                material_id=MaterialID.FRAME,
-                x_min=self.sash_x_end, x_max=self.f_x_end,
-                y_min=self.f_width, y_max=ext_y_end,
-                lambda_w_mk=MAT_FRAME_EQ
-            ))
+        # Domain: Fixed 1000mm width as requested
+        x_dom_max = 1000.0
         
-        # 9. Glass (extends from sash upward)
-        glass_y_start = sash_y_start + 10  # 10mm overlap
-        
-        regions.append(GeometryRegion(
-            name="Glass",
-            material_id=MaterialID.GLASS,
-            x_min=self.glass_x_start, x_max=self.glass_x_end,
-            y_min=glass_y_start, y_max=self.y_max,
-            lambda_w_mk=MAT_GLASS_UG11
-        ))
-        
-        # 10. Exterior Air (everything right of structure)
-        # This is handled by detecting "outside" after material assignment
-        
-        return regions
-    
-    def get_critical_x_points(self) -> List[float]:
-        """Key X coordinates for mesh alignment."""
-        points = [
-            self.x_min,
-            0,  # Interior masonry face
-            self.f_x_start,
-            self.sash_x_start,
-            self.glass_x_start,
-            self.glass_x_end,
-            self.sash_x_end,
-            self.f_x_end,
-            self.win_outer,
-            self.w_th,
-            self.w_th + self.cfg.insulation_thick_min_mm,
-            self.w_th + self.cfg.insulation_thick_max_mm,
-            self.x_max,
-        ]
-        # Filter to valid range and unique
-        return sorted(set(p for p in points if self.x_min <= p <= self.x_max))
-    
-    def get_critical_y_points(self) -> List[float]:
-        """Key Y coordinates for mesh alignment."""
-        points = [
-            self.y_min,
-            -self.cfg.taper_length_mm,
-            0,  # Reveal edge
-            self.cfg.masonry_rebate_overlap_mm,
-            self.cfg.masonry_rebate_overlap_mm + self.cfg.reveal_insulation_mm,
-            self.f_width,  # Frame top
-            self.f_width - self.sash_overlap,  # Sash start
-            self.f_width - self.sash_overlap + self.sash_width,  # Sash end
-            self.f_width - self.sash_overlap + 10,  # Glass start
-            80.0,  # Extension end
-            self.y_max,
-        ]
-        return sorted(set(p for p in points if self.y_min <= p <= self.y_max))
-    
+        self.set_canvas(0.0, x_dom_max, 
+                        0.0, self.y_top, 
+                        grid_mm=config.grid_size_mm)
+                        
     def get_refinement_zones(self) -> List[RefinementZone]:
-        """Define zones requiring finer mesh resolution."""
         config = self.get_canvas_config()
         zones = []
         
-        # Near reveal corner - use fine resolution (not ultra)
-        # This is the critical thermal bridge region
+        # Reveal Corner (Critical)
         zones.append(RefinementZone(
-            x_min=self.f_x_start - 10,
-            x_max=self.w_th + 30,
-            y_min=-30,
-            y_max=100,
+            x_min=self.x_f_start - 20,
+            x_max=self.x_wall_ext + 30,
+            y_min=self.y_reveal - 30,
+            y_max=self.y_reveal + 100,
             target_dx=config.fine_dx_mm,
             priority=2
         ))
         
-        # Frame/sash area - fine resolution
-        zones.append(RefinementZone(
-            x_min=self.f_x_start,
-            x_max=self.f_x_end,
-            y_min=0,
-            y_max=self.f_width + self.sash_width,
-            target_dx=config.fine_dx_mm,
-            priority=1
-        ))
-        
-        # Taper zone - slightly finer than default
-        if self.cfg.taper_length_mm > 0:
-            zones.append(RefinementZone(
-                x_min=self.w_th,
-                x_max=self.w_th + self.cfg.insulation_thick_max_mm,
-                y_min=-self.cfg.taper_length_mm,
-                y_max=0,
-                target_dx=config.fine_dx_mm,
-                priority=1
-            ))
-        
         return zones
-    
-    def get_boundary_conditions(self) -> dict:
-        return {
-            'fixed_regions': [
-                (MaterialID.AIR_INT, TEMP_INT),
-                (MaterialID.AIR_EXT, TEMP_EXT),
-            ],
-            'surface_resistance': {
-                MaterialID.AIR_INT: RSI_WALL,
-                MaterialID.AIR_EXT: RSE,
-            }
-        }
-    
+
     def get_spacer_lambda(self) -> float:
         """Get thermal conductivity for configured spacer type."""
         if self.cfg.spacer_type == SpacerType.SWISS_ULTIMATE:
@@ -329,31 +251,3 @@ class WindowRevealGeometry(GeometryBuilder):
         elif self.cfg.spacer_type == SpacerType.ALUMINUM:
             return MAT_SPACER_ALUMINUM
         return 0.14  # Default
-
-
-if __name__ == "__main__":
-    # Quick test with sample config
-    from config import CalculationConfig
-    
-    cfg = CalculationConfig(
-        wall_thickness_mm=360,
-        insulation_thick_max_mm=100,
-        insulation_thick_min_mm=30,
-        reveal_insulation_mm=30,
-        taper_length_mm=150,
-        window_position_from_exterior_masonry_mm=150,
-        masonry_rebate_overlap_mm=50,
-    )
-    
-    geom = WindowRevealGeometry(cfg)
-    canvas = geom.get_canvas_config()
-    
-    print(f"Canvas: {canvas.width_mm} x {canvas.height_mm} mm")
-    print(f"  X: [{canvas.x_min_mm}, {canvas.x_max_mm}]")
-    print(f"  Y: [{canvas.y_min_mm}, {canvas.y_max_mm}]")
-    print(f"\nRegions ({len(geom.get_regions())}):")
-    for r in geom.get_regions():
-        print(f"  - {r.name}: ({r.x_min:.0f}-{r.x_max:.0f}) x ({r.y_min:.0f}-{r.y_max:.0f})")
-    print(f"\nCritical X: {geom.get_critical_x_points()}")
-    print(f"Critical Y: {geom.get_critical_y_points()}")
-    print(f"\nRefinement Zones: {len(geom.get_refinement_zones())}")
