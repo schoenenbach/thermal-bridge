@@ -1,0 +1,55 @@
+# AGENTS.md
+
+## Project Overview
+This project is a thermal bridge simulation tool designed to calculate Psi-values and fRsi temperature factors for building components. It uses a finite difference method with a hybrid Python/C++ implementation for performance.
+
+## Core Capabilities
+- **2D Heat Transfer:** Solves steady-state heat conduction equations.
+- **ISO 10211 Validation:** Includes test runners for standard validation cases (Case 1 & 2). These are defined in the underlying DIN specification.
+- **Geometric Primitives:** Polygon-based geometry definition using `SketchGeometry` to create elements of the configuration that should be simulated, e.g. parts of a wall or window.
+- **Material Management:** Automatic `grid_map` generation for thermal conductivities.
+- **Visualization:** Generates temperature vs. depth plots with isotherm contours.
+
+## Key Files & Structure
+- `solver.py`: **[CRITICAL]** The core solver module. Handles C++ library loading, conductance calculation, solving loop, and result calculation. Single source of truth.
+- `simulation_engine.py`: Main entry point for running window reveal scenarios. Defines geometry configurations (`CalculationConfig`) and orchestrates the simulation.
+- `run_iso_tests.py`: Validation script. Runs ISO 10211 test cases to ensure solver correctness.
+- `config.py`: Central configuration for material properties (Lambda), boundary conditions (Temperatures, R-values), and `WindowConfig`.
+- `geometry.py`: Base classes (`GeometryBuilder`, `SketchGeometry`) and helper functions (`build_material_grid`).
+- `mesh.py`: Mesh generation logic (`UniformMesh`, `AdaptiveMesh`).
+- `geometries/`: Package containing specific geometry implementations (`window_reveal.py`, `iso_case1.py`, etc.).
+- `legacy/`: Deprecated code (e.g., old `thermal_solver.py`). Do not touch unless necessary.
+
+## Development & Usage
+
+### Dependencies
+- Python 3.x
+- `numpy`
+- `matplotlib`
+- `ctypes` (Standard library)
+- `thermal_solver_core.so`: Compiled C++ shared library (must be present in root).
+
+### Running Simulations
+```bash
+# Run all window reveal scenarios (output: result_scenario_*.png)
+python3 simulation_engine.py
+
+# Run ISO 10211 validation tests
+python3 run_iso_tests.py all
+```
+
+### Extending the Project
+- **New Geometries:** Create a new file in `geometries/` inheriting from `SketchGeometry`. Define shape using `add_point()` and `add_shape()`.
+- **New Window Types:** Update `WindowConfig` in `config.py` or pass a custom `WindowConfig` object to `CalculationConfig`.
+- **Solver Improvements:** Modify `solver.py`. Ensure backward compatibility with `run_iso_tests.py`.
+- **Making changes:** The project is git versioned. Before making changes you can have a look at the git history to see what changes were made in the past. After your changes are accepted you should wrap up into a git commit and push it to the repository. Adhere to Chris Beams commit message guidelines and describe the "why" of your changes.
+
+## Code Style & Conventions
+- **Solver Logic:** Keep all solving and C++ interfacing in `solver.py`. 
+- **Geometry:** Use `SketchGeometry` for flexible polygon definitions. Avoid hardcoded grid indices.
+- **Units:**
+  - Lengths: Millimeters (mm) primarily, converted to meters (m) for calculation.
+  - Temperature: Degrees Celsius (°C).
+  - Conductivity: W/(m·K).
+  - Stick to SI units where not better/more common alternative is used normally.
+
