@@ -31,78 +31,17 @@ st.set_page_config(page_title="Thermal Bridge Simulator", layout="wide")
 st.title("Thermal Bridge Simulator")
 st.markdown("Calculate thermal bridges for window reveals using a hybrid Python/C++ solver.")
 
-# --- Mode Selection ---
-st.sidebar.title("Mode")
-mode = st.sidebar.radio("Select Mode", ["Standard Scenarios", "Custom Editor"])
+# --- Configuration Sidebar ---
+st.sidebar.title("Configuration")
 
-grid_override = 0.0
+# 1. Template Loader
+scenario_files = glob.glob("scenarios/scenario_*.yaml") + glob.glob("scenarios/iso_*.yaml")
+scenario_files.sort()
+display_names = ["(New Empty)"] + [os.path.basename(f) for f in scenario_files]
 
-if mode == "Standard Scenarios":
-    # --- Standard Mode (Existing Logic) ---
-    st.sidebar.header("Configuration")
-    
-    # Find Scenarios
-    scenario_files = glob.glob("scenarios/scenario_*.yaml") + glob.glob("scenarios/iso_*.yaml")
-    scenario_files.sort()
-    scenario_names = [os.path.basename(f) for f in scenario_files]
-    
-    selected_file_name = st.sidebar.selectbox("Select Scenario", scenario_names)
-    
-    if selected_file_name:
-        selected_file_path = os.path.join("scenarios", selected_file_name)
-        with open(selected_file_path, 'r') as f:
-            yaml_content = f.read()
-            data = yaml.safe_load(yaml_content)
-            
-        # ... (Parametric Controls logic - kept for standard mode)
-        # Variable Overrides
-        st.sidebar.subheader("Parameters")
-        variables = data.get('variables', {})
-        modified_variables = {}
-        
-        if variables:
-            for key, value in variables.items():
-                if isinstance(value, (int, float)):
-                    # Heuristic for ranges
-                    min_val = 0.0
-                    max_val = float(value) * 3.0 if value > 0 else 100.0
-                    step = 5.0
-                    if "thick" in key:
-                        min_val = 0.0
-                        max_val = 500.0
-                    
-                    if value < min_val: min_val = value
-                    if value > max_val: max_val = value * 2.0
-                    
-                    new_val = st.sidebar.number_input(f"{key} (mm)", 
-                                                    min_value=float(min_val), 
-                                                    max_value=float(max_val), 
-                                                    value=float(value),
-                                                    step=step)
-                    modified_variables[key] = new_val
-                else:
-                    st.sidebar.text(f"{key}: {value}")
-                    modified_variables[key] = value
-        
-        if modified_variables:
-            data['variables'] = modified_variables
-            
-        # Store data for execution
-        active_data = data
-        active_name = data.get('name', selected_file_name)
-
-else:
-    # --- Custom Editor Mode ---
-    st.sidebar.header("Builder")
-    
-    # Template Loader
-    scenario_files = glob.glob("scenarios/*.yaml")
-    scenario_files.sort()
-    display_names = ["(New Empty)"] + [os.path.basename(f) for f in scenario_files]
-    
-    template = st.sidebar.selectbox("Load Template", display_names)
-    
-    default_yaml = """name: "My Custom Geometry"
+# Use session state to handle template loading without overwriting edits accidentally
+if "yaml_editor" not in st.session_state:
+    st.session_state.yaml_editor = """name: "My Custom Geometry"
 canvas:
   bounds: [0, 500, 0, 500]
   grid: 10.0
@@ -110,38 +49,87 @@ elements:
   - type: rect
     material: 2 # WALL
     params:
-      x: 0
-      y: 0
-      width: 360
-      height: 500
+        x: 0
+        y: 0
+        width: 360
+        height: 500
 """
-    
-    if template != "(New Empty)":
-        pth = os.path.join("scenarios", template)
+
+def load_template():
+    selected = st.session_state.template_selector
+    if selected != "(New Empty)":
+        pth = os.path.join("scenarios", selected)
         with open(pth, 'r') as f:
-            default_yaml = f.read()
+            # Crucial: Update the widget key directly!
+            st.session_state.yaml_editor = f.read()
 
-    # Grid Override (Performance)
-    st.sidebar.markdown("---")
-    grid_override = st.sidebar.number_input("Override Grid Size (mm)", 
-                                           min_value=0.0, max_value=50.0, value=0.0, step=0.5,
-                                           help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
+template = st.sidebar.selectbox("Load Template", display_names, key="template_selector", on_change=load_template)
 
-    # Editor
-    st.subheader("Geometry Definition (YAML)")
-    yaml_input = st.text_area("Edit Configuration", value=default_yaml, height=400)
-    
-    try:
-        active_data = yaml.safe_load(yaml_input)
-        active_name = active_data.get('name', "Custom")
-        st.sidebar.success("YAML Valid")
-    except Exception as e:
-        st.sidebar.error(f"YAML Error: {e}")
-        active_data = None
-        active_name = "Invalid"
+# 2. Grid Override
+st.sidebar.markdown("---")
+grid_override = st.sidebar.number_input("Override Grid Size (mm)", 
+                                       min_value=0.0, max_value=50.0, value=0.0, step=0.5,
+                                       help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
+
+# --- Main Editor Area ---
+st.subheader("Geometry Definition (YAML)")
+# No need for value=... if key is used and initialized in session_state, but providing value is good practice for first run fallback
+yaml_input = st.text_area("Edit Configuration", height=500, key="yaml_editor")
+
+# --- Live Parsing & Dynamic Sliders ---
+active_data = None
+active_name = "Custom"
+
+try:
+    active_data = yaml.safe_load(yaml_input)
+    active_name = active_data.get('name', "Custom")
+    # st.sidebar.success("YAML Valid") # Less noise
+except Exception as e:
+    st.sidebar.error(f"YAML Error: {e}")
+    active_data = None
+    active_name = "Invalid"
+
+# Dynamic Variable Extraction
+if active_data:
+    variables = active_data.get('variables', {})
+    if variables:
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Parameters")
+        
+        modified_variables = {}
+        for key, value in variables.items():
+            if isinstance(value, (int, float)):
+                # Heuristic for ranges
+                min_val = 0.0
+                max_val = float(value) * 3.0 if value > 0 else 100.0
+                step = 5.0
+                if "thick" in key:
+                    min_val = 0.0
+                    max_val = 500.0
+                
+                if value < min_val: min_val = value
+                if value > max_val: max_val = value * 2.0
+                
+                # Make key unique using scenario name to avoid state collisions
+                widget_key = f"var_{active_name}_{key}"
+                
+                new_val = st.sidebar.number_input(f"{key} (mm)", 
+                                                min_value=float(min_val), 
+                                                max_value=float(max_val), 
+                                                value=float(value),
+                                                step=step,
+                                                key=widget_key)
+                modified_variables[key] = new_val
+            else:
+                st.sidebar.text(f"{key}: {value}")
+                modified_variables[key] = value
+        
+        # Apply Overrides to active_data
+        if modified_variables:
+            active_data['variables'] = modified_variables
 
 
-# --- Execution (Common) ---
+# --- Execution Control ---
 if active_data:
     st.header(active_name)
     
@@ -155,7 +143,6 @@ if active_data:
                     if grid_override > 0:
                         if 'canvas' not in active_data: active_data['canvas'] = {}
                         active_data['canvas']['grid'] = grid_override
-                        # Also bounds if needed? No, just grid.
 
                     # Temp file strategy
                     temp_yaml = "temp_active.yaml"
@@ -184,8 +171,6 @@ if active_data:
 
                     results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb)
                     
-                    prog_bar.progress(1.0)
-                    status_text.success("Simulation Complete")
                     prog_bar.progress(1.0)
                     status_text.success("Simulation Complete")
                     
@@ -231,10 +216,14 @@ if active_data:
                     # Show Result Image
                     img_path = f"result_{active_name}.png"
                     if os.path.exists(img_path):
-                        st.image(img_path, caption="Result")
+                        # Force browser reload with unique param
+                        import time
+                        st.image(img_path, caption=f"Result (Ti={active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 'Def')}°C)", output_format="PNG")
                         
                 except Exception as e:
                     st.error(f"Error: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
     
     with col_act2:
         if st.button("Preview Geometry"):
@@ -259,7 +248,6 @@ if active_data:
                 st.error(f"Preview Failed: {e}")
 
     # Download
-    if mode == "Custom Editor":
-        st.download_button("Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml")
+    st.download_button("Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml")
 
 

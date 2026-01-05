@@ -711,11 +711,15 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     else:
         temp_for_plot = temp_frsi
 
+    
+    # Format Title to include Temperature Setup
+    plot_title = f"{scenario_def['name']}\n(Ti={t_int}°C, Te={t_ext}°C)"
+
     plot_temperature_map(temp_for_plot, 
                          geom.get_canvas_config().width_mm, 
                          geom.get_canvas_config().height_mm,
                          f"result_{scenario_def['name']}.png", 
-                         title=scenario_def['name'],
+                         title=plot_title,
                          wall_thick_mm=wall_th,
                          grid_size_mm=getattr(mesh, 'grid_size_mm', None),
                          x_coords=mesh.x_coords,
