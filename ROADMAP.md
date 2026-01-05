@@ -56,7 +56,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   Inputs for Range/Step.
     *   Plotly chart showing the trend (e.g., Insulation Thickness vs. Psi-value).
 
-## 5. Interactive Geometry Builder
+## 5. Interactive Geometry Builder [DONE]
 
 **Objective:** Lower the barrier to entry by providing a visual interface for creating geometries, removing the need to write YAML manually.
 

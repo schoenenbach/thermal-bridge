@@ -13,6 +13,22 @@ sys.path.append(os.getcwd())
 from declarative_geometry import DeclarativeGeometry
 from simulation_engine import solve_scenario
 from solver import get_solver_lib
+from geometry_builder import generate_scenario, COLOR_MAP
+
+from streamlit_drawable_canvas import st_canvas
+
+# ... (Previous imports)
+
+# Remove try-except, let it crash if missing
+# try:
+#     from streamlit_drawable_canvas import st_canvas
+# except ImportError:
+#     st_canvas = None
+
+# ... (Inside tab_builder)
+
+
+
 
 # --- Auto-Build for Cloud Deployment ---
 import subprocess
@@ -73,7 +89,101 @@ grid_override = st.sidebar.number_input("Override Grid Size (mm)",
 
 # --- Main Editor Area ---
 # --- Main Area Tabs ---
-tab_editor, tab_opt = st.tabs(["Scenario Editor", "Optimization"])
+tab_editor, tab_builder, tab_opt = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization"])
+
+with tab_builder:
+    st.header("Interactive Geometry Builder")
+    
+    # CSS to force iframe visibility - potentially needed for some browser/streamlit combos
+    st.markdown("""
+        <style>
+        iframe[title="streamlit_drawable_canvas.st_canvas"] {
+            min-height: 400px;
+            border: 1px solid #ccc;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.info("Instructions:\n- **Draw**: Click and drag.\n- **Edit**: Select to move/resize.\n- **Delete**: Select object and click the **control handle/square** above it (or try Backspace).\n- **Reset**: Click 'Clear Canvas' above to remove everything.")
+    
+    # Tool Bar
+    col_tools_1, col_tools_2 = st.columns(2)
+    
+    with col_tools_1:
+        # Material Selector
+        material_mode = st.radio("Material", list(COLOR_MAP.values()), index=0, horizontal=True)
+        # Reverse lookup
+        fill_color = "#808080"
+        for k, v in COLOR_MAP.items():
+            if v == material_mode:
+                fill_color = k
+                break
+                
+    with col_tools_2:
+        tool_mode = st.radio("Tool", ["Draw Rectangle", "Edit/Select"], index=0, horizontal=True)
+        mode_map = {"Draw Rectangle": "rect", "Edit/Select": "transform"}
+    
+    # Reset Button logic
+    if "canvas_reset_count" not in st.session_state:
+        st.session_state.canvas_reset_count = 0
+        
+    if st.button("Clear Canvas", type="secondary"):
+        st.session_state.canvas_reset_count += 1
+        st.rerun()
+
+    # Canvas
+    realtime_update = st.checkbox("Update YAML Realtime", value=True)
+    
+    # CSS to force iframe visibility - potentially needed for some browser/streamlit combos
+    st.markdown("""
+        <style>
+        iframe[title="streamlit_drawable_canvas.st_canvas"] {
+            min-height: 400px;
+            border: 1px solid #ccc;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Canvas Component
+    c_container = st.container()
+    with c_container:
+        canvas_key = f"geometry_canvas_prod_v1_{st.session_state.canvas_reset_count}"
+        canvas_result = st_canvas(
+            fill_color=fill_color,
+            stroke_width=2,
+            stroke_color="#000000",
+            background_color="#eeeeee",
+            update_streamlit=realtime_update,
+            height=400,
+            width=600,
+            drawing_mode=mode_map[tool_mode],
+            display_toolbar=True,
+            initial_drawing={'version': '4.4.0', 'objects': []}, # Explicit empty on reset
+            key=canvas_key
+        )
+    
+    # Output Processing
+    if canvas_result and canvas_result.json_data:
+         # Only show summary, not full dump
+         num_obj = len(canvas_result.json_data.get("objects", []))
+         st.caption(f"Objects detected: {num_obj}")
+         
+         if num_obj > 0:
+             scen = generate_scenario(canvas_result.json_data)
+             
+             # Preview and Send
+             col_res1, col_res2 = st.columns([2, 1])
+             with col_res1:
+                 st.subheader("Generated Scenario")
+                 st.code(yaml.dump(scen), language='yaml')
+             with col_res2:
+                 st.write(" ")
+                 st.write(" ")
+                 if st.button("Use this Geometry", type="primary"):
+                    st.session_state.yaml_editor = yaml.dump(scen, sort_keys=False)
+                    st.toast("Configuration Updated!", icon="✅")
+                    # Switch to Editor tab? st.experimental_set_query_params? No, strictly manual tab check.
+                    st.success("Sent to Editor Tab ->")
 
 with tab_editor:
     st.subheader("Geometry Definition (YAML)")
@@ -333,11 +443,7 @@ with tab_opt:
         
     if st.button("Generate PDF Report"):
         # Gather results (need to be in scope or session state)
-        # We'll scrape the measurements from the last run if available, 
-        # but since 'measurements' variable is local to the button click above, 
-        # we really should persist it in session_state for this to be robust.
-        # For now, we'll try to rely on the fact that if the user just ran it, 
-        # we might need to re-parse or better yet, store 'last_results' in session_state.
+        # We might need to re-parse or better yet, store 'last_results' in session_state.
         
         # Better approach: Check if results image exists
         img_path = f"result_{active_name}.png"
