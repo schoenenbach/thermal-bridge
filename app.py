@@ -50,10 +50,12 @@ st.set_page_config(page_title="Thermal Bridge Simulator", layout="wide")
 st.title("Thermal Bridge Simulator")
 st.markdown("Calculate thermal bridges for window reveals using a hybrid Python/C++ solver.")
 
-# --- Configuration Sidebar ---
-st.sidebar.title("Configuration")
+# Sidebar removed - functionality moved to main area
+template = None # Placeholder so logic below doesn't break if referenced differently, 
+# though we are redefining it inside the tab. 
+# Better: Just define the display_names globally as before.
 
-# 1. Template Loader
+# 1. Template Loader - Definitions
 scenario_files = glob.glob("scenarios/scenario_*.yaml") + glob.glob("scenarios/iso_*.yaml")
 scenario_files.sort()
 display_names = ["(New Empty)"] + [os.path.basename(f) for f in scenario_files]
@@ -82,498 +84,366 @@ def load_template():
             # Crucial: Update the widget key directly!
             st.session_state.yaml_editor = f.read()
 
-template = st.sidebar.selectbox("Load Template", display_names, key="template_selector", on_change=load_template)
+# Default values for logic that might depend on them if UI element is hidden/separate
+transient_enabled = False
+show_mold_map = False
+indoor_rh = 50 
+grid_override = 0.0
 
-# 2. Grid Override
-st.sidebar.markdown("---")
-grid_override = st.sidebar.number_input("Override Grid Size (mm)", 
-                                       min_value=0.0, max_value=50.0, value=0.0, step=0.5,
-                                       help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
+# Sidebar is now empty or can be used for global app info if needed
+# st.sidebar.title("Configuration") - REMOVED
 
 # --- Main Editor Area ---
 # --- Main Area Tabs ---
-tab_editor, tab_builder, tab_opt, tab_compare, tab_import = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization", "Compare", "Import DXF"])
+tab_studio, tab_compare, tab_opt, tab_import = st.tabs(["Scenario Studio", "Compare", "Optimization", "Import DXF"])
 
-with tab_builder:
-    st.header("Interactive Geometry Builder")
+with tab_studio:
+    st.header("Scenario Studio")
+    st.caption("Unified workspace: Edit YAML, preview geometry, and inspect elements in one view.")
     
-    # CSS to force iframe visibility - potentially needed for some browser/streamlit combos
-    st.markdown("""
-        <style>
-        iframe[title="streamlit_drawable_canvas.st_canvas"] {
-            min-height: 400px;
-            border: 1px solid #ccc;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    st.info("Instructions:\n- **Draw**: Click and drag.\n- **Edit**: Select to move/resize.\n- **Delete**: Select object and click the **control handle/square** above it (or try Backspace).\n- **Reset**: Click 'Clear Canvas' above to remove everything.")
-    
-    # --- Load from Scenario Button ---
-    if st.button("Load from Active Scenario", type="primary", help="Populate builder with current YAML geometry"):
-        try:
-            # Parse current YAML
-            current_scen = yaml.safe_load(st.session_state.yaml_editor)
-            if current_scen:
-                # Convert to Canvas JSON
-                canvas_init = scenario_to_canvas(current_scen)
-                
-                # Update Session State to force reload
-                st.session_state.canvas_reset_count += 1
-                st.session_state['builder_initial_state'] = canvas_init
-                st.session_state['builder_obj_map'] = canvas_init.get('metadata', {}).get('obj_map', {})
-                st.session_state['builder_source_elements'] = current_scen.get('elements', [])
-                st.session_state['builder_source_variables'] = current_scen.get('variables', {})
-                
-                st.success(f"Loaded {len(canvas_init['objects'])} objects from scenario.")
-                st.rerun()
-        except Exception as e:
-            st.error(f"Failed to load scenario: {e}")
+    # 1. Template Loader (Moved from Sidebar)
+    # Using columns to make it not take up too much vertical space if needed, 
+    # but full width is fine too.
+    col_sel, col_dummy = st.columns([1, 1])
+    with col_sel:
+        template = st.selectbox("Load Scenario", display_names, key="template_selector", on_change=load_template)
 
-    # Tool Bar
-    col_tools_1, col_tools_2 = st.columns(2)
+    # --- Three-Column Layout ---
+    col_yaml, col_preview, col_inspector = st.columns([1.2, 1.5, 1.0])
     
-    with col_tools_1:
-        # Material Selector
-        material_mode = st.radio("Material", list(COLOR_MAP.values()), index=0, horizontal=True)
-        # Reverse lookup
-        fill_color = "#808080"
-        for k, v in COLOR_MAP.items():
-            if v == material_mode:
-                fill_color = k
-                break
-                
-    with col_tools_2:
-        tool_mode = st.radio("Tool", ["Draw Rectangle", "Edit/Select"], index=0, horizontal=True)
-        mode_map = {"Draw Rectangle": "rect", "Edit/Select": "transform"}
-    
-    # Reset Button logic
-    if "canvas_reset_count" not in st.session_state:
-        st.session_state.canvas_reset_count = 0
+    # == LEFT COLUMN: YAML Editor ==
+    with col_yaml:
+        st.subheader("📝 YAML Definition")
+        yaml_input = st.text_area("Edit Configuration", height=450, key="yaml_editor", label_visibility="collapsed")
         
-    if st.button("Clear Canvas", type="secondary"):
-        st.session_state.canvas_reset_count += 1
-        st.rerun()
-
-    # Canvas
-    realtime_update = st.checkbox("Update YAML Realtime", value=True)
-    
-    # CSS to force iframe visibility - potentially needed for some browser/streamlit combos
-    st.markdown("""
-        <style>
-        iframe[title="streamlit_drawable_canvas.st_canvas"] {
-            min-height: 400px;
-            border: 1px solid #ccc;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    # Canvas Component
-    c_container = st.container()
-    with c_container:
-        canvas_key = f"geometry_canvas_prod_v1_{st.session_state.canvas_reset_count}"
-        canvas_result = st_canvas(
-            fill_color=fill_color,
-            stroke_width=2,
-            stroke_color="#000000",
-            background_color="#eeeeee",
-            update_streamlit=realtime_update,
-            height=400,
-            width=600,
-            drawing_mode=mode_map[tool_mode],
-            display_toolbar=True,
-            initial_drawing=st.session_state.get('builder_initial_state', {'version': '4.4.0', 'objects': []}), 
-            key=canvas_key
-        )
-
-    # --- Element Inspector ---
-    st.markdown("---")
-    st.subheader("Element Inspector")
-    
-    # 1. Selection Logic
-    # Currently st_canvas does not push selection events to Streamlit.
-    # We rely on the Dropdown for inspection.
-    
-    source_elements = st.session_state.get('builder_source_elements', [])
-    source_variables = st.session_state.get('builder_source_variables', {})
-    obj_map = st.session_state.get('builder_obj_map', {})
-    
-    if source_elements:
-        # Create display names
-        el_names = [f"{i}: {el.get('name', el.get('type', 'Element'))}" for i, el in enumerate(source_elements)]
+        # Validation Status
+        from ui_validation import validate_scenario_yaml, get_element_hints
+        validation_res = validate_scenario_yaml(yaml_input)
         
-        st.caption("Select an element from the list below to view its variables.")
-        
-        # Try to find selected element from Dropdown
-        sel_name = st.selectbox("Select Element to Inspect", ["(None)"] + el_names)
-        
-        selected_el_idx = -1
-        if sel_name != "(None)":
-            selected_el_idx = int(sel_name.split(":")[0])
-
-        if selected_el_idx >= 0:
-            st.info(f"Inspecting Element: **{el_names[selected_el_idx]}**")
-            
-            el_data = source_elements[selected_el_idx]
-            el_params = el_data.get('params', {})
-            
-            # Display Variables
-            # If a param maps to a variable like "${wall_thick}", show that relationship.
-            
-            st.markdown("#### Parameters")
-            disp_data = []
-            for k, v in el_params.items():
-                val_display = v
-                var_name = None
-                
-                # Check for variable reference
-                if isinstance(v, str) and v.startswith("${") and v.endswith("}"):
-                    var_name = v[2:-1]
-                    val_display = f"{v} (= {source_variables.get(var_name, '???')})"
-                
-                disp_data.append({"Parameter": k, "Value": val_display})
-                
-            st.table(disp_data)
-        
-    else:
-        st.write("Load a scenario to inspect specific element variables.")
-
-    # Output Processing
-    if canvas_result and canvas_result.json_data:
-         # Only show summary, not full dump
-         num_obj = len(canvas_result.json_data.get("objects", []))
-         st.caption(f"Objects detected: {num_obj}")
-          
-         if num_obj > 0:
-             # Merge with active scenario if available to preserve BCs
-             base_scen = None
-             # Trying to retrieve active_data from editor tab is hard without re-parsing.
-             # But we stored it in session_state when loading? 
-             # No, 'active_data' is a local var in editor tab loop.
-             # Use st.session_state.get('builder_source_variables') is not enough.
-             # Re-parsing 'yaml_editor' is safest.
-             try:
-                 if 'yaml_editor' in st.session_state:
-                     base_scen = yaml.safe_load(st.session_state.yaml_editor)
-             except:
-                 pass
-
-             scen = generate_scenario(canvas_result.json_data, base_scenario=base_scen)
-             
-             # Preview and Send
-             col_res1, col_res2 = st.columns([2, 1])
-             with col_res1:
-                 st.subheader("Generated Scenario")
-                 st.code(yaml.dump(scen), language='yaml')
-             with col_res2:
-                 st.write(" ")
-                 st.write(" ")
-                 if st.button("Use this Geometry", type="primary"):
-                    st.session_state.yaml_editor = yaml.dump(scen, sort_keys=False)
-                    st.toast("Configuration Updated!", icon="✅")
-                    # Switch to Editor tab? st.experimental_set_query_params? No, strictly manual tab check.
-                    st.success("Sent to Editor Tab ->")
-
-with tab_editor:
-    st.subheader("Geometry Definition (YAML)")
-    # No need for value=... if key is used and initialized in session_state, but providing value is good practice for first run fallback
-    yaml_input = st.text_area("Edit Configuration", height=500, key="yaml_editor")
-    
-    # --- Live Parsing & Dynamic Sliders ---
-    active_data = None
-    active_name = "Custom"
-    
-    # Import Validation Logic
-    from ui_validation import validate_scenario_yaml, get_element_hints
-    
-    # Run Validation
-    validation_res = validate_scenario_yaml(yaml_input)
-    
-    if validation_res.is_valid:
-        active_data = validation_res.data
-        active_name = active_data.get('name', "Custom")
-        st.sidebar.success("✅ Scenario Valid")
-    else:
-        st.sidebar.error(f"❌ {len(validation_res.errors)} Validation Errors")
-        active_name = "Invalid"
-        
-        # Show errors in main area
-        st.error(f"Found {len(validation_res.errors)} issues in your configuration.")
-        for err in validation_res.errors:
-            loc_str = " -> ".join(str(l) for l in err.loc)
-            st.warning(f"Line {err.line}: {err.message} ({loc_str})")
-            
-        # Hints
-        st.info("ℹ️ checks: Ensure 'canvas' and 'elements' are defined. 'grid' must be > 0.")
-        
-        # Element Hints
-        with st.expander("📝 Element Parameter Hints"):
-            for etype in ["rect", "wall", "window_detail", "insulation_tapered", "polygon"]:
-                hints = get_element_hints(etype)
-                st.markdown(f"**{etype}**: {', '.join(hints)}")
-        
-        # Try to use partial data if available (e.g. for variable extraction roughly)
-        if validation_res.data:
+        if validation_res.is_valid:
             active_data = validation_res.data
-    
-    # Dynamic Variable Extraction
-    if active_data:
-        variables = active_data.get('variables', {})
-        if variables:
-            st.sidebar.markdown("---")
-            st.sidebar.subheader("Parameters")
+            active_name = active_data.get('name', "Custom")
+            st.success(f"✅ Valid: {active_name}")
+        else:
+            active_data = validation_res.data  # May be partially valid
+            active_name = "Invalid"
+            st.error(f"❌ {len(validation_res.errors)} errors")
             
-            modified_variables = {}
-            for key, value in variables.items():
-                if isinstance(value, (int, float)):
-                    # Heuristic for ranges
-                    min_val = 0.0
-                    max_val = float(value) * 3.0 if value > 0 else 100.0
-                    step = 5.0
-                    if "thick" in key:
-                        min_val = 0.0
-                        max_val = 500.0
+            with st.expander("View Errors"):
+                for err in validation_res.errors:
+                    loc_str = " -> ".join(str(l) for l in err.loc)
+                    st.warning(f"Line {err.line}: {err.message}")
                     
-                    if value < min_val: min_val = value
-                    if value > max_val: max_val = value * 2.0
-                    
-                    # Make key unique using scenario name to avoid state collisions
-                    widget_key = f"var_{active_name}_{key}"
-                    
-                    new_val = st.sidebar.number_input(f"{key} (mm)", 
-                                                    min_value=float(min_val), 
-                                                    max_value=float(max_val), 
-                                                    value=float(value),
-                                                    step=step,
-                                                    key=widget_key)
-                    modified_variables[key] = new_val
+                st.info("💡 Required: 'name', 'canvas', 'elements'. Grid must be > 0.")
+                for etype in ["rect", "wall", "window_detail"]:
+                    hints = get_element_hints(etype)
+                    st.caption(f"**{etype}**: {', '.join(hints)}")
+        
+        # Download button
+        if active_data:
+            st.download_button("⬇️ Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml", use_container_width=True)
+        
+        # Apply variable overrides from session state (set by inspector sliders)
+        # This must happen BEFORE preview generation
+        if active_data and 'variables' in active_data:
+            variables = active_data.get('variables', {})
+            for key, orig_val in variables.items():
+                if isinstance(orig_val, (int, float)):
+                    session_key = f"insp_{active_name}_{key}"
+                    if session_key in st.session_state:
+                        active_data['variables'][key] = st.session_state[session_key]
+    
+    # == CENTER COLUMN: Geometry Preview ==
+    with col_preview:
+        st.subheader("🗺️ Geometry Preview")
+        
+        # Get selected element index for highlighting
+        selected_el_idx = st.session_state.get('studio_selected_element', -1)
+        
+        # Generate preview if we have valid data
+        if active_data and 'canvas' in active_data and 'elements' in active_data:
+            try:
+                from geometry_builder import get_element_bbox
+                from mesh import AdaptiveMesh
+                from solver import plot_geometry
+                from geometry import build_material_grid
+                
+                geom = DeclarativeGeometry(active_data)
+                mesh = AdaptiveMesh(geom)
+                mesh.generate()
+                grid_map, _ = build_material_grid(geom, mesh.xc, mesh.yc)
+                
+                # Determine highlight bbox
+                highlight = None
+                if selected_el_idx >= 0:
+                    highlight = get_element_bbox(active_data, selected_el_idx)
+                
+                # Generate preview with unique filename to bust cache
+                preview_file = "studio_preview.png"
+                plot_geometry(grid_map, 
+                              geom.get_canvas_config().width_mm, 
+                              geom.get_canvas_config().height_mm,
+                              filename=preview_file,
+                              x_coords=mesh.x_coords,
+                              y_coords=mesh.y_coords,
+                              highlight_bbox=highlight)
+                
+                # Display with unique key to force refresh
+                st.image(preview_file, use_container_width=True)
+                
+            except Exception as e:
+                st.warning(f"Preview error: {e}")
+                import traceback
+                with st.expander("Error details"):
+                    st.code(traceback.format_exc())
+        else:
+            st.info("Define a valid scenario to see the geometry preview.")
+        
+        # Action Buttons
+        st.markdown("---")
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            run_sim_clicked = st.button("▶️ Run Simulation", type="primary", use_container_width=True)
+        with col_btn2:
+            refresh_preview = st.button("🔄 Refresh Preview", use_container_width=True)
+            if refresh_preview:
+                st.rerun()
+    
+    # == RIGHT COLUMN: Element Inspector ==
+    with col_inspector:
+        st.subheader("🔍 Inspector")
+        
+        # 2. Settings / Grid Override (Moved from Sidebar)
+        with st.expander("⚙️ Settings", expanded=False):
+            grid_override = st.number_input("Override Grid Size (mm)", 
+                                           min_value=0.0, max_value=50.0, value=0.0, step=0.5,
+                                           help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
+            
+        with st.expander("🌡️ Simulation Settings", expanded=True):
+             # Transient
+             transient_enabled = st.checkbox("Enable Transient Simulation", value=active_data.get('transient', {}).get('enabled', False) if active_data else False, key="transient_enable_chk")
+             
+             if transient_enabled:
+                 dur = st.number_input("Duration (hours)", min_value=0.1, max_value=48.0, value=24.0, key="trans_dur")
+                 dt = st.number_input("Time Step (s)", min_value=1.0, max_value=3600.0, value=300.0, key="trans_dt")
+                 save_int = st.number_input("Save Interval", min_value=1, max_value=100, value=1, key="trans_save")
+                 
+                 # Inject into active_data immediately
+                 if active_data:
+                     if 'transient' not in active_data: active_data['transient'] = {}
+                     active_data['transient']['enabled'] = True
+                     active_data['transient']['duration_hours'] = dur
+                     active_data['transient']['dt_seconds'] = dt
+                     active_data['transient']['save_interval_steps'] = save_int
+             else:
+                 # Ensure disabled in data if unchecked
+                 if active_data and 'transient' in active_data:
+                     active_data['transient']['enabled'] = False
+            
+             st.markdown("---")
+             # Mold
+             show_mold_map = st.checkbox("Calculate Mold Risk", value=False, key="mold_enable_chk")
+             if show_mold_map:
+                 indoor_rh = st.slider("Indoor Humidity (%)", min_value=30, max_value=80, value=50, step=5, key="mold_rh")
+        
+        if active_data:
+            elements = active_data.get('elements', [])
+            variables = active_data.get('variables', {})
+            
+            if elements:
+                # Element selector
+                el_names = [f"{i}: {el.get('name', el.get('type', 'Element'))}" for i, el in enumerate(elements)]
+                sel_options = ["(None - show all variables)"] + el_names
+                
+                sel = st.selectbox("Select Element", sel_options, key="studio_element_selector")
+                
+                # Update session state for highlighting
+                if sel == "(None - show all variables)":
+                    st.session_state['studio_selected_element'] = -1
+                    selected_el_idx = -1
                 else:
-                    st.sidebar.text(f"{key}: {value}")
-                    modified_variables[key] = value
-            
-            # Apply Overrides to active_data
-                active_data['variables'] = modified_variables
-    
-    # --- Transient Simulation Setup ---
-    st.sidebar.markdown("---")
-    transient_exp = st.sidebar.expander("Transient Simulation", expanded=False)
-    with transient_exp:
-        transient_enabled = st.checkbox("Enable Transient", value=False)
-        
-        if transient_enabled:
-            # Inject into active_data
-            if 'transient' not in active_data:
-                active_data['transient'] = {}
-            
-            active_data['transient']['enabled'] = True
-            
-            dur = st.number_input("Duration (hours)", min_value=0.1, max_value=48.0, value=24.0)
-            active_data['transient']['duration_hours'] = dur
-            
-            dt = st.number_input("Time Step (s)", min_value=1.0, max_value=3600.0, value=300.0)
-            active_data['transient']['dt_seconds'] = dt
-            
-            save_int = st.number_input("Save Interval (frames)", min_value=1, max_value=100, value=1)
-            active_data['transient']['save_interval_steps'] = save_int
-            
-            st.info(f"Total Steps: {int(dur*3600/dt)}")
-            
-    # --- Mold & Condensation Risk ---
-    st.sidebar.markdown("---")
-    mold_exp = st.sidebar.expander("Mold & Condensation Risk", expanded=False)
-    with mold_exp:
-        show_mold_map = st.checkbox("Show Mold Risk Map", value=False)
-        indoor_rh = st.slider("Indoor Relative Humidity (%)", min_value=30, max_value=80, value=50, step=5)
-    
-    
-    
-    # --- Execution Control ---
-    if active_data:
-        st.header(active_name)
-        
-        col_act1, col_act2 = st.columns([1,1])
-        
-        with col_act1:
-            if st.button("Run Simulation", type="primary"):
-                with st.spinner("Simulating..."):
-                    try:
-                        # Apply Grid Override
-                        if grid_override > 0:
-                            if 'canvas' not in active_data: active_data['canvas'] = {}
-                            active_data['canvas']['grid'] = grid_override
-    
-                        # Temp file strategy (No longer required by engine but useful for debug or legacy)
-                        # We can now pass dict directly. but let's keep temp file strictly for debug if needed
-                        # Update: solve_scenario now accepts dict.
-                        
-                        scenario_def = {
-                            "name": active_name,
-                            "file_suffix": "custom",
-                            "cfg": active_data
-                        }
-                        
-                        # Progress Bar
-                        prog_bar = st.progress(0.0)
-                        status_text = st.empty()
-                        
-                        def app_progress_cb(phase, step, total, diff):
-                            pct = float(step) / float(total)
-                            base = 0.0 if "Pass 1" in phase else 0.5
-                            final_pct = base + (pct * 0.5)
-                            # Clamp
-                            final_pct = min(1.0, max(0.0, final_pct))
-                            
-                            prog_bar.progress(final_pct)
-                            status_text.text(f"{phase}: Iteration {step}/{total} (Diff={diff:.2e})")
-    
-                        results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb)
-                        
-                        prog_bar.progress(1.0)
-                        status_text.success("Simulation Complete")
-                        
-                        measurements = results.get('measurements', {})
-                        if measurements:
-                            st.subheader("Measurements")
-                            # Dynamic grid layout
-                            cols = st.columns(3)
-                            for i, (name, res) in enumerate(measurements.items()):
-                                val = res.get('value')
-                                if val is None: continue
-                                
-                                with cols[i % 3]:
-                                    label = name
-                                    value_str = f"{val:.4f}"
-                                    delta = None
-                                    help_txt = None
-                                    
-                                    # Handle special formatting for known keys
-                                    if name == "Psi":
-                                        label = "Ψ-Value [W/mK]"
-                                    elif name == "fRsi":
-                                        label = "fRsi Factor"
-                                    elif "MinT" in name:
-                                        value_str += " °C"
-                                    
-                                    # Handle validation data
-                                    if 'expected' in res:
-                                        expected = res['expected']
-                                        diff = res.get('diff', abs(val - expected))
-                                        passed = res.get('passed', diff < 0.1) # Fallback tolerance
-                                        
-                                        icon = "✅" if passed else "❌"
-                                        label = f"{icon} {label}"
-                                        delta = f"Err: {diff:.4f}"
-                                        help_txt = f"Expected: {expected:.4f}"
-                                    
-                                    st.metric(label, value_str, delta=delta, delta_color="inverse", help=help_txt)
-                                    
-                        # Store results for report generation
-                        simple_results = {k: v.get('value') for k, v in measurements.items()}
-                        st.session_state['last_simulation_results'] = simple_results
-                                    
-                        # Show Result Image
-                        if active_data.get('transient', {}).get('enabled'):
-                             gif_path = f"result_{active_name}.gif"
-                             if os.path.exists(gif_path):
-                                 st.image(gif_path, caption=f"Transient Animation ({active_data['transient']['duration_hours']}h)")
-                                 with open(gif_path, "rb") as f:
-                                     st.download_button("Download GIF", data=f, file_name=gif_path, mime="image/gif")
-                                     
-                             final_path = f"result_{active_name}_final.png"
-                             if os.path.exists(final_path):
-                                 st.image(final_path, caption="Final State")
+                    selected_el_idx = int(sel.split(":")[0])
+                    if st.session_state.get('studio_selected_element') != selected_el_idx:
+                        st.session_state['studio_selected_element'] = selected_el_idx
+                        st.rerun()  # Refresh to show highlight
+                
+                st.markdown("---")
+                
+                # Show element-specific params or all variables
+                if selected_el_idx >= 0:
+                    el = elements[selected_el_idx]
+                    st.caption(f"**Type**: {el.get('type', 'unknown')}")
+                    st.caption(f"**Material**: {el.get('material', 'default')}")
+                    
+                    params = el.get('params', {})
+                    
+                    # Show parameters with variable resolution
+                    st.markdown("**Parameters:**")
+                    for k, v in params.items():
+                        if isinstance(v, str) and v.startswith("${") and v.endswith("}"):
+                            var_name = v[2:-1]
+                            resolved = variables.get(var_name, "?")
+                            st.caption(f"`{k}`: {v} = **{resolved}**")
                         else:
-                            img_path = f"result_{active_name}.png"
-                            if os.path.exists(img_path):
-                                # Force browser reload with unique param
-                                st.image(img_path, caption=f"Result (Ti={active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 'Def')}°C)", output_format="PNG")
-
-                        # --- Mold Analysis Plot ---
-                        if show_mold_map and not active_data.get('transient', {}).get('enabled'):
-                             st.markdown("---")
-                             st.subheader("Mold Risk Analysis")
-                             
-                             if 'temp' in results:
-                                 # Retrieve Temperature Field
-                                 temp_field = results['temp']
-                                 
-                                 # Get Internal Temperature (Robust fallback)
-                                 t_int_val = active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 20.0)
-                                 
-                                 # Calculate RH Field
-                                 rh_grid = calculate_surface_humidity(temp_field, t_int_val, indoor_rh / 100.0)
-                                 
-                                 # Mesh Coords
-                                 x_c, y_c = None, None
-                                 if 'mesh' in results:
-                                     x_c = results['mesh'].get('x_coords')
-                                     y_c = results['mesh'].get('y_coords')
-                                 else:
-                                     # Backward compatibility for uniform mesh without mesh object return
-                                     # We know width/height from config
-                                     pass 
-                                     
-                                 mold_filename = f"mold_risk_{active_name}.png"
-                                 
-                                 # Determine dimensions for plotting
-                                 if x_c is not None and y_c is not None:
-                                      # Adaptive mesh: dimensions are handled by coordinates
-                                      w_mm = 0
-                                      h_mm = 0
-                                 else:
-                                      # Uniform mesh fallback: need explicit dimensions
-                                      b = active_data.get('canvas', {}).get('bounds', [0, 500, 0, 500])
-                                      if len(b) >= 4:
-                                          w_mm = b[1] - b[0]
-                                          h_mm = b[3] - b[2]
-                                      else:
-                                          w_mm = 500
-                                          h_mm = 500
-                                 
-                                 plot_mold_risk_map(rh_grid, 
-                                                    width_mm=w_mm,
-                                                    height_mm=h_mm,
-                                                    filename=mold_filename,
-                                                    x_coords=x_c,
-                                                    y_coords=y_c)
-                                                    
-                                 st.image(mold_filename, caption=f"Mold Risk (Ti={t_int_val}°C, RHi={indoor_rh}%)")
-                             else:
-                                 st.warning("Temperature field data not found in results. Unable to calculate Mold Risk.")
+                            st.caption(f"`{k}`: **{v}**")
+                else:
+                    # Show all numeric variables as sliders
+                    st.markdown("**Variable Sliders:**")
+                    modified = {}
+                    for key, val in variables.items():
+                        if isinstance(val, (int, float)):
+                            # Calculate sensible min/max that handles negative values
+                            if val >= 0:
+                                min_v = 0.0
+                                max_v = float(val) * 3.0 if val > 0 else 100.0
+                            else:
+                                # Negative value: allow range from 2x negative to positive
+                                min_v = float(val) * 2.0
+                                max_v = abs(float(val))
                             
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-                        import traceback
-                        st.code(traceback.format_exc())
-        
-        with col_act2:
-            if st.button("Preview Geometry"):
-                try:
-                    geom = DeclarativeGeometry(active_data)
-                    from mesh import AdaptiveMesh
-                    from solver import plot_geometry
-                    from geometry import build_material_grid
+                            step = 5.0
+                            if "thick" in key: max_v = max(500.0, max_v)
+                            
+                            new_val = st.number_input(
+                                f"{key}", 
+                                min_value=float(min_v), 
+                                max_value=float(max_v), 
+                                value=float(val),
+                                step=step,
+                                key=f"insp_{active_name}_{key}"
+                            )
+                            modified[key] = new_val
+                        else:
+                            st.caption(f"`{key}`: {val}")
+                            modified[key] = val
                     
-                    mesh = AdaptiveMesh(geom)
-                    mesh.generate()
-                    grid_map, _ = build_material_grid(geom, mesh.xc, mesh.yc)
-                    
-                    plot_geometry(grid_map, 
-                                  geom.get_canvas_config().width_mm, 
-                                  geom.get_canvas_config().height_mm,
-                                  filename="preview.png",
-                                  x_coords=mesh.x_coords,
-                                  y_coords=mesh.y_coords)
-                    st.image("preview.png", caption="Geometry Map")
-                except Exception as e:
-                    st.error(f"Preview Failed: {e}")
+                    # Apply modifications
+                    if modified:
+                        active_data['variables'] = modified
+            else:
+                st.info("No elements defined.")
+        else:
+            st.info("Load a valid scenario.")
     
-        # Download
-        st.download_button("Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml")
+    # --- Simulation Execution (triggered by button above) ---
+    if run_sim_clicked and active_data:
+        with st.spinner("Running simulation..."):
+            try:
+                # Apply Grid Override
+                if grid_override > 0:
+                    if 'canvas' not in active_data: active_data['canvas'] = {}
+                    active_data['canvas']['grid'] = grid_override
 
+                scenario_def = {
+                    "name": active_name,
+                    "file_suffix": "custom",
+                    "cfg": active_data
+                }
+                
+                # Progress Bar
+                prog_bar = st.progress(0.0)
+                status_text = st.empty()
+                
+                def app_progress_cb(phase, step, total, diff):
+                    pct = float(step) / float(total)
+                    base = 0.0 if "Pass 1" in phase else 0.5
+                    final_pct = min(1.0, max(0.0, base + (pct * 0.5)))
+                    prog_bar.progress(final_pct)
+                    status_text.text(f"{phase}: Iteration {step}/{total} (Diff={diff:.2e})")
+
+                results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb)
+                
+                prog_bar.progress(1.0)
+                status_text.success("Simulation Complete!")
+                
+                # Display Measurements
+                measurements = results.get('measurements', {})
+                if measurements:
+                    st.subheader("📊 Results")
+                    cols = st.columns(3)
+                    for i, (name, res) in enumerate(measurements.items()):
+                        val = res.get('value')
+                        if val is None: continue
+                        
+                        with cols[i % 3]:
+                            label = name
+                            value_str = f"{val:.4f}"
+                            delta = None
+                            
+                            if name == "Psi": label = "Ψ-Value [W/mK]"
+                            elif name == "fRsi": label = "fRsi Factor"
+                            elif "MinT" in name: value_str += " °C"
+                            
+                            if 'expected' in res:
+                                expected = res['expected']
+                                diff = res.get('diff', abs(val - expected))
+                                passed = res.get('passed', diff < 0.1)
+                                icon = "✅" if passed else "❌"
+                                label = f"{icon} {label}"
+                                delta = f"Err: {diff:.4f}"
+                            
+                            st.metric(label, value_str, delta=delta, delta_color="inverse")
+                
+                # Store for report
+                simple_results = {k: v.get('value') for k, v in measurements.items()}
+                st.session_state['last_simulation_results'] = simple_results
+                
+                # Show Result Image
+                if active_data.get('transient', {}).get('enabled'):
+                    gif_path = f"result_{active_name}.gif"
+                    if os.path.exists(gif_path):
+                        st.image(gif_path, caption=f"Transient Animation ({active_data['transient']['duration_hours']}h)")
+                        with open(gif_path, "rb") as f:
+                            st.download_button("Download GIF", data=f, file_name=gif_path, mime="image/gif")
+                    
+                    final_path = f"result_{active_name}_final.png"
+                    if os.path.exists(final_path):
+                        st.image(final_path, caption="Final State")
+                else:
+                    img_path = f"result_{active_name}.png"
+                    if os.path.exists(img_path):
+                        st.image(img_path, caption=f"Temperature Distribution")
+                
+                # Mold Analysis
+                if show_mold_map and not active_data.get('transient', {}).get('enabled'):
+                    st.markdown("---")
+                    st.subheader("🦠 Mold Risk Analysis")
+                    
+                    if 'temp' in results:
+                        temp_field = results['temp']
+                        t_int_val = active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 20.0)
+                        rh_grid = calculate_surface_humidity(temp_field, t_int_val, indoor_rh / 100.0)
+                        
+                        x_c, y_c = None, None
+                        if 'mesh' in results:
+                            x_c = results['mesh'].get('x_coords')
+                            y_c = results['mesh'].get('y_coords')
+                        
+                        mold_filename = f"mold_risk_{active_name}.png"
+                        
+                        if x_c is not None and y_c is not None:
+                            w_mm, h_mm = 0, 0
+                        else:
+                            b = active_data.get('canvas', {}).get('bounds', [0, 500, 0, 500])
+                            w_mm = b[1] - b[0] if len(b) >= 4 else 500
+                            h_mm = b[3] - b[2] if len(b) >= 4 else 500
+                        
+                        plot_mold_risk_map(rh_grid, width_mm=w_mm, height_mm=h_mm,
+                                           filename=mold_filename, x_coords=x_c, y_coords=y_c)
+                        st.image(mold_filename, caption=f"Mold Risk (Ti={t_int_val}°C, RHi={indoor_rh}%)")
+                    else:
+                        st.warning("Temperature field not found in results.")
+                        
+            except Exception as e:
+                st.error(f"Simulation Error: {e}")
+                import traceback
+                st.code(traceback.format_exc())
 
 import plotly.express as px
 from batch_simulator import BatchSimulator
+
+
+
 
 with tab_opt:
     st.header("Parametric Optimization")

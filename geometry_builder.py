@@ -3,8 +3,86 @@ Geometry Builder Helper
 Converts Streamlit Canvas JSON to Declarative Scenario Dictionary.
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from geometry import MaterialID
+
+
+def get_element_bbox(scenario_data: Dict[str, Any], element_index: int) -> Optional[Tuple[float, float, float, float]]:
+    """
+    Extract bounding box (x, y, width, height) for an element after resolving variables.
+    
+    Returns None if element cannot provide a bbox (e.g., unknown type or missing params).
+    """
+    elements = scenario_data.get('elements', [])
+    if element_index < 0 or element_index >= len(elements):
+        return None
+    
+    el = elements[element_index]
+    variables = scenario_data.get('variables', {})
+    
+    def resolve(val):
+        if isinstance(val, str) and val.startswith("${") and val.endswith("}"):
+            k = val[2:-1]
+            return variables.get(k, val)
+        return val
+    
+    el_type = el.get('type', '')
+    params = el.get('params', {})
+    
+    # Handle rect/wall types with x, y, width, height
+    if el_type in ('rect', 'wall', 'air', 'venetian_blind'):
+        try:
+            x = float(resolve(params.get('x', el.get('x', 0))))
+            y = float(resolve(params.get('y', el.get('y', 0))))
+            w = float(resolve(params.get('width', el.get('width', 0))))
+            h = float(resolve(params.get('height', el.get('height', 0))))
+            return (x, y, w, h)
+        except (ValueError, TypeError):
+            return None
+    
+    # Handle insulation_tapered
+    elif el_type == 'insulation_tapered':
+        try:
+            x_base = float(resolve(params.get('x_base', 0)))
+            y_bottom = float(resolve(params.get('y_bottom', 0)))
+            y_top = float(resolve(params.get('y_top', 0)))
+            thick_main = float(resolve(params.get('thick_main', 0)))
+            return (x_base, y_bottom, thick_main, y_top - y_bottom)
+        except (ValueError, TypeError):
+            return None
+    
+    # Handle window_detail
+    elif el_type == 'window_detail':
+        try:
+            x = float(resolve(params.get('x_frame_start', 0)))
+            y = float(resolve(params.get('y_frame_start', 0)))
+            frame_depth = float(resolve(params.get('frame_depth', 70)))
+            y_top = float(resolve(params.get('y_top', y + 100)))
+            return (x, y, frame_depth + 50, y_top - y)  # Approximate width
+        except (ValueError, TypeError):
+            return None
+    
+    # Handle polygon - compute bounding box from points
+    elif el_type == 'polygon':
+        try:
+            point_names = el.get('points', [])
+            points_def = scenario_data.get('points', {})
+            
+            xs, ys = [], []
+            for pname in point_names:
+                if pname in points_def:
+                    coords = points_def[pname]
+                    xs.append(float(resolve(coords[0])))
+                    ys.append(float(resolve(coords[1])))
+            
+            if xs and ys:
+                x_min, x_max = min(xs), max(xs)
+                y_min, y_max = min(ys), max(ys)
+                return (x_min, y_min, x_max - x_min, y_max - y_min)
+        except (ValueError, TypeError):
+            return None
+    
+    return None
 
 # Material Color Mapping (Hex -> Material Name)
 COLOR_MAP = {

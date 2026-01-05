@@ -538,7 +538,8 @@ def plot_geometry(grid_map: np.ndarray,
                   filename: str = "geometry_debug.png",
                   x_coords: Optional[np.ndarray] = None,
                   y_coords: Optional[np.ndarray] = None,
-                  equal_aspect: bool = False):
+                  equal_aspect: bool = False,
+                  highlight_bbox: Optional[Tuple[float, float, float, float]] = None):
     """
     Plot material ID map for geometry verification.
     
@@ -601,6 +602,15 @@ def plot_geometry(grid_map: np.ndarray,
     plt.ylabel('Facade Length [mm]')
     
 
+    
+    # Draw highlight box if specified
+    if highlight_bbox is not None:
+        from matplotlib.patches import Rectangle
+        ax = plt.gca()
+        x, y, w, h = highlight_bbox
+        rect = Rectangle((x, y), w, h, linewidth=2.5, 
+                          edgecolor='red', facecolor='none', linestyle='--')
+        ax.add_patch(rect)
     
     plt.grid(True, color='white', alpha=0.3)
     plt.tight_layout()

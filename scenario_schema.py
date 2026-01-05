@@ -31,6 +31,14 @@ class CanvasConfig(BaseModel):
     bounds: List[Union[float, str]] = Field(..., min_length=4, max_length=4, description="[x_min, x_max, y_min, y_max]")
     grid: Union[float, str] = Field(..., description="Grid resolution in mm")
 
+    @field_validator('grid')
+    @classmethod
+    def grid_must_be_positive(cls, v):
+        """Grid must be > 0 when specified as a number."""
+        if isinstance(v, (int, float)) and v <= 0:
+            raise ValueError('grid must be greater than 0')
+        return v
+
     @property
     def x_min(self) -> Union[float, str]: return self.bounds[0]
     @property

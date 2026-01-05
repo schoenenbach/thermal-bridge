@@ -152,17 +152,19 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 
 ---
 
-## 12. UI Validation Layer [DONE]
+## 12. UI Validation Layer [WIP]
 
 **Objective:** Provide real-time schema validation feedback in the Streamlit editor.
 
-**Proposed Tasks:**
-- [ ] Wrap YAML parsing with Pydantic validation in `app.py`
-- [ ] Display validation errors inline with line numbers
-- [ ] Color-code YAML text area based on validity
-- [ ] Show element-specific hints (e.g., "rect requires x, y, width, height")
+**Completed Tasks:**
+- [x] Wrap YAML parsing with Pydantic validation in `app.py`
+- [x] Display validation errors with line numbers in sidebar
+- [x] Show element-specific hints (e.g., "rect requires x, y, width, height")
 
-**Effort Estimate:** 4-6 hours
+**Remaining Tasks:**
+- [ ] Color-code YAML text area based on validity (green/red border)
+
+**Effort Estimate:** 1-2 hours remaining
 
 ---
 
@@ -181,5 +183,35 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 - [ ] Use JSON Schema for dynamic form generation
 - [ ] Evaluate React vs. Angular as alternative frontend frameworks
 
+**Key Features to Implement (not feasible in Streamlit):**
+- [ ] Visual element creation with drag-drop and click-to-place
+- [ ] Resize handles and direct manipulation of geometry
+- [ ] Click-to-select elements on canvas (bidirectional Canvas ↔ Inspector sync)
+- [ ] Real-time collaborative editing (optional)
+
 **Note:** This is a significant undertaking requiring architectural changes. Consider as a separate project phase.
+
+---
+
+## 14. Unified Scenario Studio [DONE]
+
+**Objective:** Integrate YAML editor, geometry preview, and element inspector into a single cohesive workspace.
+
+**Completed Tasks:**
+- [x] Merge "Scenario Editor" and "Geometry Builder" tabs into single "Scenario Studio" 
+- [x] Implement 3-column layout (YAML | Preview | Inspector)
+- [x] Add live geometry preview on YAML validation
+- [x] Add element highlighting via red dashed bounding box
+- [x] Add variable sliders in inspector panel
+- [x] Add `highlight_bbox` parameter to `plot_geometry` in `solver.py`
+- [x] Add `get_element_bbox` helper in `geometry_builder.py`
+
+**UI Layout:**
+```
+┌────────────┬──────────────┬─────────────┐
+│ YAML       │  Geometry    │  Element    │
+│ Editor     │  Preview     │  Inspector  │
+│            │  + Highlight │  + Sliders  │
+└────────────┴──────────────┴─────────────┘
+```
 
