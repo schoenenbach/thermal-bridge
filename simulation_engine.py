@@ -512,16 +512,32 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
         print(f"    Glass MinT: {min_temp_glass:.2f}C")
         
     
-    # Plot
-    plot_temperature_map(temp_frsi, 
+    # Plot - exclude padding rows if auto-padding was used
+    if has_padding:
+        # Extract interior region only (exclude air layer padding)
+        ny_p, nx_p = temp_frsi.shape
+        y_start = 1 if pad_bottom else 0
+        y_end = ny_p - 1 if pad_top else ny_p
+        x_start = 1 if pad_left else 0
+        x_end = nx_p - 1 if pad_right else nx_p
+        temp_for_plot = temp_frsi[y_start:y_end, x_start:x_end]
+        # Use original mesh coordinates (before padding)
+        x_coords_plot = mesh.x_coords
+        y_coords_plot = mesh.y_coords
+    else:
+        temp_for_plot = temp_frsi
+        x_coords_plot = mesh.x_coords
+        y_coords_plot = mesh.y_coords
+
+    plot_temperature_map(temp_for_plot, 
                          geom.get_canvas_config().width_mm, 
                          geom.get_canvas_config().height_mm,
                          f"result_{scenario_def['name']}.png", 
                          title=scenario_def['name'],
                          wall_thick_mm=wall_thick_mm,
                          grid_size_mm=getattr(mesh, 'grid_size_mm', None),
-                         x_coords=mesh.x_coords,
-                         y_coords=mesh.y_coords)
+                         x_coords=x_coords_plot,
+                         y_coords=y_coords_plot)
     
     return {
         "name": scenario_def['name'],
@@ -574,9 +590,10 @@ def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
         print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f} | {wall_t:<10} | {frame_t:<10} | {glass_t:<10}")
 
 
-def generate_geometries():
+def generate_geometries(scenarios=None):
     """Generate and save geometry plots for all scenarios (Simulation Skipped)."""
-    scenarios = get_scenarios()
+    if scenarios is None:
+        scenarios = get_scenarios()
     print(f"Generating geometry plots for {len(scenarios)} scenarios...")
     
     for sc in scenarios:
@@ -634,7 +651,17 @@ if __name__ == "__main__":
         exit(0)
 
     if args.geometries_only:
-        generate_geometries()
+        target_scenarios = None
+        if args.scenario_file:
+            fpath = args.scenario_file
+            fname = os.path.basename(fpath).replace('.yaml', '')
+            target_scenarios = [{
+                "name": fname,
+                "file_suffix": fname,
+                "cfg": fpath
+            }]
+        
+        generate_geometries(target_scenarios)
     else:
         indices = None
         if args.scenarios:

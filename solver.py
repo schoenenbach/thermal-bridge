@@ -436,23 +436,58 @@ def plot_geometry(grid_map: np.ndarray,
                   height_mm: float,
                   filename: str = "geometry_debug.png",
                   x_coords: Optional[np.ndarray] = None,
-                  y_coords: Optional[np.ndarray] = None):
+                  y_coords: Optional[np.ndarray] = None,
+                  equal_aspect: bool = False):
     """
     Plot material ID map for geometry verification.
-    """
-    plt.figure(figsize=(12, 10))
     
-    cmap = plt.get_cmap('tab10', 10)
+    Args:
+        grid_map: Material ID grid
+        width_mm: Domain width in mm
+        height_mm: Domain height in mm
+        filename: Output filename
+        x_coords: X face coordinates (for adaptive mesh)
+        y_coords: Y face coordinates (for adaptive mesh)
+        equal_aspect: If True, use equal aspect ratio (shows true proportions)
+    """
+    # Adjust figure size based on aspect ratio
+    aspect = width_mm / height_mm
+    if equal_aspect:
+        fig_width = 12
+        fig_height = max(3, fig_width / aspect)  # Minimum height for readability
+    else:
+        fig_width, fig_height = 12, 10
+    
+    plt.figure(figsize=(fig_width, fig_height))
+    
+    # Derive color range from actual material IDs
+    unique_mats = np.unique(grid_map)
+    n_materials = len(unique_mats)
+    cmap = plt.get_cmap('tab10', max(n_materials, 10))
+    
+    # Create normalized version for proper coloring
+    # Map unique materials to sequential indices for better color distinction
+    mat_to_idx = {m: i for i, m in enumerate(unique_mats)}
+    grid_normalized = np.vectorize(lambda x: mat_to_idx[x])(grid_map)
     
     if x_coords is not None and y_coords is not None:
         X, Y = np.meshgrid(x_coords, y_coords)
-        im = plt.pcolormesh(X, Y, grid_map, cmap=cmap, shading='flat', vmin=0, vmax=9)
+        im = plt.pcolormesh(X, Y, grid_normalized, cmap=cmap, shading='flat', 
+                           vmin=0, vmax=max(n_materials-1, 1))
     else:
-        im = plt.imshow(grid_map, cmap=cmap, origin='lower',
+        im = plt.imshow(grid_normalized, cmap=cmap, origin='lower',
                         extent=[0, width_mm, 0, height_mm], 
-                        interpolation='nearest', vmin=0, vmax=9)
+                        interpolation='nearest', vmin=0, vmax=max(n_materials-1, 1))
+    
+    # Create colorbar with actual material IDs as labels
+    cbar = plt.colorbar(im, label='Material ID')
+    if n_materials <= 10:
+        cbar.set_ticks(range(n_materials))
+        cbar.set_ticklabels([str(m) for m in unique_mats])
+    
+    if equal_aspect:
+        plt.gca().set_aspect('equal', adjustable='box')
                         
-    plt.colorbar(im, label='Material ID')
     plt.title(f'Geometry: {filename}')
     plt.xlabel('Depth [mm]')
     plt.ylabel('Facade Length [mm]')
@@ -461,5 +496,6 @@ def plot_geometry(grid_map: np.ndarray,
     plt.ylim(0, height_mm)
     
     plt.grid(True, color='white', alpha=0.3)
+    plt.tight_layout()
     plt.savefig(filename, dpi=150)
     plt.close()

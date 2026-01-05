@@ -20,7 +20,8 @@ from declarative_geometry import DeclarativeGeometry
 from solver import (
     get_solver_lib,
     solve,
-    plot_temperature_map
+    plot_temperature_map,
+    plot_geometry
 )
 
 def calculate_conductances(cond, dx_in, dy_in):
@@ -402,12 +403,50 @@ if __name__ == "__main__":
                         help='Test case to run (1, 2, or all)')
     parser.add_argument('--mesh', default='adaptive', choices=['uniform', 'adaptive'],
                         help='Mesh type to use (default: adaptive)')
+    parser.add_argument('--geometry-only', action='store_true',
+                        help='Generate geometry plots only, skip simulation')
+    parser.add_argument('--equal-aspect', action='store_true',
+                        help='Use equal aspect ratio for geometry plots (shows true proportions)')
     args = parser.parse_args()
+    
+    use_adaptive = (args.mesh == 'adaptive')
+    
+    if args.geometry_only:
+        # Generate geometry plots only
+        print("Generating geometry plots for ISO cases...")
+        
+        if args.test in ['1', 'all']:
+            fpath = os.path.abspath("scenarios/iso_case_1.yaml")
+            with open(fpath, 'r') as f:
+                data = yaml.safe_load(f)
+            geom = DeclarativeGeometry(data)
+            mesh = AdaptiveMesh(geom) if use_adaptive else UniformMesh(geom, grid_size_mm=geom.get_canvas_config().default_dx_mm)
+            mesh.generate()
+            grid_map, _ = build_material_grid(geom, mesh.xc, mesh.yc)
+            plot_geometry(grid_map, mesh.width_mm, mesh.height_mm, 
+                         filename='geometry_iso_case_1.png',
+                         x_coords=mesh.x_coords, y_coords=mesh.y_coords,
+                         equal_aspect=args.equal_aspect)
+            print("  Saved geometry_iso_case_1.png")
+            
+        if args.test in ['2', 'all']:
+            fpath = os.path.abspath("scenarios/iso_case_2.yaml")
+            with open(fpath, 'r') as f:
+                data = yaml.safe_load(f)
+            geom = DeclarativeGeometry(data)
+            mesh = AdaptiveMesh(geom) if use_adaptive else UniformMesh(geom, grid_size_mm=geom.get_canvas_config().default_dx_mm)
+            mesh.generate()
+            grid_map, _ = build_material_grid(geom, mesh.xc, mesh.yc)
+            plot_geometry(grid_map, mesh.width_mm, mesh.height_mm, 
+                         filename='geometry_iso_case_2.png',
+                         x_coords=mesh.x_coords, y_coords=mesh.y_coords,
+                         equal_aspect=args.equal_aspect)
+            print("  Saved geometry_iso_case_2.png")
+            
+        sys.exit(0)
     
     # Initialize solver (lazy loading handled by get_solver_lib)
     get_solver_lib()
-    
-    use_adaptive = (args.mesh == 'adaptive')
     
     results = {}
     
