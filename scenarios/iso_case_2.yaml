@@ -94,7 +94,7 @@ refinement_zones:
     x_max: 20.0
     y_min: 0.0
     y_max: 47.5
-    target_dx: 0.25
+    target_dx: 0.2
     priority: 1
 
 elements:
