@@ -13,6 +13,8 @@ from geometry import build_material_grid, MaterialID
 from geometries.window_reveal import WindowRevealGeometry
 from mesh import UniformMesh, AdaptiveMesh
 from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map, plot_geometry
+from declarative_geometry import DeclarativeGeometry
+import yaml
 
 # --- Scenarios ---
 def get_scenarios():
@@ -132,7 +134,22 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     suffix = scenario_def['file_suffix']
     
     # 1. Geometry & Mesh
-    geom = WindowRevealGeometry(cfg)
+    if isinstance(cfg, str) and cfg.endswith('.yaml'):
+         # Load Declarative
+         with open(cfg, 'r') as f:
+             data = yaml.safe_load(f)
+         geom = DeclarativeGeometry(data)
+         # Extract grid size from resolved data in geom
+         grid_sz = 2.5
+         if 'canvas' in geom.data and 'grid' in geom.data['canvas']:
+             grid_sz = float(geom.data['canvas']['grid'])
+         cfg_grid_size = grid_sz
+         wall_thick_mm = geom.data.get('variables', {}).get('wall_thick', 360)
+    else:
+        # Standard configs
+        geom = WindowRevealGeometry(cfg)
+        cfg_grid_size = cfg.grid_size_mm
+        wall_thick_mm = cfg.wall_thickness_mm
     
     if use_adaptive_mesh:
         from mesh import AdaptiveMesh
@@ -140,7 +157,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     else:
         from mesh import UniformMesh
         # UniformMesh needs explicit grid size if not default
-        mesh = UniformMesh(geom, grid_size_mm=cfg.grid_size_mm)
+        mesh = UniformMesh(geom, grid_size_mm=cfg_grid_size)
 
     mesh.generate()
     print(f"  {mesh.info()}")
@@ -314,13 +331,25 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     # Reference Flow
     l_wall = 0.25
     l_win = 0.25
-    l_frame = cfg.frame_width_mm / 1000.0
+    
+    # Handle YAML config abstraction
+    if isinstance(geom, DeclarativeGeometry):
+        vars = geom.data.get('variables', {})
+        f_width = float(vars.get('frame_width', 70))
+        wall_th = float(vars.get('wall_thick', 360))
+        ins_th = float(vars.get('ins_thick_max', 0))
+    else:
+        f_width = cfg.frame_width_mm
+        wall_th = cfg.wall_thickness_mm
+        ins_th = cfg.insulation_thick_max_mm
+        
+    l_frame = f_width / 1000.0
     l_glass = l_win - l_frame
     
     # Wall U-Value (1D)
-    r_wall_1d = RSI_WALL + (cfg.wall_thickness_mm/1000.0)/MAT_WALL + RSE
-    if cfg.insulation_thick_max_mm > 0:
-        r_wall_1d += (cfg.insulation_thick_max_mm/1000.0)/MAT_INSULATION
+    r_wall_1d = RSI_WALL + (wall_th/1000.0)/MAT_WALL + RSE
+    if ins_th > 0:
+        r_wall_1d += (ins_th/1000.0)/MAT_INSULATION
     
     u_wall_1d = 1.0 / r_wall_1d
     u_frame = 1.3
@@ -416,7 +445,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
                          geom.get_canvas_config().height_mm,
                          f"result_{scenario_def['name']}.png", 
                          title=scenario_def['name'],
-                         wall_thick_mm=cfg.wall_thickness_mm,
+                         wall_thick_mm=wall_thick_mm,
                          grid_size_mm=getattr(mesh, 'grid_size_mm', None),
                          x_coords=mesh.x_coords,
                          y_coords=mesh.y_coords)
@@ -514,6 +543,8 @@ if __name__ == "__main__":
     parser.add_argument("--use-uniform-mesh", action="store_true", help="Use Uniform Mesh instead of Adaptive Mesh")
     parser.add_argument("--list", action="store_true", help="List available scenarios")
     
+    parser.add_argument("--scenario-file", type=str, help="Path to YAML scenario file to run")
+    
     args = parser.parse_args()
     
     if args.list:
@@ -529,10 +560,22 @@ if __name__ == "__main__":
         indices = None
         if args.scenarios:
             indices = args.scenarios.split(",")
-        
-        # If neither run-all nor scenarios specified, and not geometries-only, 
-        # normally we might want to default to something or show help.
-        # But let's follow the user's intent: run specific or all.
-        
-        run_scenarios(scenario_indices=indices, use_adaptive_mesh=not args.use_uniform_mesh)
+            
+        custom_scenarios = []
+        if args.scenario_file:
+            # Create a bespoke scenario definition
+            fpath = args.scenario_file
+            fname = os.path.basename(fpath).replace('.yaml', '')
+            custom_scenarios.append({
+                "name": fname,
+                "file_suffix": fname,
+                "cfg": fpath # Pass path string, detected in solve_scenario
+            })
+            
+            # Run custom immediately
+            get_solver_lib()
+            for sc in custom_scenarios:
+                solve_scenario(sc, use_adaptive_mesh=not args.use_uniform_mesh)
+        else:    
+            run_scenarios(scenario_indices=indices, use_adaptive_mesh=not args.use_uniform_mesh)
 

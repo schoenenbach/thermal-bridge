@@ -40,6 +40,9 @@ MAT_GLASS_UG11 = 0.024 / (1.0/1.1 - RSI_WALL - RSE)
 MAT_SPACER_SWISS_ULTIMATE = 0.14
 MAT_SPACER_STAINLESS = 0.60  # Typical stainless steel box
 MAT_SPACER_ALUMINUM = 10.0 # High internal conductivity
+MAT_ALUMINUM = 160.0
+MAT_CAVITY_ISO = 0.25      # Equivalent lambda for unventilated cavity
+MAT_EPDM = 0.25
 
 class SpacerType:
     NONE = 0

@@ -1,0 +1,236 @@
+name: "Scenario 5: Wall 360mm (Full Ins) [YAML]"
+description: "Replication of Scenario 5 using Declarative Geometry"
+
+# Variables matching CalculationConfig for Scenario 5
+variables:
+  # Geometry Config
+  wall_thick: 360.0
+  ins_thick_max: 200.0
+  ins_thick_min: 100.0
+  reveal_ins_mm: 30.0
+  taper_len: 150.0
+  win_pos: 150.0
+  rebate_overlap: 50.0
+  
+  # Offsets
+  off_x: 50.0
+  off_y: 250.0
+  
+  # Canvas
+  grid_size: 2.5
+  
+  # Derived (Calculated by user/generator, not auto-calc in YAML yet)
+  # x_wall_int = 50
+  # x_wall_ext = 410 (50+360)
+  # x_win_outer = 410 - 150 = 260
+  x_wall_int: 50.0
+  x_wall_ext: 410.0
+  x_win_outer: 260.0
+  
+  y_bottom: 0.0
+  y_reveal: 250.0
+  y_top: 500.0 # 250 + 250
+  
+  # Window details
+  f_depth: 70.0
+  f_width: 70.0
+  sash_overlap: 10.0
+  sash_depth: 70.0
+  sash_width: 70.0
+  sash_recess: 30.0
+  glass_thick: 24.0
+  
+  # Calculated window helpers
+  # x_f_end = x_win_outer = 260
+  # x_f_start = 260 - 70 = 190
+  x_f_start: 190.0
+  
+  # Sash coords for Air Polygon
+  # y_f_end = 250 + 70 = 320
+  # y_sash_start = 320 - 10 = 310
+  # y_sash_end = 310 + 70 = 380
+  # x_sash_end = 260 - 30 = 230
+  # x_sash_start = 230 - 70 = 160
+  # glass_mid_x = (160+230)/2 = 195
+  # x_glass_start = 195 - 12 = 183
+  y_sash_start: 310.0
+  y_sash_end: 380.0
+  x_sash_start: 160.0
+  x_glass_start: 183.0
+  
+  # Reveal Shift (30mm insulation -> shift wall down by 30mm)
+  reveal_shift: 30.0
+  y_reveal_shifted: 220.0 # 250 - 30
+
+canvas:
+  bounds: [0, 660, 0, 500] # x_max = 410 + 200 + 50 buffer = 660
+  grid: ${grid_size}
+
+# --- Points for Complex Polygons ---
+points:
+  # Interior Air Polygon Points
+  AirInt_BL: [0.0, "${y_bottom}"]
+  Wall_BL: ["${x_wall_int}", "${y_bottom}"]
+  Wall_TL: ["${x_wall_int}", "${y_reveal}"]
+  Frame_BL: ["${x_f_start}", "${y_reveal}"]
+  Frame_Int_Step: ["${x_f_start}", "${y_sash_start}"]
+  Sash_BL: ["${x_sash_start}", "${y_sash_start}"]
+  Sash_TL: ["${x_sash_start}", "${y_sash_end}"]
+  Sash_Glass_Step: ["${x_glass_start}", "${y_sash_end}"]
+  Glass_TL: ["${x_glass_start}", "${y_top}"]
+  AirInt_TopLeft: [0.0, "${y_top}"]
+
+  # Reveal Insulation Points (Tapered continuation)
+  # Not used in this scenario (Simple rect if not tapered through)
+  # Code says if taper > 0 and ins_max > ins_min (True), then Tapered logic applies
+  # slope m = (200-100)/150 = 0.666
+  # taper_delta = 0.666 * 30 = 20.0
+  # x_end_bottom = 410 + 100 = 510
+  # x_end_top = 510 - 20 = 490
+  # y_masonry_top = 220 + 50 = 270
+  
+  RevIns_BL: ["${x_win_outer}", 270.0]
+  RevIns_BR: [510.0, 270.0]
+  RevIns_TR: [490.0, 300.0] # 270 + 30
+  RevIns_TL: ["${x_win_outer}", 300.0]
+
+elements:
+  # 1. Interior Air (Define FIRST so it's background/lowest priority? 
+  # Actually SketchGeometry renders in order, so later overrides earlier in MaterialGrid?
+  # Wait, existing code uses Painter's algorithm?
+  # build_material_grid initializes with AIR_EXT (0).
+  # Then iterates regions. later regions overwrite.
+  # So AirInt (1) should overwrite background.
+  # Then Wall (2) overwrites AirInt if they overlap?
+  # Usually AirInt is defined carefully not to overlap, OR we place it last?
+  # In window_reveal.py it's defined first.
+  - type: polygon
+    name: "Interior Air Polygon"
+    material: AIR_INT
+    points: 
+      - AirInt_BL
+      - Wall_BL
+      - Wall_TL
+      - Frame_BL
+      - Frame_Int_Step
+      - Sash_BL
+      - Sash_TL
+      - Sash_Glass_Step
+      - Glass_TL
+      - AirInt_TopLeft
+
+  # 2. Wall (Interior Part)
+  - type: wall
+    params:
+      x: ${x_wall_int}
+      y: ${y_bottom}
+      width: 210.0 # 260 - 50
+      height: ${y_reveal}
+
+  # 3. Wall (Exterior/Reveal Part) LOWERED by 30mm
+  - type: wall
+    params:
+      x: ${x_win_outer}
+      y: ${y_bottom}
+      width: 150.0 # 410 - 260
+      height: ${y_reveal_shifted}
+
+  # 4. Rebate (on lowered wall)
+  - type: rect
+    name: "Rebate"
+    material: WALL
+    params:
+      x: ${x_win_outer}
+      y: ${y_reveal_shifted}
+      width: 150.0 
+      height: ${rebate_overlap}
+
+  # 5. External Insulation (Main + Tapered)
+  # y_taper_start = (220+50) - 150 = 120 (since taper_len=150, Rebate Top=270)
+  # Wait: y_ins_top = y_reveal_shifted + rebate = 220 + 50 = 270
+  # y_taper_start = 270 - 150 = 120
+  - type: insulation_tapered
+    material: INSULATION
+    params:
+      x_base: ${x_wall_ext}
+      y_bottom: ${y_bottom}
+      y_top: 270.0
+      thick_main: ${ins_thick_max}
+      thick_taper: ${ins_thick_min}
+      taper_start_y: 120.0
+      
+  # 6. Reveal Insulation (Tapered Polygon)
+  - type: polygon
+    name: "Reveal Insulation"
+    material: REVEAL_INS
+    points: [RevIns_BL, RevIns_BR, RevIns_TR, RevIns_TL]
+
+  # 7. Window Assembly
+  - type: window_detail
+    params:
+      x_frame_start: ${x_f_start}
+      y_frame_start: ${y_reveal}
+      frame_depth: ${f_depth}
+      frame_width: ${f_width}
+      sash_depth: ${sash_depth}
+      sash_width: ${sash_width}
+      sash_overlap: ${sash_overlap}
+      sash_recess: ${sash_recess}
+      glass_thickness: ${glass_thick}
+      y_top: ${y_top}
+      
+  # 8. Shutter Rails (Manual Rects for now)
+  # ISG (53x22) at x=260, y=303 (250+53)
+  # Y offset: 53.0
+  # x_isg_start: 260.0
+  # y_isg_start: 250 + 53 = 303
+  
+  # Outer Alu
+  - type: rect
+    name: "ISG_Alu"
+    material: ALUMINUM
+    params:
+       x: 260.0
+       y: 303.0
+       width: 22.0
+       height: 53.0
+       
+  # Inner Cavity (2mm wall)
+  - type: rect
+    name: "ISG_Air"
+    material: CAVITY
+    params:
+       x: 262.0
+       y: 305.0
+       width: 18.0
+       height: 49.0
+       
+  # Seal (1mm)
+  - type: rect
+    name: "ISG_Seal"
+    material: AIR_EXT # EPDM/Spacer
+    lambda: 0.25
+    params:
+       x: 282.0
+       y: 303.0
+       width: 1.0
+       height: 53.0
+       
+  # Shutter Rail
+  - type: rect
+    name: "Shutter_Alu"
+    material: ALUMINUM
+    params:
+       x: 283.0 # 282+1
+       y: 303.0
+       width: 22.0
+       height: 53.0
+       
+  - type: rect
+    name: "Shutter_Air"
+    material: CAVITY
+    params:
+       x: 285.0
+       y: 305.0
+       width: 18.0
+       height: 49.0
