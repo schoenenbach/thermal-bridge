@@ -13,7 +13,7 @@ from geometry import SketchGeometry, RefinementZone, MaterialID, CanvasConfig
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
-    MAT_SPACER_SWISS_ULTIMATE, MAT_SPACER_STAINLESS, MAT_SPACER_ALUMINUM
+    MAT_SPACER_SWISS_ULTIMATE, MAT_SPACER_STAINLESS, MAT_SPACER_ALUMINUM, MAT_STYRODUR
 )
 from typing import List
 
@@ -175,13 +175,46 @@ class WindowRevealGeometry(SketchGeometry):
                 y_taper_start = y_ins_top - float(taper_len)
                 x_ins_min_end = x_ins_start + config.insulation_thick_min_mm # at corner
                 
-                self.add_point("Ins_Taper_Start", x_ins_end, y_taper_start)
-                self.add_point("Ins_Top_Corner", x_ins_min_end, y_ins_top)
-                self.add_point("Ins_Top_Inner", x_ins_start, y_ins_top)
+                # Check for Styrodur Variant
+                if config.use_styrodur_variant:
+                    # 1. Main Block (Rectangular part below taper)
+                    # From y_bottom to y_taper_start
+                    self.add_point("Ins_Main_TL", x_ins_end, y_taper_start)
+                    self.add_point("Ins_Main_TR", x_ins_end, y_taper_start) # Same x as BR (simplified if vertical)
+                    # Actually, if insulation is uniform thickness below taper:
+                    # x_ins_end is max thickness.
+                    # Wait, is the taper cutting INTO the max thickness?
+                    # Yes, "tapered... from 100mm to 200mm".
+                    # So below taper, thickness is max (200mm).
+                    # Geometry: Rect from y_bottom to y_taper_start, width = max.
+                    
+                    self.add_point("Ins_Main_TR", x_ins_end, y_taper_start)
+                    self.add_point("Ins_Main_TL", x_ins_start, y_taper_start)
+                    
+                    self.add_shape(["Ins_BL", "Ins_BR", "Ins_Main_TR", "Ins_Main_TL"],
+                                   material_id=MaterialID.INSULATION, lambda_val=MAT_INSULATION,
+                                   name="Insulation Main")
+                                   
+                    # 2. Taper Block (Wedge part)
+                    # From y_taper_start to y_ins_top
+                    self.add_point("Ins_Wedge_BR", x_ins_end, y_taper_start)
+                    self.add_point("Ins_Wedge_TR", x_ins_min_end, y_ins_top)
+                    self.add_point("Ins_Wedge_TL", x_ins_start, y_ins_top)
+                    self.add_point("Ins_Wedge_BL", x_ins_start, y_taper_start)
+                    
+                    self.add_shape(["Ins_Wedge_BL", "Ins_Wedge_BR", "Ins_Wedge_TR", "Ins_Wedge_TL"],
+                                   material_id=MaterialID.INSULATION, lambda_val=MAT_STYRODUR,
+                                   name="Insulation Taper (Styrodur)")
                 
-                self.add_shape(["Ins_BL", "Ins_BR", "Ins_Taper_Start", "Ins_Top_Corner", "Ins_Top_Inner"],
-                               material_id=MaterialID.INSULATION, lambda_val=MAT_INSULATION,
-                               name="Insulation")
+                else:
+                    # Original single block logic
+                    self.add_point("Ins_Taper_Start", x_ins_end, y_taper_start)
+                    self.add_point("Ins_Top_Corner", x_ins_min_end, y_ins_top)
+                    self.add_point("Ins_Top_Inner", x_ins_start, y_ins_top)
+                    
+                    self.add_shape(["Ins_BL", "Ins_BR", "Ins_Taper_Start", "Ins_Top_Corner", "Ins_Top_Inner"],
+                                   material_id=MaterialID.INSULATION, lambda_val=MAT_INSULATION,
+                                   name="Insulation")
             else:
                  self.add_point("Ins_Top_Outer", x_ins_end, y_ins_top)
                  self.add_point("Ins_Top_Inner", x_ins_start, y_ins_top)
@@ -193,6 +226,12 @@ class WindowRevealGeometry(SketchGeometry):
         # 5. Reveal Insulation
         if config.reveal_insulation_mm > 0 and not config.uninsulated_reveal:
             rev_ins = config.reveal_insulation_mm
+            rev_mat = MAT_REVEAL_INSULATION
+            
+            if config.use_styrodur_variant:
+                rev_ins = min(rev_ins, 30.0)
+                rev_mat = MAT_STYRODUR
+            
             y_base = self.y_reveal + (float(rebate) if rebate > 0 else 0)
             
             # Assuming reveal insulation wraps the rebate or lines the reveal
@@ -211,7 +250,7 @@ class WindowRevealGeometry(SketchGeometry):
             self.add_point("Rev_TL", x_start, y_base + rev_ins)
             
             self.add_shape(["Rev_BL", "Rev_BR", "Rev_TR", "Rev_TL"],
-                           material_id=MaterialID.REVEAL_INS, lambda_val=MAT_REVEAL_INSULATION,
+                           material_id=MaterialID.REVEAL_INS, lambda_val=rev_mat,
                            name="Reveal Insulation")
 
         # 6. Frame

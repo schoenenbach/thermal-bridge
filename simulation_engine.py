@@ -85,6 +85,31 @@ def get_scenarios():
             masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID
         )
     })
+
+    # 7. 360mm Wall, Full Ins (Styrodur Variant)
+    configs.append({
+        "name": "Scenario 7: Wall 360mm (Styrodur Variant)",
+        "file_suffix": "scenario_7_styrodur",
+        "cfg": CalculationConfig(
+            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
+            reveal_insulation_mm=30, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
+            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID,
+            use_styrodur_variant=True
+        )
+    })
+
+    # 8. 360mm Wall, Styrodur Taper, No Reveal Ins
+    configs.append({
+        "name": "Scenario 8: Wall 360mm (Styrodur, No Rev)",
+        "file_suffix": "scenario_8_styrodur_norev",
+        "cfg": CalculationConfig(
+            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
+            reveal_insulation_mm=0, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
+            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID,
+            use_styrodur_variant=True
+        )
+    })
+
     return configs
 
 # --- Solver Core ---

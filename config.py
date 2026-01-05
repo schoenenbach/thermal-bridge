@@ -5,6 +5,7 @@ from dataclasses import dataclass
 MAT_WALL = 0.81  # Brick/Masonry (Standard Vollziegel 1800kg/m3)
 MAT_INSULATION = 0.035  # ETICS WLS 035
 MAT_REVEAL_INSULATION = 0.035
+MAT_STYRODUR = 0.025 # Styrodur / XPS WLS 025
 
 # Boundary Conditions (Temperature in C, Resistance in m2K/W)
 TEMP_INT = 20.0
@@ -97,6 +98,7 @@ class CalculationConfig:
     # Simulation settings
     grid_size_mm: float = 2.5
     spacer_type: int = SpacerType.SWISS_ULTIMATE
+    use_styrodur_variant: bool = False
     
     def __post_init__(self):
         """Initialize window config if not provided."""
