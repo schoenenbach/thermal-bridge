@@ -73,32 +73,40 @@ class WindowRevealGeometry(SketchGeometry):
         
         # --- 2. Build Elements ---
         
+        # Reveal Shift (Removal of masonry reveal for insulation)
+        # As requested: "move the respective wall parts down (on the x-axis) 
+        # so that the reveal insulation fits between the shutter rails and the wall."
+        # We interpret this as lowering the wall height by the insulation thickness
+        # for the entire depth of the reveal (from window to exterior).
+        self.reveal_shift_y = 0.0
+        if config.reveal_insulation_mm > 0 and not config.uninsulated_reveal:
+            self.reveal_shift_y = float(config.reveal_insulation_mm)
+
         # A. Interior Air (Complex Polygon)
         # We define this manually because it follows a unique contour
         self._build_interior_air_polygon()
         
         # B. Wall
-        # 360mm or 450mm wall block
-        add_wall(self, self.x_wall_int, self.y_bottom, self.w_th, self.y_reveal)
+        # Split wall into interior and exterior (reveal) parts
+        w_int = self.x_win_outer - self.x_wall_int
+        w_ext = self.x_wall_ext - self.x_win_outer
+        
+        # Interior Part (Full height)
+        add_wall(self, self.x_wall_int, self.y_bottom, w_int, self.y_reveal)
+        
+        # Reveal Part (Lowered by reveal_shift_y)
+        add_wall(self, self.x_win_outer, self.y_bottom, w_ext, self.y_reveal - self.reveal_shift_y)
         
         # C. Rebate (if present)
         rebate_h = float(config.masonry_rebate_overlap_mm)
         if rebate_h > 0:
-            # Rebate sits on top of wall corner (shoulder)
-            # x_corner is where window touches wall? 
-            # In original code: x_min=x_win_outer, x_max=x_wall_ext
-            # Width = x_wall_ext - x_win_outer ??
-            # Wait, "x_win_outer" is "exterior face of window frame".
-            # Window position "150mm from exterior masonry"
-            # If wall is flush with rebate (typical), then rebate depth defines where window sits.
-            # Original code: Add Rect(x_win_outer, x_wall_ext).
-            # Width = x_wall_ext - x_win_outer.
-            rebate_depth = self.x_wall_ext - self.x_win_outer
+            # Rebate sits on the LOWERED wall surface
+            y_rebate_start = self.y_reveal - self.reveal_shift_y
             
             add_rebate_corner(self, 
                               x_corner=self.x_win_outer, 
-                              y_corner=self.y_reveal,
-                              rebate_depth=rebate_depth,
+                              y_corner=y_rebate_start,
+                              rebate_depth=w_ext,
                               rebate_height=rebate_h)
             
         # D. Insulation (External)
@@ -169,7 +177,8 @@ class WindowRevealGeometry(SketchGeometry):
         taper_len = config.taper_length_mm
         
         x_ins_start = self.x_wall_ext
-        y_ins_top = self.y_reveal + rebate_h
+        # Exterior wall part height is (y_reveal - reveal_shift_y)
+        y_ins_top = self.y_reveal - self.reveal_shift_y + rebate_h
         
         if taper_len > 0:
             # Tapered
@@ -205,16 +214,35 @@ class WindowRevealGeometry(SketchGeometry):
         if config.use_styrodur_variant:
             rev_ins = min(rev_ins, 30.0)
             
-        y_base = self.y_reveal + (float(rebate_h) if rebate_h > 0 else 0)
-        
-        # Reveal Insulation sits on top of the rebate/masonry shoulder
+        y_masonry_top = self.y_reveal - self.reveal_shift_y + float(rebate_h)
         x_start = self.x_win_outer
-        # Extends outwards to cover the masonry/insulation interface?
-        x_end = self.x_wall_ext + config.insulation_thick_min_mm
-        width = x_end - x_start
         
-        add_rect(self, "Reveal Insulation", x_start, y_base, width, rev_ins,
-                 MaterialID.REVEAL_INS, rev_mat)
+        thick_min = config.insulation_thick_min_mm
+        taper_len = config.taper_length_mm
+        ins_max = config.insulation_thick_max_mm
+
+        if taper_len > 0 and (ins_max > thick_min):
+            # Prolong the taper from the external insulation through the reveal insulation layer
+            # Slope m = (thick_max - thick_min) / taper_length
+            m = (ins_max - thick_min) / float(taper_len)
+            taper_delta = m * rev_ins
+            
+            x_end_bottom = self.x_wall_ext + thick_min
+            x_end_top = x_end_bottom - taper_delta
+            
+            # Define tapered polygon
+            self.add_point("RevIns_BL", x_start, y_masonry_top)
+            self.add_point("RevIns_BR", x_end_bottom, y_masonry_top)
+            self.add_point("RevIns_TR", x_end_top, y_masonry_top + rev_ins)
+            self.add_point("RevIns_TL", x_start, y_masonry_top + rev_ins)
+            
+            self.add_shape(["RevIns_BL", "RevIns_BR", "RevIns_TR", "RevIns_TL"], 
+                           MaterialID.REVEAL_INS, rev_mat, "Reveal Insulation Tapered")
+        else:
+            # Simple rectangular reveal insulation
+            width = (self.x_wall_ext + thick_min) - x_start
+            add_rect(self, "Reveal Insulation", x_start, y_masonry_top, width, rev_ins,
+                     MaterialID.REVEAL_INS, rev_mat)
 
     def _build_shutter_rails(self):
         """
