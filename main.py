@@ -15,7 +15,7 @@ if __name__ == "__main__":
         window_position_from_exterior_masonry_mm=150,
         masonry_rebate_overlap_mm=50,
         uninsulated_reveal=True,
-        grid_size_mm=2.0,           # High Res (adjusted for speed)
+        grid_size_mm=5.0,           # High Res (adjusted for speed)
         spacer_type=SpacerType.STAINLESS_STEEL # "Old" (Ug 1.1)
     )
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         window_position_from_exterior_masonry_mm=150,
         masonry_rebate_overlap_mm=50,
         uninsulated_reveal=True,
-        grid_size_mm=2.0,           # High Res (adjusted for speed)
+        grid_size_mm=5.0,           # High Res (adjusted for speed)
         spacer_type=SpacerType.SWISS_ULTIMATE 
     )
 

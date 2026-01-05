@@ -62,5 +62,5 @@ class CalculationConfig:
     uninsulated_reveal: bool = False
     
     # Simulation Fidelity
-    grid_size_mm: float = 1.0
+    grid_size_mm: float = 5.0
     spacer_type: int = SpacerType.SWISS_ULTIMATE
