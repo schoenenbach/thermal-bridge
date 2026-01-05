@@ -27,7 +27,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   `RoofJunction`: Eaves detail where wall meets roof (raffer tails, insulation connectivity).
 *   **Refactoring:** Convert `elements.py` functions into a class-based hierarchy (e.g., `Element` -> `Window`, `Element` -> `Shutter`) to store default parameters and validation logic.
 
-## 3. Professional PDF Report Generation
+## 3. Professional PDF Report Generation [DONE]
 
 **Objective:** Enable the generation of signed, branded PDF reports for documentation and client submission.
 

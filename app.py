@@ -210,6 +210,10 @@ if active_data:
                                 
                                 st.metric(label, value_str, delta=delta, delta_color="inverse", help=help_txt)
                                 
+                    # Store results for report generation
+                    simple_results = {k: v.get('value') for k, v in measurements.items()}
+                    st.session_state['last_simulation_results'] = simple_results
+                                
                     # Cleanup
                     if os.path.exists(temp_yaml): os.remove(temp_yaml)
                     
@@ -249,5 +253,58 @@ if active_data:
 
     # Download
     st.download_button("Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml")
+
+    # --- PDF Report Generation ---
+    st.markdown("---")
+    st.subheader("Export Report")
+    
+    from report_generator import generate_pdf_report
+    
+    col_rep1, col_rep2 = st.columns(2)
+    with col_rep1:
+        rep_project_name = st.text_input("Project Name", value=active_name)
+        rep_author = st.text_input("Author", value="User")
+    
+    with col_rep2:
+        rep_desc = st.text_area("Description", value="Thermal simulation of window reveal details.")
+        
+    if st.button("Generate PDF Report"):
+        # Gather results (need to be in scope or session state)
+        # We'll scrape the measurements from the last run if available, 
+        # but since 'measurements' variable is local to the button click above, 
+        # we really should persist it in session_state for this to be robust.
+        # For now, we'll try to rely on the fact that if the user just ran it, 
+        # we might need to re-parse or better yet, store 'last_results' in session_state.
+        
+        # Better approach: Check if results image exists
+        img_path = f"result_{active_name}.png"
+        if os.path.exists(img_path):
+            # Try to reconstruct results from a simplified approach or session state
+            # Ideally, 'results' should be saved. 
+            # Let's check if we can read measurement values from a log or just pass empty for now if missing.
+            # To do this properly, let's modify the simulation block to save to session_state.
+            
+            # Use 'st.session_state.get' to find results if we decide to store them
+            results_for_report = st.session_state.get('last_simulation_results', {})
+            
+            pdf_path = f"report_{active_name.replace(' ', '_')}.pdf"
+            success, msg = generate_pdf_report(
+                project_name=rep_project_name,
+                author=rep_author,
+                description=rep_desc,
+                results=results_for_report,
+                image_path=img_path,
+                output_path=pdf_path
+            )
+            
+            if success:
+                st.success(f"Report Generated: {pdf_path}")
+                with open(pdf_path, "rb") as f:
+                    st.download_button("Download Report PDF", data=f, file_name=pdf_path, mime="application/pdf")
+            else:
+                st.error(msg)
+        else:
+            st.warning("Please run the simulation first to generate results.")
+
 
 
