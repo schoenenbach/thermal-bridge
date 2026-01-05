@@ -15,6 +15,10 @@ from config import (
     MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
     MAT_SPACER_SWISS_ULTIMATE, MAT_SPACER_STAINLESS, MAT_SPACER_ALUMINUM, MAT_STYRODUR
 )
+# New constants for Shutter Rails
+MAT_ALUMINUM = 160.0
+MAT_CAVITY_ISO = 0.25      # Equivalent lambda for unventilated cavity
+MAT_EPDM = 0.25
 from typing import List
 
 # Import Element Library
@@ -120,6 +124,9 @@ class WindowRevealGeometry(SketchGeometry):
                           mat_frame_lambda=MAT_FRAME_EQ,
                           mat_glass_lambda=MAT_GLASS_UG11)
 
+        # G. Shutter Rails (ISG + Aussteller)
+        self._build_shutter_rails()
+
         # --- 3. Canvas Config ---
         self._configure_canvas()
 
@@ -208,6 +215,71 @@ class WindowRevealGeometry(SketchGeometry):
         
         add_rect(self, "Reveal Insulation", x_start, y_base, width, rev_ins,
                  MaterialID.REVEAL_INS, rev_mat)
+
+    def _build_shutter_rails(self):
+        """
+        Add Insect Screen (ISG) and Shutter Rails.
+        Reference: 'Außenkante Rahmen' (x_win_outer) & 'Vorderkante' (y_reveal).
+        Flow: Frame Edge -> ISG -> Seal -> Shutter -> Exterior
+        """
+        # --- 1. ISG Rail (Insect Screen) ---
+        # 28mm wide (along Y), 35mm deep (along X)
+        # Position: "Direkt auf dem Rahmen" (Starts at x_win_outer?)
+        # Wait, if it is "Auf dem Rahmen" and "Vor... ISG", and user Reference X=0 is Frame Edge.
+        # Implemented logic:
+        # My X = User Y (Depth/Outwards +)
+        # My Y = User X (Width/Along Frame)
+        
+        isg_width = 53.0 # Manufacturer: 53mm
+        isg_depth = 22.0 # Measured: 22mm
+        wall_th = 2.0
+        
+        # Shift Y by 53mm ("Thickness of reveal") to start in clear opening
+        # clearing the masonry rebate (typically 50mm).
+        # "take the absolute value here, not a reveal based variable" -> Use fixed 53.0
+        y_offset = 53.0 
+        
+        x_isg_start = self.x_win_outer
+        y_isg_start = self.y_reveal + y_offset # Start after the rebate/offset
+        
+        # Outer Alu Box
+        add_rect(self, "ISGRail_Alu", x_isg_start, y_isg_start, 
+                 isg_depth, isg_width, MaterialID.ALUMINUM, MAT_ALUMINUM)
+        
+        # Inner Cavity (18 x 49)
+        add_rect(self, "ISGRail_Air", 
+                 x_isg_start + wall_th, y_isg_start + wall_th,
+                 isg_depth - 2*wall_th, isg_width - 2*wall_th,
+                 MaterialID.CAVITY, MAT_CAVITY_ISO)
+
+        # --- 2. Seal (Keder) ---
+        # 1mm thick, between ISG and Shutter
+        # Contact area is based on overlap. Both 53mm now.
+        seal_depth = 1.0
+        x_seal_start = x_isg_start + isg_depth
+        
+        add_rect(self, "RailSeal", x_seal_start, y_isg_start,
+                 seal_depth, isg_width, 
+                 MaterialID.SPACER, MAT_EPDM)
+
+        # --- 3. Shutter Rail (Rollladen) ---
+        # 53mm wide (along Y), 22mm deep (along X)
+        shutter_width = 53.0
+        shutter_depth = 22.0
+        
+        x_shut_start = x_seal_start + seal_depth
+        y_shut_start = y_isg_start # Same Y position as ISG (aligned)
+        
+        # Outer Alu Box
+        add_rect(self, "ShutRail_Alu", x_shut_start, y_shut_start,
+                 shutter_depth, shutter_width, MaterialID.ALUMINUM, MAT_ALUMINUM)
+                 
+        # Inner Cavity (49 x 18) -> 53-4 x 22-4 (2mm wall)
+        add_rect(self, "ShutRail_Air", 
+                 x_shut_start + wall_th, y_shut_start + wall_th,
+                 shutter_depth - 2*wall_th, shutter_width - 2*wall_th,
+                 MaterialID.CAVITY, MAT_CAVITY_ISO)
+
 
     def _configure_canvas(self):
         # Domain: Ensure enough space for insulation + exterior air buffer
