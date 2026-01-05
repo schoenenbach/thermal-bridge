@@ -1,0 +1,68 @@
+import React from 'react';
+import WallShape from './shapes/WallShape';
+import PolygonShape from './shapes/PolygonShape'; // Assuming imported
+import { ScenarioElement, RectElement, PolygonElement } from './types';
+import { Rect, Text, Group } from 'react-konva';
+
+interface ShapeFactoryProps {
+    element: ScenarioElement;
+    isSelected: boolean;
+    onSelect: (id: string) => void;
+    onChange: (id: string, newAttrs: any) => void;
+}
+
+const ShapeFactory: React.FC<ShapeFactoryProps> = ({ element, isSelected, onSelect, onChange }) => {
+    // Generate a temporary ID if missing
+    const id = element.id || `el-${Math.random().toString(36).substr(2, 9)}`;
+
+    switch (element.type) {
+        case 'rect':
+        case 'wall':
+            const rectEl = element as RectElement;
+            return (
+                <WallShape
+                    id={id}
+                    x={rectEl.x}
+                    y={rectEl.y}
+                    width={rectEl.width}
+                    height={rectEl.height}
+                    isSelected={isSelected}
+                    onSelect={onSelect}
+                    onChange={onChange}
+                />
+            );
+        case 'polygon':
+            const polyEl = element as PolygonElement;
+            if (polyEl.calculatedPoints && polyEl.calculatedPoints.length > 0) {
+                return (
+                    <PolygonShape
+                        id={id}
+                        points={polyEl.calculatedPoints}
+                        isSelected={isSelected}
+                        onSelect={onSelect}
+                    />
+                );
+            }
+            return null;
+        case 'window':
+        case 'window_detail':
+            // Placeholder for Window
+            // We'll render a box at the frame start position if available in params
+            const params = element.params || {};
+            if (params.x_frame_start && params.y_frame_start) {
+                // Simplified visualization request
+                return (
+                    <Group x={params.x_frame_start} y={params.y_frame_start} onClick={() => onSelect(id)}>
+                        <Rect width={100} height={100} stroke="red" dash={[5, 5]} />
+                        <Text text="Window" fill="red" />
+                    </Group>
+                );
+            }
+            return null;
+        default:
+            console.warn('Unknown element type:', element.type);
+            return null;
+    }
+};
+
+export default ShapeFactory;

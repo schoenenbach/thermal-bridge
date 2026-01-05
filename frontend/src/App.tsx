@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import './App.css';
 import { ScenarioList } from './components/ScenarioList';
 import { ScenarioDetail } from './components/ScenarioDetail';
+import GeometryEditor from './components/editor/GeometryEditor';
 
 function App() {
-  const [view, setView] = useState<'list' | 'detail'>('list');
+  const [view, setView] = useState<'list' | 'detail' | 'editor'>('list');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
 
   const handleSelectScenario = (filename: string) => {
@@ -13,8 +14,16 @@ function App() {
   };
 
   const handleBack = () => {
-    setSelectedScenario(null);
-    setView('list');
+    if (view === 'editor') {
+      setView('detail'); // Back to detail from editor
+    } else {
+      setSelectedScenario(null);
+      setView('list');
+    }
+  };
+
+  const handleOpenEditor = () => {
+    setView('editor');
   };
 
   return (
@@ -34,13 +43,23 @@ function App() {
         <p style={{ margin: '5px 0 0', fontSize: '14px', opacity: 0.8 }}>Frontend Migration (Phase 3A)</p>
       </header>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', height: 'calc(100vh - 100px)' }}>
         {view === 'list' && (
           <ScenarioList onSelectScenario={handleSelectScenario} />
         )}
 
         {view === 'detail' && selectedScenario && (
-          <ScenarioDetail filename={selectedScenario} onBack={handleBack} />
+          <div>
+            <button onClick={handleOpenEditor} style={{ marginBottom: '10px' }}>Open Visual Editor</button>
+            <ScenarioDetail filename={selectedScenario} onBack={handleBack} />
+          </div>
+        )}
+
+        {view === 'editor' && (
+          <div style={{ height: '100%' }}>
+            <button onClick={handleBack} style={{ margin: '10px' }}>Back to Detail</button>
+            <GeometryEditor filename={selectedScenario!} />
+          </div>
         )}
       </main>
     </div>

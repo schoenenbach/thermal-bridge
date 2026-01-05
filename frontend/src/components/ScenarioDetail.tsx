@@ -66,7 +66,7 @@ export const ScenarioDetail: React.FC<ScenarioDetailProps> = ({ filename, onBack
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}>
-                        <p>Phase 3B: Interactive Geometry Editor implementation planned here.</p>
+                        <p>Click "Open Visual Editor" above to view and edit the geometry.</p>
                     </div>
                 </div>
             </div>

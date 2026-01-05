@@ -175,7 +175,7 @@ Upload DXF → Map Layers → Preview (with stats) → Adjust Settings → Conve
 
 ---
 
-## 13. Frontend Migration (React/Angular) [WIP - Phase 1 Done]
+## 13. Frontend Migration (React/Angular) [WIP - Phase 3B Done]
 
 **Objective:** Migrate from Streamlit to a modern SPA framework for better UX.
 
@@ -218,9 +218,9 @@ uvicorn api.main:app --reload
 - [x] Implement Basic Scenario List & View
 
 **Phase 3B: Interactive Geometry Editor (The Deep Dive)**
-- [ ] Implement Canvas with `react-konva`
-- [ ] Implement Scene Graph <-> Schema synchronization
-- [ ] Drag-and-Drop and Resize interactions
+- [x] Implement Canvas with `react-konva`
+- [x] Implement Scene Graph <-> Schema synchronization (via local state)
+- [x] Drag-and-Drop and Resize interactions
 
 **Phase 3C: Full Application Replacement**
 - [ ] Re-implement Inspector Panel
