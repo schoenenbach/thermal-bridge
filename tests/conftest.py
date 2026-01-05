@@ -63,3 +63,19 @@ def iso_case_1_data():
 def iso_case_1_geometry(iso_case_1_data):
     """DeclarativeGeometry for ISO Case 1."""
     return DeclarativeGeometry(iso_case_1_data)
+
+@pytest.fixture
+def iso_case_2_data():
+    """Load ISO Case 2 YAML data."""
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../scenarios/iso_case_2.yaml'))
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
+
+@pytest.fixture
+def iso_case_2_geometry(iso_case_2_data):
+    """
+    DeclarativeGeometry for ISO Case 2.
+    Note: For the test we might need to modify this to add fictitious layers,
+    so the test might instantiate its own geometry from iso_case_2_data.
+    """
+    return DeclarativeGeometry(iso_case_2_data)

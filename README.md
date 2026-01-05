@@ -8,8 +8,8 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
 -   **Declarative Geometries**: Define simulation scenarios using simple **YAML** files. No Python coding required for new geometries.
     -   Support for Points, Polygons, and parametric Variables.
     -   Built-in macros for Walls, Insulation, Window Frames, and Shutter Rails.
--   **Adaptive Meshing**: Automatically refines the grid in critical areas (e.g., thermal breaks, thin layers) to ensure accuracy while maintaining performance.
--   **ISO 10211 Verified**: Validated against Test Cases 1 and 2 from the DIN EN ISO 10211 standard.
+-   **Adaptive & Graded Meshing**: Automatically refines the grid in critical areas and uses **geometric grading** to expand cell sizes away from details, significantly reducing simulation time while maintaining ISO accuracy.
+-   **ISO 10211 Verified**: Validated against **Test Cases 1 (High Precision) and 2 (Multi-Material Bridge)** from the DIN EN ISO 10211 standard.
 -   **Transient Simulation**: Calculate time-dependent thermal behavior (e.g., heating curves, thermal inertia) and generate animated results.
 -   **Visual Output**: Generates temperature maps (with isotherms) and concise result summaries (Psi-values, fRsi factors).
 -   **Web App**: Interactive Interface using Streamlit for easy sharing and parameter exploration.
@@ -207,3 +207,9 @@ The output plots will display the actual temperatures used (`Ti` and `Te`) in th
 -   `config.py`: Material properties and simulation constants.
 -   `tests/`: Unit and integration tests.
 -   `legacy/`: Archived geometry scripts and legacy code.
+
+## trial js frontend/backend
+
+uvicorn backend.app.main:app --reload --port 8000
+
+npm run dev in frontend folder

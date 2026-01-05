@@ -324,6 +324,7 @@ class RefinementZoneDef(BaseModel):
     target_dx: float
     target_dy: Optional[float] = None  # defaults to target_dx if not specified
     priority: int = 0
+    grading: float = 1.0 # Default grading factor
 
 
 # --- Main Scenario ---

@@ -315,7 +315,8 @@ class DeclarativeGeometry(SketchGeometry):
                 y_max=z.y_max,
                 target_dx=z.target_dx,
                 target_dy=z.target_dy if z.target_dy is not None else z.target_dx,
-                priority=z.priority
+                priority=z.priority,
+                grading=z.grading
             ))
         
         # 2. Auto-generate zones at material boundaries (lower priority)

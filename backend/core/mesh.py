@@ -61,7 +61,7 @@ class AdaptiveMesh:
             config.x_min_mm, 
             config.x_max_mm,
             config.default_dx_mm,
-            [(z.x_min, z.x_max, z.target_dx, z.priority) for z in refine_zones]
+            [(z.x_min, z.x_max, z.target_dx, z.priority, z.grading) for z in refine_zones]
         )
         
         # Build Y coordinates
@@ -70,7 +70,7 @@ class AdaptiveMesh:
             config.y_min_mm,
             config.y_max_mm,
             config.default_dy_mm,
-            [(z.y_min, z.y_max, z.target_dy, z.priority) for z in refine_zones]
+            [(z.y_min, z.y_max, z.target_dy, z.priority, z.grading) for z in refine_zones]
         )
         
         # Compute cell properties
@@ -88,16 +88,16 @@ class AdaptiveMesh:
                          coord_min: float,
                          coord_max: float,
                          default_dh: float,
-                         refinement_1d: List[Tuple[float, float, float, int]]
+                         refinement_1d: List[Tuple[float, float, float, int, float]]
                         ) -> np.ndarray:
         """
-        Build 1D coordinate array with refinement.
+        Build 1D coordinate array with refinement and grading.
         
         Args:
             critical_points: Points where mesh nodes should align
             coord_min, coord_max: Domain bounds
             default_dh: Default cell size
-            refinement_1d: List of (min, max, target_dh, priority) tuples
+            refinement_1d: List of (min, max, target_dh, priority, grading) tuples
             
         Returns:
             1D numpy array of face coordinates
@@ -116,24 +116,156 @@ class AdaptiveMesh:
             if dist <= 1e-9:
                 continue
                 
-            # Determine target resolution for this interval
-            # Check if interval overlaps any refinement zone
+            # Determine params for this interval
             target_dh = default_dh
+            grading = 1.05 # Default grading if slightly allowed? Or stick to uniform?
+            # Stick to uniform (1.0) unless specified otherwise to prevent unexpected drift
+            grading = 1.0 
+            
             best_priority = -1
             
-            for r_min, r_max, r_dh, r_priority in refinement_1d:
-                # Check overlap
-                if start < r_max and end > r_min:
+            # Check overlap with refinement zones
+            for r_min, r_max, r_dh, r_priority, r_grading in refinement_1d:
+                # Interval is fully or partially inside zone?
+                # Usually we refine if the interval is "of interest".
+                # Simplification: If center of interval is in zone
+                mid = (start + end) / 2
+                if mid >= r_min and mid <= r_max:
                     if r_priority > best_priority:
                         target_dh = r_dh
                         best_priority = r_priority
+                        grading = r_grading
             
-            # Subdivide interval
-            n_cells = max(1, int(np.ceil(dist / target_dh)))
-            steps = np.linspace(start, end, n_cells + 1)
-            
-            for s in steps[1:]:
-                coords.append(s)
+            # Generate points for this interval
+            # Case 1: Uniform
+            if abs(grading - 1.0) < 1e-3:
+                n_cells = max(1, int(np.ceil(dist / target_dh)))
+                # Adjust dh to fit exactly
+                actual_dh = dist / n_cells
+                for k in range(n_cells):
+                    coords.append(start + (k+1)*actual_dh)
+            else:
+                # Case 2: Graded (Geometric Expansion)
+                # We want to start with target_dh at both ends (if adjacent to other crit points?)
+                # Or just start with target_dh and expand towards center?
+                # WUFI strategy: Expand from critical edges.
+                # Since 'start' and 'end' are critical points, we should be fine at boundaries.
+                # Problem: How to expand from BOTH sides to the middle? 
+                # Or is this interval just one-way?
+                # Usually critical points define the rigid features.
+                # We should refine near start and end, and coarse in middle.
+                # "Double Grading"
+                
+                # Check required space for 2 steps
+                if dist < 2 * target_dh:
+                    # Too small to grade, just uniform
+                     n_cells = max(1, int(np.ceil(dist / target_dh)))
+                     actual_dh = dist / n_cells
+                     for k in range(n_cells):
+                         coords.append(start + (k+1)*actual_dh)
+                     continue
+                
+                # Iterative generation from both sides
+                pts_left = []
+                pts_right = []
+                
+                curr_dx = target_dh
+                curr_pos = start
+                
+                # Forward from start
+                rem_dist = dist
+                while rem_dist > 0:
+                    pts_left.append(curr_pos + curr_dx)
+                    curr_pos += curr_dx
+                    rem_dist -= curr_dx
+                    curr_dx *= grading
+                    # Cap at default_dh to avoid over-coarsening?
+                    if curr_dx > default_dh: curr_dx = default_dh
+                
+                # If we overshot, we need to reconcile.
+                # Simpler approach: Calculate number of steps N such that sum(geometric series) ~ dist
+                # But double sided is tricky.
+                
+                # Alternative: Explicit "Graded Interval" generator
+                # 1. Generate normalized spacing 1, r, r^2 ... until sum > dist/2
+                # 2. Mirror for other side
+                # 3. Scale to fit exactly
+                
+                # Let's try a robust "fill with expansion"
+                # Generate points from left
+                xs = [start]
+                dx = target_dh
+                while xs[-1] + dx < end - target_dh/2: # stop before end
+                    next_x = xs[-1] + dx
+                    # Check if we passed midpoint?
+                    # If we passed midpoint, we should match the sequence coming from the right?
+                    xs.append(next_x)
+                    dx *= grading
+                    if dx > default_dh: dx = default_dh
+                
+                # This is one-sided expansion.
+                # Ideally we want symmetric if start/end are both critical.
+                # If best_priority was triggered by a zone, it implies high res needed entire zone?
+                # No, grading is usually used OUTSIDE refinement zones.
+                # But here we are applying grading INSIDE an interval between critical points.
+                # If this interval is "Wall core", we want fine near surface, coarse in center.
+                
+                # Let's assume symmetric expansion from start and end towards center.
+                left_pts = [start]
+                right_pts = [end]
+                
+                ldx = target_dh
+                rdx = target_dh
+                
+                # While gap exists
+                while (right_pts[-1] - left_pts[-1]) > (ldx + rdx): # heuristic check
+                    # Add point from left
+                    left_pts.append(left_pts[-1] + ldx)
+                    ldx *= grading
+                    if ldx > default_dh: ldx = default_dh
+                    
+                    if (right_pts[-1] - left_pts[-1]) <= rdx: break # Check overlap
+                    
+                    # Add point from right
+                    right_pts.append(right_pts[-1] - rdx)
+                    rdx *= grading
+                    if rdx > default_dh: rdx = default_dh
+                    
+                # Fill the remaining gap with uniform steps
+                gap_start = left_pts[-1]
+                gap_end = right_pts[-1]
+                gap = gap_end - gap_start
+                
+                # Use the average of last dx values as step size for gap
+                avg_dx = (ldx + rdx) / 2
+                if grading > 1 and gap > avg_dx: 
+                     # slightly squash or stretch?
+                     n_gap = max(1, int(round(gap / avg_dx)))
+                     gap_step = gap / n_gap
+                     for k in range(n_gap):
+                         left_pts.append(gap_start + (k+1)*gap_step)
+                else: 
+                     # Just close it?
+                     pass # gap is covered by merge
+                     
+                # Sort and uniq (right_pts are descending, so reverse)
+                # Combine
+                right_pts.pop(0) # Remove 'end' which is duplicate if we merge carefully? 
+                # Actually right_pts has 'end' at index 0. 
+                # We generated: end, end-dx..
+                
+                # Merging
+                full_pts = left_pts + sorted(right_pts)
+                
+                # Sanity check: Ensure monotonic and within bounds
+                full_pts = sorted(list(set(full_pts))) # Dedupe boundaries
+                full_pts = [p for p in full_pts if p >= start and p <= end]
+                
+                # Fix exact end point floating point issues
+                if abs(full_pts[-1] - end) > 1e-9:
+                     full_pts.append(end)
+                     
+                coords.extend(full_pts[1:]) # Skip start as it matches prev coords[-1]
         
         return np.array(coords)
     

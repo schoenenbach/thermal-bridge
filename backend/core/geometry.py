@@ -82,6 +82,7 @@ class RefinementZone:
     target_dx: float
     target_dy: float = None
     priority: int = 0
+    grading: float = 1.1 # Default geometric expansion factor (1.1 = 10% growth)
     
     def __post_init__(self):
         if self.target_dy is None:
