@@ -46,43 +46,107 @@ class DeclarativeGeometry(SketchGeometry):
         self._build_elements()
         
     def _resolve_variables(self):
-        """Recursively replace ${var} in self.data."""
-        # Simple string substitution for now. 
-        # For numeric values, we might need eval or strict type casting.
-        
-        def replace_val(val):
-            if isinstance(val, str):
-                # Regex to find ${var}
-                pattern = r"\$\{(\w+)\}"
-                matches = re.finditer(pattern, val)
-                
-                new_val = val
-                for match in matches:
-                    var_name = match.group(1)
-                    if var_name in self.vars:
-                        # If the whole string is just the variable, replace with typed value
-                        if match.group(0) == val:
-                            return self.vars[var_name]
-                        else:
-                            new_val = new_val.replace(match.group(0), str(self.vars[var_name]))
-                    else:
-                        print(f"[WARNING] Variable '{var_name}' not found.")
-                
-                # Try converting to number if simple number string
-                try:
-                    if "." in new_val:
-                        return float(new_val)
-                    return int(new_val)
-                except ValueError:
-                    return new_val
-                    
-            elif isinstance(val, dict):
-                return {k: replace_val(v) for k, v in val.items()}
-            elif isinstance(val, list):
-                return [replace_val(v) for v in val]
-            return val
+        """
+        Resolve variables recursively with expressions support.
+        Handles:
+        - Simple substitution: ${var} -> value
+        - String interpolation: prefix_${var} -> prefix_value
+        - Math expressions: ${a} + ${b} -> result
+        - Dependencies: a=${b}, b=10 -> a=10
+        """
+        import math
 
-        self.data = replace_val(self.data)
+        # 1. Resolve 'variables' block first (handling dependencies)
+        # We limit iterations to prevent infinite loops (circular deps)
+        max_iterations = 10
+        
+        # Prepare safe eval scope
+        safe_scope = {"__builtins__": None, "math": math, "abs": abs, "min": min, "max": max}
+        
+        for _ in range(max_iterations):
+            changes_count = 0
+            
+            # Create a snapshot of current variables for substitution
+            current_vars = self.vars.copy()
+            
+            for key, val in self.vars.items():
+                if isinstance(val, str) and "${" in val:
+                    # Attempt to resolve this string
+                    resolved = self._substitute_and_eval(val, current_vars, safe_scope)
+                    if resolved != val:
+                        self.vars[key] = resolved
+                        changes_count += 1
+            
+            if changes_count == 0:
+                break
+        
+        # 2. Resolve the rest of data using the fully resolved variables
+        self.data = self._recursive_resolve(self.data, self.vars, safe_scope)
+
+    def _substitute_and_eval(self, val_str: str, context: Dict[str, Any], scope: Dict[str, Any]) -> Any:
+        """Helper to substitute ${var} and evaluate expressions."""
+        if not isinstance(val_str, str):
+            return val_str
+            
+        pattern = r"\$\{(\w+)\}"
+        
+        # 1. Substitution
+        # We need to handle cases where properties are numbers but inserted into strings
+        
+        matches = list(re.finditer(pattern, val_str))
+        if not matches:
+            return val_str
+            
+        # Optimization: If string is EXACTLY "${var}", return the var value directly (preserving type)
+        if len(matches) == 1 and matches[0].group(0) == val_str:
+            var_name = matches[0].group(1)
+            return context.get(var_name, val_str)
+
+        new_val = val_str
+        for match in matches:
+            var_name = match.group(1)
+            if var_name in context:
+                val = context[var_name]
+                # CRITICAL Fix: Do not substitute if the dependency itself is not resolved yet.
+                # This prevents "expanding" formulas which leads to order-of-ops errors.
+                if isinstance(val, str) and "${" in val:
+                    continue
+                    
+                # Replace with string representation for regex substitution
+                new_val = new_val.replace(match.group(0), str(val))
+            else:
+                # print(f"[WARNING] Variable '{var_name}' not found.")
+                pass
+                
+        # 2. Evaluation (if it looks like math)
+        # Simple heuristic: if it contains math operators and no letters (except e for scientific notation, or known math funcs)
+        # This is tricky. Let's just try to eval it. if it fails, return string.
+        
+        # Only try eval if there are no remaining ${...} (unresolved vars)
+        if "${" not in new_val:
+            try:
+                # Simple check to avoid evaling things like "Wall_50" that result in syntax errors safely,
+                # but "10 + 20" works.
+                # However, python's eval allows "Wall_50" to be a variable name lookup, which fails in restricted scope.
+                # We want to support math.
+                result = eval(new_val, scope)
+                return result
+            except (SyntaxError, NameError, TypeError):
+                # Fallback: it's just a string, e.g. "Name_Suffix"
+                return new_val
+        
+        return new_val
+
+    def _recursive_resolve(self, data: Any, context: Dict[str, Any], scope: Dict[str, Any]) -> Any:
+        """"Recursively traverse data structure and resolve strings."""
+        if isinstance(data, dict):
+            return {k: self._recursive_resolve(v, context, scope) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._recursive_resolve(v, context, scope) for v in data]
+        elif isinstance(data, str) and "${" in data:
+            return self._substitute_and_eval(data, context, scope)
+        else:
+            return data
         
     def _validate_schema(self):
         """Validate scenario data against schema."""

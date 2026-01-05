@@ -17,26 +17,19 @@ variables:
   
   # Canvas
   grid_size: 2.5
+  canvas_width: "${x_wall_ext} + ${ins_thick_max} + 50"
   
-  # Derived
-  x_wall_int: 50.0
-  x_wall_ext: 500.0 
-  x_win_outer: 350.0 
+  # Derived Coordinates
+  x_wall_int: "${off_x}"
+  x_wall_ext: "${x_wall_int} + ${wall_thick}"
+  x_win_outer: "${x_wall_ext} - ${win_pos}" 
   
   y_bottom: 0.0
-  y_reveal: 250.0
-  y_top: 500.0
+  y_reveal: "${off_y}"
+  y_top: "${y_reveal} + 250.0"
   
-  x_f_start: 280.0
-  y_sash_start: 310.0
-  y_sash_end: 380.0
-  x_sash_start: 250.0
-  x_glass_start: 273.0
-  
-  # Reveal Shift (0mm)
-  y_reveal_shifted: 250.0
-
-  # Window details
+  # Derived Window Details
+  # Frame starts relative to window outer edge minus frame depth
   f_depth: 70.0
   f_width: 70.0
   sash_overlap: 10.0
@@ -45,8 +38,24 @@ variables:
   sash_recess: 30.0
   glass_thick: 24.0
 
+  x_f_start: "${x_win_outer} - ${f_depth}"
+  x_f_end: "${x_f_start} + ${f_depth}"
+  
+  y_sash_start: "${y_reveal} + ${f_width} - ${sash_overlap}"
+  y_sash_end: "${y_sash_start} + ${sash_width}"
+  
+  x_sash_end: "${x_f_end} - ${sash_recess}"
+  x_sash_start: "${x_sash_end} - ${sash_depth}"
+  
+  # Glass Centered in Sash
+  glass_mid_x: "(${x_sash_start} + ${x_sash_end}) / 2"
+  x_glass_start: "${glass_mid_x} - (${glass_thick} / 2)"
+  
+  # Reveal Shift (0mm)
+  y_reveal_shifted: "${y_reveal} + ${reveal_ins_mm}"
+
 canvas:
-  bounds: [0, 750, 0, 500] # x_max=500+200+buffer ~ 750
+  bounds: [0, "${canvas_width}", 0, "${y_top}"]
   grid: ${grid_size}
 
 measurements:

@@ -68,6 +68,19 @@ class Insulation(RectElement):
         super().__init__(sketch, **params)
 
 
+class Air(RectElement):
+    def __init__(self, sketch: SketchGeometry, **params):
+        # Default to AIR_EXT, but check 'type' or 'subtype' param for INT
+        subtype = params.get('type', 'ext').lower()
+        if subtype == 'int' or subtype == 'internal':
+             params.setdefault('material_id', MaterialID.AIR_INT)
+             params.setdefault('lambda_val', MAT_AIR_INT)
+        else:
+             params.setdefault('material_id', MaterialID.AIR_EXT)
+             params.setdefault('lambda_val', MAT_AIR_EXT)
+        super().__init__(sketch, **params)
+
+
 class InsulationTapered(Element):
     def build(self):
         x_base = float(self._get_param('x_base', 0.0))
@@ -278,6 +291,20 @@ class RoofJunction(Element):
         # TODO: Implement angled rafter using PolygonShape when we have generic polygon support in Element
         pass
 
+class PolygonElement(Element):
+    """
+    Generic Polygon Element.
+    Expects 'points' parameter (list of point names).
+    """
+    def build(self):
+        pt_names = self._get_param('points', [])
+        if not pt_names:
+            print(f"[WARNING] PolygonElement '{self.name}' has no points.")
+            return
+            
+        self.sketch.add_shape(pt_names, self.material_id, self.lambda_val, self.name)
+
+
 class Factory:
     @staticmethod
     def create(type_name: str, sketch: SketchGeometry, **params) -> Element:
@@ -285,12 +312,15 @@ class Factory:
             'rect': RectElement,
             'wall': Wall,
             'insulation': Insulation,
+            'air': Air,  # Added Air
+            'insulation_tapered': InsulationTapered,
             'insulation_tapered': InsulationTapered,
             'window_detail': WindowDetail,
             'roller_shutter': RollerShutterBox,
             'window_sill': WindowSill,
             'venetian_blind': VenetianBlindBox,
             'roof_junction': RoofJunction,
+            'polygon': PolygonElement,
         }
         
         cls = map_.get(type_name.lower())

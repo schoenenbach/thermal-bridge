@@ -13,7 +13,8 @@ sys.path.append(os.getcwd())
 from declarative_geometry import DeclarativeGeometry
 from simulation_engine import solve_scenario
 from solver import get_solver_lib
-from geometry_builder import generate_scenario, COLOR_MAP
+from solver import get_solver_lib
+from geometry_builder import generate_scenario, COLOR_MAP, scenario_to_canvas
 
 from streamlit_drawable_canvas import st_canvas
 
@@ -106,6 +107,27 @@ with tab_builder:
     
     st.info("Instructions:\n- **Draw**: Click and drag.\n- **Edit**: Select to move/resize.\n- **Delete**: Select object and click the **control handle/square** above it (or try Backspace).\n- **Reset**: Click 'Clear Canvas' above to remove everything.")
     
+    # --- Load from Scenario Button ---
+    if st.button("Load from Active Scenario", type="primary", help="Populate builder with current YAML geometry"):
+        try:
+            # Parse current YAML
+            current_scen = yaml.safe_load(st.session_state.yaml_editor)
+            if current_scen:
+                # Convert to Canvas JSON
+                canvas_init = scenario_to_canvas(current_scen)
+                
+                # Update Session State to force reload
+                st.session_state.canvas_reset_count += 1
+                st.session_state['builder_initial_state'] = canvas_init
+                st.session_state['builder_obj_map'] = canvas_init.get('metadata', {}).get('obj_map', {})
+                st.session_state['builder_source_elements'] = current_scen.get('elements', [])
+                st.session_state['builder_source_variables'] = current_scen.get('variables', {})
+                
+                st.success(f"Loaded {len(canvas_init['objects'])} objects from scenario.")
+                st.rerun()
+        except Exception as e:
+            st.error(f"Failed to load scenario: {e}")
+
     # Tool Bar
     col_tools_1, col_tools_2 = st.columns(2)
     
@@ -158,18 +180,83 @@ with tab_builder:
             width=600,
             drawing_mode=mode_map[tool_mode],
             display_toolbar=True,
-            initial_drawing={'version': '4.4.0', 'objects': []}, # Explicit empty on reset
+            initial_drawing=st.session_state.get('builder_initial_state', {'version': '4.4.0', 'objects': []}), 
             key=canvas_key
         )
+
+    # --- Element Inspector ---
+    st.markdown("---")
+    st.subheader("Element Inspector")
     
+    # 1. Selection Logic
+    # Currently st_canvas does not push selection events to Streamlit.
+    # We rely on the Dropdown for inspection.
+    
+    source_elements = st.session_state.get('builder_source_elements', [])
+    source_variables = st.session_state.get('builder_source_variables', {})
+    obj_map = st.session_state.get('builder_obj_map', {})
+    
+    if source_elements:
+        # Create display names
+        el_names = [f"{i}: {el.get('name', el.get('type', 'Element'))}" for i, el in enumerate(source_elements)]
+        
+        st.caption("Select an element from the list below to view its variables.")
+        
+        # Try to find selected element from Dropdown
+        sel_name = st.selectbox("Select Element to Inspect", ["(None)"] + el_names)
+        
+        selected_el_idx = -1
+        if sel_name != "(None)":
+            selected_el_idx = int(sel_name.split(":")[0])
+
+        if selected_el_idx >= 0:
+            st.info(f"Inspecting Element: **{el_names[selected_el_idx]}**")
+            
+            el_data = source_elements[selected_el_idx]
+            el_params = el_data.get('params', {})
+            
+            # Display Variables
+            # If a param maps to a variable like "${wall_thick}", show that relationship.
+            
+            st.markdown("#### Parameters")
+            disp_data = []
+            for k, v in el_params.items():
+                val_display = v
+                var_name = None
+                
+                # Check for variable reference
+                if isinstance(v, str) and v.startswith("${") and v.endswith("}"):
+                    var_name = v[2:-1]
+                    val_display = f"{v} (= {source_variables.get(var_name, '???')})"
+                
+                disp_data.append({"Parameter": k, "Value": val_display})
+                
+            st.table(disp_data)
+        
+    else:
+        st.write("Load a scenario to inspect specific element variables.")
+
     # Output Processing
     if canvas_result and canvas_result.json_data:
          # Only show summary, not full dump
          num_obj = len(canvas_result.json_data.get("objects", []))
          st.caption(f"Objects detected: {num_obj}")
-         
+          
          if num_obj > 0:
-             scen = generate_scenario(canvas_result.json_data)
+             # Merge with active scenario if available to preserve BCs
+             base_scen = None
+             # Trying to retrieve active_data from editor tab is hard without re-parsing.
+             # But we stored it in session_state when loading? 
+             # No, 'active_data' is a local var in editor tab loop.
+             # Use st.session_state.get('builder_source_variables') is not enough.
+             # Re-parsing 'yaml_editor' is safest.
+             try:
+                 if 'yaml_editor' in st.session_state:
+                     base_scen = yaml.safe_load(st.session_state.yaml_editor)
+             except:
+                 pass
+
+             scen = generate_scenario(canvas_result.json_data, base_scenario=base_scen)
              
              # Preview and Send
              col_res1, col_res2 = st.columns([2, 1])

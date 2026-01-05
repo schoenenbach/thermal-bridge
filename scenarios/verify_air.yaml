@@ -1,0 +1,28 @@
+name: "Verification Air Visibility"
+canvas:
+  bounds: [0, 500, 0, 500]
+elements:
+  - type: air
+    params:
+      name: "External_Air"
+      x: 50
+      y: 50
+      width: 150
+      height: 150
+      type: "ext"
+      
+  - type: air
+    params:
+        name: "Internal_Air"
+        x: 250
+        y: 50
+        width: 150
+        height: 150
+        type: "int"
+        
+  - type: wall
+    params:
+        x: 50
+        y: 250
+        width: 350
+        height: 50
