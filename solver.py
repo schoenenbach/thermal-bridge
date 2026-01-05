@@ -160,7 +160,8 @@ def solve(temp: np.ndarray,
           tol: float = 1e-7,
           omega: float = 1.90,
           batch_size: int = 5000,
-          verbose: bool = True) -> np.ndarray:
+          verbose: bool = True,
+          progress_callback=None) -> np.ndarray:
     """
     Solve the temperature field using C++ accelerated SOR solver.
     
@@ -175,6 +176,7 @@ def solve(temp: np.ndarray,
         omega: SOR relaxation factor (1.85-1.95 typical)
         batch_size: Iterations per batch for progress checking
         verbose: Print progress updates
+        progress_callback: Optional callable(step, max_iter, diff)
         
     Returns:
         Solved temperature field
@@ -205,6 +207,9 @@ def solve(temp: np.ndarray,
         step = k + batch_size
         if verbose and step % 10000 == 0:
             print(f"  Iteration {step}/{max_iter}: Diff={diff:.2e}")
+            
+        if progress_callback:
+            progress_callback(step, max_iter, diff)
         
         if diff < tol:
             if verbose:

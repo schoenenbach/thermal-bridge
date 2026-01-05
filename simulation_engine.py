@@ -59,7 +59,7 @@ def get_scenarios():
     return configs
 
 # --- Solver Core ---
-def solve_scenario(scenario_def, use_adaptive_mesh=True):
+def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None):
     """Solve a thermal bridge scenario and return results."""
     print(f"\nrunning {scenario_def['name']}...")
     cfg = scenario_def['cfg']
@@ -93,6 +93,71 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     
     # 2. Material Grid & Conductivity
     grid_map, cond = build_material_grid(geom, mesh.xc, mesh.yc)
+    
+    # --- Auto-Padding for Convective BCs (ISO Case 2 Support) ---
+    bcs = geom.data.get('boundary_conditions', {})
+    conv_bcs = bcs.get('convective', {})
+    
+    pad_top = 'top' in conv_bcs
+    pad_bottom = 'bottom' in conv_bcs
+    pad_left = 'left' in conv_bcs
+    pad_right = 'right' in conv_bcs
+    
+    has_padding = any([pad_top, pad_bottom, pad_left, pad_right])
+    
+    original_ny, original_nx = cond.shape
+    
+    # Initialize overrides list (Fixes NameError)
+    explicit_mask_overrides = []
+    y_off, x_off = 0, 0
+    dx_array = mesh.dx_array
+    dy_array = mesh.dy_array
+    
+    if has_padding:
+        print("  [Auto-Padding] Extending domain for convective boundaries...")
+        # New dimensions
+        ny_new = original_ny + (1 if pad_top else 0) + (1 if pad_bottom else 0)
+        nx_new = original_nx + (1 if pad_left else 0) + (1 if pad_right else 0)
+        
+        # Offsets
+        y_off = 1 if pad_bottom else 0
+        x_off = 1 if pad_left else 0
+        
+        # Pad Cond
+        cond_new = np.ones((ny_new, nx_new)) * 0.025 # Default air
+        cond_new[y_off:y_off+original_ny, x_off:x_off+original_nx] = cond
+        cond = cond_new
+        
+        # Pad GridMap 
+        grid_map_new = np.full((ny_new, nx_new), MaterialID.AIR_EXT, dtype=int)
+        grid_map_new[y_off:y_off+original_ny, x_off:x_off+original_nx] = grid_map
+        
+        # Set specific sides to INT/EXT based on T
+        if pad_bottom:
+             T_val = float(conv_bcs['bottom'].get('T', 20.0))
+             mat = MaterialID.AIR_INT if T_val > 10.0 else MaterialID.AIR_EXT
+             grid_map_new[0, :] = mat
+        if pad_top:
+             T_val = float(conv_bcs['top'].get('T', 0.0))
+             mat = MaterialID.AIR_INT if T_val > 10.0 else MaterialID.AIR_EXT
+             grid_map_new[-1, :] = mat
+        if pad_left:
+             T_val = float(conv_bcs['left'].get('T', 20.0))
+             mat = MaterialID.AIR_INT if T_val > 10.0 else MaterialID.AIR_EXT
+             grid_map_new[:, 0] = mat
+        if pad_right:
+             T_val = float(conv_bcs['right'].get('T', 0.0))
+             mat = MaterialID.AIR_INT if T_val > 10.0 else MaterialID.AIR_EXT
+             grid_map_new[:, -1] = mat
+             
+        grid_map = grid_map_new
+        
+        # Pad dx/dy
+        if pad_left: dx_array = np.insert(dx_array, 0, 1.0)
+        if pad_right: dx_array = np.append(dx_array, 1.0)
+        if pad_bottom: dy_array = np.insert(dy_array, 0, 1.0)
+        if pad_top: dy_array = np.append(dy_array, 1.0)
+    # -----------------------------------------------------------
     
     # 3. Boundary Conditions & Solver Setup
     
@@ -128,7 +193,8 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     
     # Vectorized K_eff calculation
     # k_eff = dx / (2 * R) where dx is the width of the cell
-    dx_grid = np.tile(mesh.dx_array, (mesh.ny, 1))
+    # NOTE: dx_array may have been extended by auto-padding, use the updated array
+    dx_grid = np.tile(dx_array, (cond.shape[0], 1))
     
     # We set K for Pass 1 (Design Rsi)
     k_eff_int_design = (dx_grid / 1000.0) / (2 * rsi_design)
@@ -138,9 +204,9 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     cond_pass1[mask_int] = k_eff_int_design[mask_int]
     cond_pass1[mask_ext] = k_eff_ext[mask_ext]
     
-    # 4. Conductance Matrices (Pass 1)
+
     from solver import calculate_conductances
-    Gh, Gv = calculate_conductances(cond_pass1, mesh.dx_array, mesh.dy_array)
+    Gh, Gv = calculate_conductances(cond_pass1, dx_array, dy_array)
     
     # Correction for Anisotropic Mesh at Boundaries
     def apply_boundary_conductances(Gh, Gv, rsi, mask_air):
@@ -150,8 +216,9 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
         # mask is (ny, nx), Gh is (ny, nx) [last col unused usually or periodic]
         # We perform vectorized update.
         
-        dx_m = mesh.dx_array / 1000.0
-        dy_m = mesh.dy_array / 1000.0
+        # Use padded arrays from local scope
+        dx_m = dx_array / 1000.0
+        dy_m = dy_array / 1000.0
         
         # --- Horizontal ---
         # Find interfaces
@@ -273,8 +340,13 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     
     # Pass 1: Solve for Psi (Standard Rsi = 0.13)
     print(f"  [PASS 1] Solving for Psi-value (Rsi={rsi_design})...")
-    temp_res = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, 
-                     batch_size=5000, verbose=True)
+    
+    cb1 = None
+    if progress_callback:
+        cb1 = lambda s, t, d: progress_callback("Pass 1: Psi-Value", s, t, d)
+
+    temp_res = solve(temp, Gh, Gv, mask, values, max_iter=500000, tol=1e-7, 
+                     batch_size=5000, verbose=True, progress_callback=cb1)
     
     # 6. Calculate Results - Total Flux L2D
     # Flux calculation needs to handle variable dy/dx
@@ -331,16 +403,21 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     cond_frsi = cond.copy()
     cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
     
-    Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, mesh.dx_array, mesh.dy_array)
+    Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, dx_array, dy_array)
     
     # Apply corrections for fRsi pass
     apply_boundary_conductances(Gh_frsi, Gv_frsi, rsi_check, mask_int)
     apply_boundary_conductances(Gh_frsi, Gv_frsi, rse, mask_ext)
     
     print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={rsi_check})...")
+    
+    cb2 = None
+    if progress_callback:
+        cb2 = lambda s, t, d: progress_callback("Pass 2: fRsi/MinT", s, t, d)
+
     temp_frsi = temp_res.copy()
-    temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
-                      tol=1e-7, batch_size=5000, verbose=True)
+    temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=500000, 
+                      tol=1e-7, batch_size=5000, verbose=True, progress_callback=cb2)
     
     # Minimum surface temperature
     def get_min_surf(t_field, k_field, rsi_used, material_filter=None):

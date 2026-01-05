@@ -35,12 +35,14 @@ st.markdown("Calculate thermal bridges for window reveals using a hybrid Python/
 st.sidebar.title("Mode")
 mode = st.sidebar.radio("Select Mode", ["Standard Scenarios", "Custom Editor"])
 
+grid_override = 0.0
+
 if mode == "Standard Scenarios":
     # --- Standard Mode (Existing Logic) ---
     st.sidebar.header("Configuration")
     
     # Find Scenarios
-    scenario_files = glob.glob("scenarios/scenario_*.yaml")
+    scenario_files = glob.glob("scenarios/scenario_*.yaml") + glob.glob("scenarios/iso_*.yaml")
     scenario_files.sort()
     scenario_names = [os.path.basename(f) for f in scenario_files]
     
@@ -108,7 +110,10 @@ elements:
   - type: rect
     material: 2 # WALL
     params:
-      x: 0; y: 0; width: 360; height: 500
+      x: 0
+      y: 0
+      width: 360
+      height: 500
 """
     
     if template != "(New Empty)":
@@ -163,9 +168,24 @@ if active_data:
                         "cfg": temp_yaml
                     }
                     
-                    results = solve_scenario(scenario_def, use_adaptive_mesh=True)
+                    # Progress Bar
+                    prog_bar = st.progress(0.0)
+                    status_text = st.empty()
                     
-                    st.success("Complete")
+                    def app_progress_cb(phase, step, total, diff):
+                        pct = float(step) / float(total)
+                        base = 0.0 if "Pass 1" in phase else 0.5
+                        final_pct = base + (pct * 0.5)
+                        # Clamp
+                        final_pct = min(1.0, max(0.0, final_pct))
+                        
+                        prog_bar.progress(final_pct)
+                        status_text.text(f"{phase}: Iteration {step}/{total} (Diff={diff:.2e})")
+
+                    results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb)
+                    
+                    prog_bar.progress(1.0)
+                    status_text.success("Simulation Complete")
                     st.metric("Psi-Value", f"{results['Psi']:.4f} W/mK")
                     st.metric("fRsi Factor", f"{results['fRsi']:.4f}")
                     st.metric("Min Temp", f"{results['MinT']:.2f} °C")
