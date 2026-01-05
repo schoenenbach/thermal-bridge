@@ -19,13 +19,13 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
 -   **Linux** (Tested on Ubuntu/Debian)
 -   **Python 3.10+**
 -   **G++** (or compatible C++ compiler)
--   Python dependencies: `numpy`, `matplotlib`, `pyyaml`
+-   Python dependencies: `numpy`, `matplotlib`, `pyyaml`, `scipy`, `shapely`, `pytest`
 
 ### Setup
 1.  Clone the repository.
 2.  Install Python dependencies:
     ```bash
-    pip install numpy matplotlib pyyaml
+    pip install -r requirements.txt
     ```
 3.  Compile the C++ solver core:
     ```bash
@@ -81,6 +81,12 @@ python3 run_iso_tests.py all
 ```
 This runs Test Case 1 and Test Case 2 and outputs the deviation from reference values.
 
+### Running Unit Tests
+To run the project's test suite (using pytest):
+```bash
+pytest
+```
+
 ## Configuration (YAML)
 
 Geometries are defined in `.yaml` files. See `scenarios/scenario_1.yaml` for a simple example or `scenarios/scenario_5.yaml` for a complex parametric example.
@@ -127,21 +133,33 @@ elements:
 -   `window_detail`: Macro for standard window frames (Sash + Frame + Glass).
 -   `insulation_tapered`: Macro for external insulation with a tapered top edge.
 
-### Boundary Conditions
-You can optionally override the standard boundary conditions (Temperature and Surface Resistance) in the YAML file. If omitted, standard ISO values are used (Int: 20°C/Rsi=0.13, Ext: -5°C/Rse=0.04).
+## Boundary Conditions
+By default, the simulation uses standard ISO conditions:
+-   **Interior**: 20.0 °C (Rsi = 0.13 m²K/W)
+-   **Exterior**: -5.0 °C (Rse = 0.04 m²K/W)
+-   **Condensation Check**: Rsi = 0.25 m²K/W (used in a second pass for fRsi calculation).
+
+You can override these standards per scenario in the YAML file:
 
 ```yaml
 boundary_conditions:
   convective:
-    internal:
-      T: 20.0
-      R: 0.13  # Design Rsi
-    external:
-      T: -5.0
-      R: 0.04
-    internal_check:
-      R: 0.25  # For fRsi/Condensation check (Pass 2)
+    # Essential for Temperature Field
+    internal: { T: 22.0, R: 0.13 }
+    external: { T: -10.0, R: 0.04 }
+    
+    # Optional: Assign specific boundary sides (top, bottom, left, right)
+    # This is helpful for ISO test cases or vertical/horizontal gradients.
+    bottom: { T: 20.0, R: 0.11 } 
+    
+  # Boundaries with no heat flow
+  adiabatic:
+    - top
+    - right
 ```
+
+### Visualizing Results
+The output plots will display the actual temperatures used (`Ti` and `Te`) in the title, allowing you to instantly verify if your overrides were applied correctly. Note that metric results like **fRsi** and **Psi-value** are generally invariant to the absolute temperature difference, so check absolute temperatures (e.g., `MinT`) to confirm changes.
 
 ## Project Structure
 
@@ -152,5 +170,8 @@ boundary_conditions:
 -   `scenarios/`: Directory containing all YAML geometry definitions.
 -   `run_iso_tests.py`: ISO 10211 verification runner.
 -   `geometry.py`: Core geometry classes (SketchGeometry, PolygonShape).
+-   `elements.py`: Library of geometry macros (Walls, Insulation, Windows, etc.).
 -   `mesh.py`: Adaptive and Uniform meshing logic.
 -   `config.py`: Material properties and simulation constants.
+-   `tests/`: Unit and integration tests.
+-   `legacy/`: Archived geometry scripts and legacy code.

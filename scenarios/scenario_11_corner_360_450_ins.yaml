@@ -1,0 +1,124 @@
+name: "Scenario 11: Building Corner (360mm meets 450mm) + 200mm Insulation"
+description: "External Corner: Wall 360mm meets Wall 450mm. 200mm WLS 035 Insulation."
+
+variables:
+  # Geometry Dimensions
+  wall_thick_v: 450.0  # Vertical Wall Thickness
+  wall_thick_h: 360.0  # Horizontal Wall Thickness
+  arm_length: 1000.0   # Length of wall arms extensions
+  ins_thick: 200.0     # Insulation Thickness
+  
+  # Coordinates
+  # Inner Corner at (0,0) defines the Interior Origin
+  x_inner: 0.0
+  y_inner: 0.0
+  
+  # Outer Bounds (Masonry)
+  x_outer: -450.0      # -wall_thick_v
+  y_outer: -360.0      # -wall_thick_h
+  
+  # Insulation Bounds
+  x_ins_outer: -650.0  # x_outer - ins_thick
+  y_ins_outer: -560.0  # y_outer - ins_thick
+  
+  # Canvas Limits (padding around the 1000mm arms + insulation)
+  x_min: -700.0        # x_ins_outer - 50
+  y_min: -600.0        # y_ins_outer - 40
+  x_max: 1000.0        # arm_length
+  y_max: 1000.0        # arm_length
+  
+  # Calculated Dimensions for Rects
+  # Vertical Wall Height = Top(1000) - Bottom(-360) = 1360
+  wall_v_height: 1360.0 
+  
+  # Horizontal Wall Width = Right(1000) - Left(0) = 1000
+  wall_h_width: 1000.0
+  
+  # Insulation Dimensions
+  # Vert Ins: Runs from y_ins_outer (-560) to y_max (1000)
+  ins_v_height: 1560.0 # 1000 - (-560)
+  
+  # Horz Ins: Runs from x_outer (-450) to x_max (1000)
+  # (Abuts the vertical insulation side)
+  ins_h_width: 1450.0  # 1000 - (-450)
+  
+canvas:
+  bounds: ["${x_min}", "${x_max}", "${y_min}", "${y_max}"] 
+  grid: 10.0
+
+points:
+  # Reference Points
+  Inner_Corner: ["${x_inner}", "${y_inner}"]
+  Outer_Corner: ["${x_outer}", "${y_outer}"]
+  Ins_Corner: ["${x_ins_outer}", "${y_ins_outer}"]
+
+elements:
+  # Interior Air (Quadrant I)
+  - type: rect
+    name: "Interior_Air"
+    material: AIR_INT
+    params:
+       x: ${x_inner}
+       y: ${y_inner}
+       width: ${x_max}
+       height: ${y_max}
+
+  # Vertical Wall (Masonry)
+  - type: rect
+    name: "Wall_Vertical"
+    material: WALL
+    params:
+       x: ${x_outer}
+       y: ${y_outer}
+       width: ${wall_thick_v}
+       height: ${wall_v_height}
+       
+  # Horizontal Wall (Masonry)
+  - type: rect
+    name: "Wall_Horizontal"
+    material: WALL
+    params:
+       x: ${x_inner}
+       y: ${y_outer}
+       width: ${wall_h_width}
+       height: ${wall_thick_h}
+       
+  # Vertical Insulation
+  - type: rect
+    name: "Insulation_Vertical"
+    material: INSULATION # Default WLS 035
+    params:
+       x: ${x_ins_outer}
+       y: ${y_ins_outer}
+       width: ${ins_thick}
+       height: ${ins_v_height}
+
+  # Horizontal Insulation
+  - type: rect
+    name: "Insulation_Horizontal"
+    material: INSULATION # Default WLS 035
+    params:
+       x: ${x_outer}
+       y: ${y_ins_outer}
+       width: ${ins_h_width}
+       height: ${ins_thick}
+
+boundary_conditions:
+  # Cut-off boundaries
+  adiabatic:
+    - top
+    - right
+  
+  # Exterior boundaries (left and bottom) will default to AIR_EXT
+  # The canvas margin is filled with AIR_EXT by default in SketchGeometry if not covered.
+  # Here, we cover the bulk, but the margin outside x_ins_outer and y_ins_outer will be AIR_EXT.
+
+measurements:
+  surface_metrics:
+    - { name: "MinT_Corner", type: min, boundary: internal, materials: [WALL] }
+  
+  point_probes:
+    - { name: "T_InnerCorner", x: 0.0, y: 0.0 }
+  
+  derived:
+    - { name: "fRsi", formula: frsi }
