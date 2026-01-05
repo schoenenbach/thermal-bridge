@@ -36,7 +36,7 @@ class WindowRevealGeometry(SketchGeometry):
         # Let's use similar OFF_X, OFF_Y but reduced Y range.
         
         self.OFF_X = 50.0  
-        self.OFF_Y = 500.0 
+        self.OFF_Y = 250.0 
         
         self.w_th = config.wall_thickness_mm
         self.pos = max(0, config.window_position_from_exterior_masonry_mm)
@@ -50,7 +50,7 @@ class WindowRevealGeometry(SketchGeometry):
         # Y Coordinates
         self.y_bottom = 0.0
         self.y_reveal = self.OFF_Y
-        self.y_top = self.OFF_Y + 500.0 # Total height 1000
+        self.y_top = self.OFF_Y + 250.0 # Total height reduced from 1000 to 750
         
         # Frame
         self.f_depth = config.frame_depth_mm
@@ -83,14 +83,45 @@ class WindowRevealGeometry(SketchGeometry):
         
         # --- Points Definitions ---
         
-        # 1. Interior Air
-        # Left of wall, up to top
-        self.add_point("AirInt_BL", self.x_int_air_left, self.y_bottom)
-        self.add_point("AirInt_BR", self.x_wall_int, self.y_bottom)
-        self.add_point("AirInt_TR", self.x_wall_int, self.y_top)
-        self.add_point("AirInt_TL", self.x_int_air_left, self.y_top)
+        # 1. Interior Air (Complex Polygon to fill interior void)
+        # Left of wall, and above wall/sill, following frame contour
         
-        self.add_shape(["AirInt_BL", "AirInt_BR", "AirInt_TR", "AirInt_TL"],
+        # Helper Points for Contour
+        self.add_point("AirInt_BL", self.x_int_air_left, self.y_bottom)
+        
+        # Wall Points (Duplicate definition or Move here? Better define them here)
+        self.add_point("Wall_BL", self.x_wall_int, self.y_bottom)
+        self.add_point("Wall_TL", self.x_wall_int, self.y_reveal)
+        
+        # Frame/Sash Points needed for Contour
+        self.add_point("Frame_BL", self.x_f_start, self.y_f_start)
+        self.add_point("Sash_BL", self.x_sash_start, self.y_sash_start)
+        self.add_point("Sash_TL", self.x_sash_start, self.y_sash_end)
+        self.add_point("Glass_TL", self.x_glass_start, self.y_top)
+        
+        self.add_point("Frame_Int_Step", self.x_f_start, self.y_sash_start) # (190, 310)
+        self.add_point("Sash_Glass_Step", self.x_glass_start, self.y_sash_end) # (183, 380)
+        self.add_point("AirInt_TopLeft", 0.0, self.y_top)
+        
+        # Points trace: BL -> Wall_Base -> Wall_Top -> Frame_Base -> Frame_Step -> Sash_Base -> Sash_Top -> Glass_Step -> Glass_Top -> TL -> BL
+        
+        poly_points = [
+            "AirInt_BL",       # (0,0)
+            "Wall_BL",         # (50,0)
+            "Wall_TL",         # (50,250)
+            "Frame_BL",        # (190,250) - Sill
+            "Frame_Int_Step",  # (190,310) - Up Frame
+            "Sash_BL",         # (160,310) - Out to Sash
+            "Sash_TL",         # (160,380) - Up Sash
+            "Sash_Glass_Step", # (183,380) - In to Glass
+            "Glass_TL",        # (183,500) - Up Glass (actually Glass Start is 320, but this is the exposed surface above sash)
+             # Wait, Glass_TL is (183, 500) in my previous def? 
+             # Let's check: self.add_point("Glass_TL", self.x_glass_start, self.y_top) -> Yes. 183, 500.
+            "Glass_TL",
+            "AirInt_TopLeft"   # (0,500)
+        ]
+        
+        self.add_shape(poly_points,
                        material_id=MaterialID.AIR_INT, lambda_val=0.025,
                        name="Interior Air")
 
@@ -219,8 +250,8 @@ class WindowRevealGeometry(SketchGeometry):
         # So AIR_INT shape overrides AIR_EXT default
         # WALL overrides AIR_INT where it might overlap? (Usually disjoint)
         
-        # Domain: Fixed 1000mm width as requested
-        x_dom_max = 1000.0
+        # Domain: Reduced from 1000mm to focus on relevant area
+        x_dom_max = self.x_wall_ext + 150.0  # e.g. 410 + 150 = 560mm
         
         self.set_canvas(0.0, x_dom_max, 
                         0.0, self.y_top, 

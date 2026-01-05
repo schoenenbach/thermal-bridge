@@ -43,7 +43,7 @@ except Exception as e:
     USE_CPP = False
 
 class ThermalSolver:
-    def __init__(self, config: CalculationConfig, rsi_value: float = 0.13, use_adaptive: bool = True):
+    def __init__(self, config: CalculationConfig, rsi_value: float = 0.13, use_adaptive: bool = True, skip_grid_generation: bool = False):
         self.cfg = config
         self.rsi_value = rsi_value 
         self.use_adaptive = use_adaptive
@@ -56,12 +56,6 @@ class ThermalSolver:
         self.dx_array = None # Widths
         self.dy_array = None # Heights
         
-        # Dimensions are now derived from grid generation
-        self.setup_adaptive_grid() if self.use_adaptive else self.setup_uniform_grid()
-        
-        self.grid_map = np.zeros((self.ny, self.nx), dtype=int) 
-        self.temp = np.ones((self.ny, self.nx)) * TEMP_INT 
-        
         # IDs
         from geometry import MaterialID
         self.ID_AIR_INT = MaterialID.AIR_INT
@@ -73,6 +67,18 @@ class ThermalSolver:
         self.ID_GLASS = MaterialID.GLASS
         self.ID_SPACER = MaterialID.SPACER
 
+        if skip_grid_generation:
+            # Caller must manually set up grid_map, temp, coords, etc.
+            self.grid_map = None
+            self.temp = None
+            return
+
+        # Dimensions are now derived from grid generation
+        self.setup_adaptive_grid() if self.use_adaptive else self.setup_uniform_grid()
+        
+        self.grid_map = np.zeros((self.ny, self.nx), dtype=int) 
+        self.temp = np.ones((self.ny, self.nx)) * TEMP_INT 
+        
         self.setup_geometry_map()
         self.assign_materials_adaptive()
 
