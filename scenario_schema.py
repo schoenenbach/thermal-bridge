@@ -105,6 +105,14 @@ class ComponentDefinition(BaseModel):
 
 # --- Main Scenario ---
 
+
+class TransientConfig(BaseModel):
+    enabled: bool = False
+    duration_hours: float = Field(24.0, description="Simulation duration in hours")
+    dt_seconds: float = Field(300.0, description="Time step in seconds")
+    initial_temp: float = Field(20.0, description="Initial uniform temperature")
+    save_interval_steps: int = Field(1, description="Save result every N steps")
+
 class Scenario(BaseModel):
     name: str
     description: Optional[str] = None
@@ -125,3 +133,4 @@ class Scenario(BaseModel):
     
     measurements: MeasurementsConfig = Field(default_factory=MeasurementsConfig)
     boundary_conditions: BoundaryConditions = Field(default_factory=BoundaryConditions)
+    transient: TransientConfig = Field(default_factory=TransientConfig)

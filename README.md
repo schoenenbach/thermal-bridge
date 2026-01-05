@@ -10,6 +10,7 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
     -   Built-in macros for Walls, Insulation, Window Frames, and Shutter Rails.
 -   **Adaptive Meshing**: Automatically refines the grid in critical areas (e.g., thermal breaks, thin layers) to ensure accuracy while maintaining performance.
 -   **ISO 10211 Verified**: Validated against Test Cases 1 and 2 from the DIN EN ISO 10211 standard.
+-   **Transient Simulation**: Calculate time-dependent thermal behavior (e.g., heating curves, thermal inertia) and generate animated results.
 -   **Visual Output**: Generates temperature maps (with isotherms) and concise result summaries (Psi-values, fRsi factors).
 -   **Web App**: Interactive Interface using Streamlit for easy sharing and parameter exploration.
 

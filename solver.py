@@ -216,7 +216,98 @@ def solve(temp: np.ndarray,
                 print(f"  Converged in {step} iterations (diff={diff:.2e})")
             break
     
+
     return temp_c
+
+
+def solve_transient(temp_current: np.ndarray,
+                    temp_prev: np.ndarray,
+                    Gh: np.ndarray,
+                    Gv: np.ndarray,
+                    capacitance: np.ndarray,
+                    fixed_mask: np.ndarray,
+                    fixed_values: np.ndarray,
+                    dt: float,
+                    steps: int = 1,
+                    max_iter: int = 100,
+                    tol: float = 1e-4,
+                    omega: float = 1.0) -> np.ndarray:
+    """
+    Solve for the next time step(s) using Implicit Euler.
+    
+    Args:
+        temp_current: Current temperature field (initial guess for new step)
+        temp_prev: Temperature field at previous time step
+        Gh, Gv: Conductance matrices
+        capacitance: Node heat capacity [J/K]
+        fixed_mask: Fixed node mask
+        fixed_values: Fixed node values
+        dt: Time step [s]
+        steps: Number of time steps to perform (usually 1)
+        max_iter: Max SOR iterations per step
+        tol: Convergence tolerance
+        omega: SOR relaxation factor
+        
+    Returns:
+        Updated temperature field (new time step)
+    """
+    lib = get_solver_lib()
+    
+    # Prepare types
+    temp_sol_c = np.ascontiguousarray(temp_current, dtype=np.float64)
+    temp_prev_c = np.ascontiguousarray(temp_prev, dtype=np.float64)
+    gh_c = np.ascontiguousarray(Gh, dtype=np.float64)
+    gv_c = np.ascontiguousarray(Gv, dtype=np.float64)
+    cap_c = np.ascontiguousarray(capacitance, dtype=np.float64)
+    mask_c = np.ascontiguousarray(fixed_mask.astype(np.int32))
+    val_c = np.ascontiguousarray(fixed_values, dtype=np.float64)
+    
+    rows, cols = temp_current.shape
+    
+    p_temp = temp_sol_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    p_prev = temp_prev_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    p_gh = gh_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    p_gv = gv_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    p_cap = cap_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+    p_val = val_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+    # Note: solve_transient_step signature:
+    # double solve_transient_step(double *temp_sol, const double *temp_prev,
+    #                             const double *cond_h, const double *cond_v,
+    #                             const double *capacitance, const int *fixed_mask,
+    #                             const double *fixed_values, int rows, int cols,
+    #                             int iterations, double dt, double omega)
+    
+    if not hasattr(lib, 'solve_transient_step'):
+         # Bind it if not done
+         lib.solve_transient_step.argtypes = [
+            ctypes.POINTER(ctypes.c_double), # temp_sol
+            ctypes.POINTER(ctypes.c_double), # temp_prev
+            ctypes.POINTER(ctypes.c_double), # Gh
+            ctypes.POINTER(ctypes.c_double), # Gv
+            ctypes.POINTER(ctypes.c_double), # Cap
+            ctypes.POINTER(ctypes.c_int),    # Mask
+            ctypes.POINTER(ctypes.c_double), # Values
+            ctypes.c_int, ctypes.c_int,      # rows, cols
+            ctypes.c_int,                    # iterations
+            ctypes.c_double,                 # dt
+            ctypes.c_double                  # omega
+         ]
+         lib.solve_transient_step.restype = ctypes.c_double
+
+    # Perform time steps
+    # Note: For multiple steps, we would need to ping-pong buffers. 
+    # For now, we assume 1 step at a time is managed by the caller, 
+    # OR we update temp_prev internally if steps > 1 (not implemented for simplicity)
+    
+    diff = lib.solve_transient_step(
+        p_temp, p_prev, p_gh, p_gv, p_cap, p_mask, p_val,
+        ctypes.c_int(rows), ctypes.c_int(cols), ctypes.c_int(max_iter), 
+        ctypes.c_double(dt), ctypes.c_double(omega)
+    )
+    
+    return temp_sol_c
 
 
 # --- Psi / fRsi Calculation ---

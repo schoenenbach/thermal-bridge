@@ -1,0 +1,34 @@
+name: "Transient Verification Case"
+description: "1D Wall heating up over time"
+
+canvas:
+  grid: 5.0
+  bounds: [0, 200, 0, 100]
+
+boundary_conditions:
+  dirichlet:
+    left: 20.0
+    right: 0.0
+  adiabatic:
+    - top
+    - bottom
+
+materials:
+  - id: WALL
+    lambda: 1.0
+    description: "Generic Wall"
+
+elements:
+  - type: rect
+    material: WALL
+    x: 0
+    y: 0
+    width: 200
+    height: 100
+
+transient:
+  enabled: true
+  duration_hours: 12.0
+  dt_seconds: 60.0
+  initial_temp: 0.0
+  save_interval_steps: 60

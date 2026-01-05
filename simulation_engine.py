@@ -14,9 +14,9 @@ warnings.filterwarnings("ignore", message="The value of the smallest subnormal f
 import numpy as np
 import matplotlib.pyplot as plt
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
-from geometry import build_material_grid, MaterialID
+from geometry import build_material_grid, build_transient_grid, MaterialID
 from mesh import UniformMesh, AdaptiveMesh
-from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map, plot_geometry
+from solver import get_solver_lib, solve, solve_transient, calculate_conductances_uniform, plot_temperature_map, plot_geometry
 from declarative_geometry import DeclarativeGeometry
 import yaml
 
@@ -226,6 +226,106 @@ def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond,
     return results
 
 # --- Solver Core ---
+
+def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_map, t_int, t_ext, cfg):
+    """
+    Run transient simulation and generate animation frames.
+    """
+    print(f"  [TRANSIENT] Initializing transient solver...")
+    print(f"  Duration: {cfg.get('duration_hours', 24)}h, dt: {cfg.get('dt_seconds', 300)}s")
+    
+    # Build Capacity Grids
+    rho, cp = build_transient_grid(geom, grid_map)
+    
+    # Calculate Node Capacitance [J/K]
+    # C = rho * cp * V = rho * cp * dx * dy * 1.0 (assuming 1m depth)
+    dx_grid = np.tile(mesh.dx_array, (mesh.ny, 1)) / 1000.0 # meters
+    dy_grid = np.tile(mesh.dy_array[:, None], (1, mesh.nx)) / 1000.0 # meters
+    
+    capacitance = rho * cp * dx_grid * dy_grid
+    
+    # Time loop
+    dt = float(cfg.get('dt_seconds', 300))
+    duration_s = float(cfg.get('duration_hours', 24)) * 3600.0
+    steps = int(duration_s / dt)
+    save_interval = int(cfg.get('save_interval_steps', 1))
+    
+    temp = temp_init.copy()
+    temp_prev = temp_init.copy()
+    
+    import time
+    start_time = time.time()
+    
+    # Prepare result storage
+    frames = []
+    
+    for step in range(steps):
+        # Update temp (Implicit Euler)
+        temp_prev[:] = temp[:]
+        
+        # Call optimized C++ solver
+        temp = solve_transient(temp, temp_prev, Gh, Gv, capacitance, mask, values, dt,
+                               max_iter=100, tol=1e-4, omega=1.0)
+        
+        if step % 10 == 0:
+            print(f"    Step {step}/{steps} (t={step*dt/3600:.1f}h)...", end='\r')
+            
+        if step % save_interval == 0 or step == steps - 1:
+            # Generate snapshot logic
+            # To avoid excessive plotting overhead, we only plot if interval is reasonable
+            # OR we just collect arrays and plot later? Plotting later consumes memory.
+            # Let's plot now.
+            fname = f"result_{geom.data.get('name', 'transient')}_step_{step:04d}.png"
+            title = f"Transient State t={step*dt/3600:.1f}h"
+            
+            # Use matplotlib to render frame to buffer for GIF
+            try:
+                from PIL import Image
+                import io
+                
+                # Create figure but don't save to disk unless requested?
+                # For now let's just collect for GIF and save a few keyframes
+                # We reuse plot_temperature_map but we need it to return image or save to buffer
+                # Provide a hook or just do it manually here
+                
+                # Simplified plot for animation
+                fig, ax = plt.subplots(figsize=(8, 6))
+                im = ax.imshow(temp, cmap='jet', origin='lower', animated=True)
+                ax.set_title(title)
+                ax.axis('off')
+                
+                # Save to buffer
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', dpi=80)
+                plt.close(fig)
+                buf.seek(0)
+                frames.append(Image.open(buf))
+            except ImportError:
+                 pass
+            
+    elapsed = time.time() - start_time
+    print(f"\n  [TRANSIENT] Completed in {elapsed:.2f}s")
+    
+    # Save GIF
+    if frames:
+        gif_name = f"result_{geom.data.get('name', 'transient')}.gif"
+        print(f"  Saving animation to {gif_name}...")
+        frames[0].save(gif_name, save_all=True, append_images=frames[1:], optimize=True, duration=100, loop=0)
+    
+    # Plot final state
+    plot_temperature_map(temp, 
+                         geom.get_canvas_config().width_mm, 
+                         geom.get_canvas_config().height_mm,
+                         f"result_{geom.data.get('name', 'transient')}_final.png", 
+                         title=f"Transient End State (t={duration_s/3600:.1f}h)",
+                         wall_thick_mm=geom.data.get('variables', {}).get('wall_thick', 360))
+                         
+    return {
+        "name": geom.data.get('name', 'transient'),
+        "measurements": {"EndTemp": {"value": np.mean(temp)}},
+        "final_temp": temp
+    }
+
 
 def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None):
     """Solve a thermal bridge scenario and return results."""
@@ -582,6 +682,11 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # Apply strict boundary conditions from Dirichlet config (ISO tests etc.)
     # This ensures the solver sees the boundary values immediately in the first iteration
     temp[mask == 1] = values[mask == 1]
+    
+    # --- Transient Simulation Dispatch ---
+    trans_cfg = geom.data.get('transient', {})
+    if trans_cfg.get('enabled'):
+        return solve_transient_scenario(geom, mesh, temp, Gh, Gv, mask, values, grid_map, t_int, t_ext, trans_cfg)
     
     # Pass 1: Solve for Psi (Standard Rsi = 0.13)
     print(f"  [PASS 1] Solving for Psi-value (Rsi={rsi_design})...")

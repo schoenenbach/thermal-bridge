@@ -495,4 +495,132 @@ double solve_general_conductance(double *temp, const double *cond_h,
   }
   return max_diff;
 }
+
+/**
+ * Transient Solver Step (Implicit Euler with SOR)
+ *
+ * Solves: C_i * (T_i_new - T_i_old) / dt = Sum(G_ij * (T_j_new - T_i_new))
+ *
+ * Rearranged for T_i_new:
+ * T_i_new * (C_i/dt + Sum(G_ij)) = C_i/dt * T_i_old + Sum(G_ij * T_j_new)
+ *
+ * @param temp_sol       Pointer to current solution guess (In/Out) - becomes
+ * T_new
+ * @param temp_prev      Pointer to T_old (Input, Constant)
+ * @param cond_h         Horizontal Conductance
+ * @param cond_v         Vertical Conductance
+ * @param capacitance    Node heat capacity (rho * cp * dx * dy) [J/K]
+ * @param fixed_mask     Fixed node mask
+ * @param fixed_values   Fixed node values
+ * @param rows           Number of rows
+ * @param cols           Number of columns
+ * @param iterations     Number of inner SOR iterations
+ * @param dt             Time step [s]
+ * @param omega          SOR relaxation factor
+ */
+double solve_transient_step(double *temp_sol, const double *temp_prev,
+                            const double *cond_h, const double *cond_v,
+                            const double *capacitance, const int *fixed_mask,
+                            const double *fixed_values, int rows, int cols,
+                            int iterations, double dt, double omega) {
+  double max_diff = 0.0;
+  double inv_dt = 1.0 / dt;
+
+  for (int iter = 0; iter < iterations; ++iter) {
+    max_diff = 0.0;
+
+    // Red-Black Sweep
+    for (int color = 0; color < 2; ++color) {
+#pragma omp parallel for reduction(max : max_diff)
+      for (int r = 1; r < rows - 1; ++r) {
+        int c_start = 1;
+        if ((r + c_start) % 2 != color)
+          c_start++;
+
+#pragma omp simd
+        for (int c = c_start; c < cols - 1; c += 2) {
+          int idx = r * cols + c;
+
+          if (fixed_mask[idx])
+            continue;
+
+          // Conductances to neighbors
+          // G_right = cond_h[idx]
+          // G_left  = cond_h[idx_lf]
+          // G_down  = cond_v[idx]
+          // G_up    = cond_v[idx_up]
+
+          int idx_lf = r * cols + (c - 1);
+          int idx_rt = r * cols + (c + 1);
+          int idx_up = (r - 1) * cols + c;
+          int idx_dn = (r + 1) * cols + c;
+
+          double g_rt = cond_h[idx];
+          double g_lf = cond_h[idx_lf];
+          double g_dn = cond_v[idx];
+          double g_up = cond_v[idx_up];
+
+          double g_sum = g_rt + g_lf + g_dn + g_up;
+
+          // Inertia term
+          double cap = capacitance[idx];
+          double g_inertia = cap * inv_dt;
+
+          // Gauss-Seidel part
+          double neighbor_sum =
+              (g_up * temp_sol[idx_up] + g_dn * temp_sol[idx_dn] +
+               g_lf * temp_sol[idx_lf] + g_rt * temp_sol[idx_rt]);
+
+          // Transient source term
+          double source_term = g_inertia * temp_prev[idx];
+
+          double val_gauss =
+              (neighbor_sum + source_term) / (g_sum + g_inertia + 1e-12);
+
+          // SOR Update
+          double val_new = (1.0 - omega) * temp_sol[idx] + omega * val_gauss;
+
+          double diff = std::abs(val_new - temp_sol[idx]);
+          if (diff > max_diff)
+            max_diff = diff;
+
+          temp_sol[idx] = val_new;
+        }
+      }
+    }
+
+    // Boundaries (Adiabatic) - Copy from nearest neighbor
+    // Left
+    for (int r = 0; r < rows; ++r) {
+      if (!fixed_mask[r * cols])
+        temp_sol[r * cols] = temp_sol[r * cols + 1];
+      else
+        temp_sol[r * cols] = fixed_values[r * cols];
+    }
+    // Right
+    for (int r = 0; r < rows; ++r) {
+      int idx = r * cols + cols - 1;
+      if (!fixed_mask[idx])
+        temp_sol[idx] = temp_sol[idx - 1];
+      else
+        temp_sol[idx] = fixed_values[idx];
+    }
+    // Bottom
+    for (int c = 0; c < cols; ++c) {
+      if (!fixed_mask[c])
+        temp_sol[c] = temp_sol[c + cols];
+      else
+        temp_sol[c] = fixed_values[c];
+    }
+    // Top
+    for (int c = 0; c < cols; ++c) {
+      int idx = (rows - 1) * cols + c;
+      if (!fixed_mask[idx])
+        temp_sol[idx] = temp_sol[idx - cols];
+      else
+        temp_sol[idx] = fixed_values[idx];
+    }
+  }
+  return max_diff;
+}
 }

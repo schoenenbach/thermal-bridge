@@ -263,6 +263,39 @@ class GeometryBuilder(ABC):
         }
         return defaults.get(material_id, 0.025)
 
+    def get_material_density(self, material_id: int) -> float:
+        defaults = {
+            MaterialID.WALL: 1800.0,
+            MaterialID.INSULATION: 20.0,
+            MaterialID.REVEAL_INS: 20.0,
+            MaterialID.FRAME: 500.0,
+            MaterialID.GLASS: 2500.0,
+            MaterialID.SPACER: 1000.0,
+            MaterialID.AIR_INT: 1.2,
+            MaterialID.AIR_EXT: 1.2,
+            MaterialID.CONCRETE: 2400.0,
+            MaterialID.WOOD: 500.0,
+            MaterialID.ALUMINUM: 2700.0,
+        }
+        return defaults.get(material_id, 1000.0)
+
+    def get_material_heat_capacity(self, material_id: int) -> float:
+        defaults = {
+            MaterialID.WALL: 1000.0,
+            MaterialID.INSULATION: 1400.0,
+            MaterialID.REVEAL_INS: 1400.0,
+            MaterialID.FRAME: 1000.0,
+            MaterialID.GLASS: 840.0,
+            MaterialID.SPACER: 1000.0,
+            MaterialID.AIR_INT: 1000.0,
+            MaterialID.AIR_EXT: 1000.0,
+            MaterialID.CONCRETE: 1000.0,
+            MaterialID.WOOD: 1600.0,
+            MaterialID.ALUMINUM: 900.0,
+        }
+        return defaults.get(material_id, 1000.0)
+
+
 
 class SketchGeometry(GeometryBuilder):
     """
@@ -369,3 +402,24 @@ def build_material_grid(geometry: GeometryBuilder,
             cond[mask] = geometry.get_material_conductivity(region.material_id)
     
     return grid_map, cond
+
+
+def build_transient_grid(geometry: GeometryBuilder, 
+                         grid_map: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Build density and heat capacity grids based on material map.
+    Returns (density_grid, capacity_grid)
+    """
+    ny, nx = grid_map.shape
+    
+    rho = np.zeros((ny, nx), dtype=float)
+    cp = np.zeros((ny, nx), dtype=float)
+    
+    unique_ids = np.unique(grid_map)
+    
+    for mid in unique_ids:
+        mask = (grid_map == mid)
+        rho[mask] = geometry.get_material_density(mid)
+        cp[mask] = geometry.get_material_heat_capacity(mid)
+        
+    return rho, cp

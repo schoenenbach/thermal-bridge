@@ -69,16 +69,13 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 *   **Synchronization:** Two-way binding: The canvas updates the YAML state, and YAML edits update the canvas.
 
 ## 6. Transient Thermal Simulation
-
-**Objective:** Extend the physics engine to calculate time-dependent thermal behavior (e.g., summer heat protection).
-
-**Implementation Strategy:**
-*   **Mathematical Model:** Implement the Heat Equation with time derivative: $\rho c \frac{\partial T}{\partial t} = \nabla \cdot (k \nabla T)$.
-*   **Solver Update:**
-    *   Update C++ `thermal_solver_core` to handle time-stepping (Implicit Crank-Nicolson or Explicit).
-    *   Require `density` and `heat_capacity` in material definitions.
-*   **Boundary Conditions:** Allow time-varying BCs (e.g., sinusoidal daily temperature curve).
-*   **Output:** Generate animations (GIF/MP4) of temperature distribution over 24-48 hours.
+## 6. Transient Thermal Simulation [x]
+- **Goal**: Enable time-dependent simulations (e.g., summer heat protection).
+- **Tasks**:
+  - [x] Implement Heat Equation with time derivative ($\rho c_p \frac{\partial T}{\partial t} = \dots$).
+  - [x] Update solver mechanics (implicit stepping for stability).
+  - [x] Output: Generate animations (GIF/MP4) of temperature distribution over 24-48 hours.
+- **Status**: Completed. Implemented Implicit Euler solver, added material density/capacity, and GIF generation.
 
 ## 7. Mold & Condensation Risk Map
 
