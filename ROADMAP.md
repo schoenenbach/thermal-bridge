@@ -116,7 +116,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 
 *   **Note on DWG:** Direct DWG support requires external converters (e.g., ODA or LibreDWG). Current solution supports native DXF. Convert DWG to DXF before import.
 
-## 10. Cloud & CI/CD Readiness
+## 10. Cloud & CI/CD Readiness [DONE]
 
 **Objective:** Professionalize the software delivery lifecycle and enable cloud hosting.
 
