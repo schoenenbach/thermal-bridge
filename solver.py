@@ -91,22 +91,40 @@ def calculate_conductances(cond: np.ndarray,
         dy_array = np.full(cond.shape[0], float(dy_array))
     
     # Horizontal Conductance (between (i,j) and (i,j+1))
+    # Series resistance: R_tot = R_left + R_right = (dx_L/2)/(k_L*dy) + (dx_R/2)/(k_R*dy)
+    # G = 1/R_tot = (2*dy) / (dx_L/k_L + dx_R/k_R)
+    
+    k_curr = cond
     k_right = np.roll(cond, -1, axis=1)
-    k_harm_h = 2 * cond * k_right / (cond + k_right + 1e-12)
     
-    dx_dist_h = (dx_array[:-1] + dx_array[1:]) / 2.0
-    dx_dist_h = np.append(dx_dist_h, dx_array[-1])
+    dx_curr = dx_array # (nx,)
+    dx_right = np.roll(dx_array, -1)
     
-    Gh = k_harm_h * dy_array[:, None] / dx_dist_h[None, :]
+    # Broadcast dx to 2D
+    dx_curr_2d = dx_curr[None, :]
+    dx_right_2d = dx_right[None, :]
     
+    # Denominator term: (dx_L/k_L + dx_R/k_R)
+    # Add epsilon to k to avoid div by zero (though k shouldn't be 0)
+    denom_h = (dx_curr_2d / (k_curr + 1e-12)) + (dx_right_2d / (k_right + 1e-12))
+    
+    Gh = (2 * dy_array[:, None]) / (denom_h + 1e-12)
+
     # Vertical Conductance (between (i,j) and (i+1,j))
+    # Series resistance: R_tot = R_up + R_down = (dy_U/2)/(k_U*dx) + (dy_D/2)/(k_D*dx)
+    # G = 1/R_tot = (2*dx) / (dy_U/k_U + dy_D/k_D)
+    
     k_down = np.roll(cond, -1, axis=0)
-    k_harm_v = 2 * cond * k_down / (cond + k_down + 1e-12)
     
-    dy_dist_v = (dy_array[:-1] + dy_array[1:]) / 2.0
-    dy_dist_v = np.append(dy_dist_v, dy_array[-1])
+    dy_curr = dy_array # (ny,)
+    dy_down = np.roll(dy_array, -1)
     
-    Gv = k_harm_v * dx_array[None, :] / dy_dist_v[:, None]
+    dy_curr_2d = dy_curr[:, None]
+    dy_down_2d = dy_down[:, None]
+    
+    denom_v = (dy_curr_2d / (k_curr + 1e-12)) + (dy_down_2d / (k_down + 1e-12))
+    
+    Gv = (2 * dx_array[None, :]) / (denom_v + 1e-12)
     
     return Gh, Gv
 

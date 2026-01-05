@@ -18,7 +18,7 @@ from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_t
 def get_scenarios():
     configs = []
     # Common Parameters
-    GRID = 1.0 # 1mm Grid for high accuracy
+    GRID = 2.5 # 2.5mm Grid for faster runs (was 1.0mm)
     
     # 1. 360mm Wall, No Insulation
     configs.append({
@@ -113,7 +113,7 @@ def get_scenarios():
     return configs
 
 # --- Solver Core ---
-def solve_scenario(scenario_def):
+def solve_scenario(scenario_def, use_adaptive_mesh=True):
     """Solve a thermal bridge scenario and return results."""
     print(f"\nrunning {scenario_def['name']}...")
     cfg = scenario_def['cfg']
@@ -121,9 +121,15 @@ def solve_scenario(scenario_def):
     
     # 1. Geometry & Mesh
     geom = WindowRevealGeometry(cfg)
-    # Switch to AdaptiveMesh for better efficiency
-    from mesh import AdaptiveMesh
-    mesh = AdaptiveMesh(geom)
+    
+    if use_adaptive_mesh:
+        from mesh import AdaptiveMesh
+        mesh = AdaptiveMesh(geom)
+    else:
+        from mesh import UniformMesh
+        # UniformMesh needs explicit grid size if not default
+        mesh = UniformMesh(geom, grid_size_mm=cfg.grid_size_mm)
+
     mesh.generate()
     print(f"  {mesh.info()}")
     
@@ -171,6 +177,96 @@ def solve_scenario(scenario_def):
     # 4. Conductance Matrices (Use general calculation for non-uniform mesh)
     from solver import calculate_conductances
     Gh, Gv = calculate_conductances(cond, mesh.dx_array, mesh.dy_array)
+    
+    # Correction for Anisotropic Mesh at Boundaries
+    # The standard calculation uses scalar k for air, which cannot satisfy RSI for both dx and dy
+    # if the air cell is not square. We explicitly overwrite boundary conductances.
+    
+    def apply_boundary_conductances(Gh, Gv, rsi, mask_air):
+        # Horizontal Interfaces: (i, j) connects j and j+1
+        # 1. Air at Left (j), Solid at Right (j+1)
+        # mask is (ny, nx), Gh is (ny, nx) [last col unused usually or periodic]
+        # We perform vectorized update.
+        
+        dx_m = mesh.dx_array / 1000.0
+        dy_m = mesh.dy_array / 1000.0
+        
+        # --- Horizontal ---
+        # Find interfaces
+        is_air = mask_air
+        is_solid = (~mask_air) & (grid_map != MaterialID.AIR_EXT) & (grid_map != MaterialID.AIR_INT)
+        
+        # Left Air, Right Solid
+        # shift solid mask to left to align with Gh index (which is "left" of the link)
+        # link (j) connects j and j+1.
+        # IF is_air[:, :-1] AND is_solid[:, 1:]
+        mask_lr = is_air[:, :-1] & is_solid[:, 1:]
+        
+        if np.any(mask_lr):
+            # For these links, resistance is R_solid_half + RSI
+            # Solid is at right (j+1)
+            # We need k_solid and dx_solid from j+1
+            # k is in cond.
+            
+            # Indices
+            y_idx, x_idx = np.where(mask_lr)
+            # x_idx corresponds to j. j+1 is solid.
+            
+            k_s = cond[y_idx, x_idx + 1]
+            dx_s = dx_m[x_idx + 1]
+            dy = dy_m[y_idx]
+            
+            # G = Area / R_tot = dy / (dx_s/(2*k_s) + RSI)
+            Gh_new = dy / ( (dx_s / (2*k_s)) + rsi )
+            Gh[y_idx, x_idx] = Gh_new
+
+        # Left Solid, Right Air
+        # IF is_solid[:, :-1] AND is_air[:, 1:]
+        mask_rl = is_solid[:, :-1] & is_air[:, 1:]
+        
+        if np.any(mask_rl):
+            # Solid is at left (j)
+            y_idx, x_idx = np.where(mask_rl)
+            k_s = cond[y_idx, x_idx]
+            dx_s = dx_m[x_idx]
+            dy = dy_m[y_idx]
+            
+            Gh_new = dy / ( (dx_s / (2*k_s)) + rsi )
+            Gh[y_idx, x_idx] = Gh_new
+            
+        # --- Vertical ---
+        # Vertical Interfaces: (i, j) connects i and i+1
+        # Top Air (i), Bottom Solid (i+1)
+        
+        # Top Air, Bottom Solid
+        mask_ud = is_air[:-1, :] & is_solid[1:, :]
+        if np.any(mask_ud):
+            y_idx, x_idx = np.where(mask_ud)
+            # Solid is i+1
+            k_s = cond[y_idx + 1, x_idx]
+            dy_s = dy_m[y_idx + 1]
+            dx = dx_m[x_idx]
+            
+            # G = Area / R_tot = dx / (dy_s/(2*k_s) + RSI)
+            Gv_new = dx / ( (dy_s / (2*k_s)) + rsi )
+            Gv[y_idx, x_idx] = Gv_new
+            
+        # Top Solid, Bottom Air
+        mask_du = is_solid[:-1, :] & is_air[1:, :]
+        if np.any(mask_du):
+            y_idx, x_idx = np.where(mask_du)
+            # Solid is i
+            k_s = cond[y_idx, x_idx]
+            dy_s = dy_m[y_idx]
+            dx = dx_m[x_idx]
+            
+            Gv_new = dx / ( (dy_s / (2*k_s)) + rsi )
+            Gv[y_idx, x_idx] = Gv_new
+            
+    # Apply corrections for Interior and Exterior
+    apply_boundary_conductances(Gh, Gv, RSI_WALL, mask_int)
+    apply_boundary_conductances(Gh, Gv, RSE, mask_ext)
+
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
     mask = mask_int | mask_ext
@@ -227,6 +323,10 @@ def solve_scenario(scenario_def):
     cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
     
     Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, mesh.dx_array, mesh.dy_array)
+    
+    # Apply corrections for fRsi pass
+    apply_boundary_conductances(Gh_frsi, Gv_frsi, RSI_CORNER, mask_int)
+    apply_boundary_conductances(Gh_frsi, Gv_frsi, RSE, mask_ext)
     
     temp_frsi = temp_res.copy()
     temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
@@ -318,7 +418,7 @@ def solve_scenario(scenario_def):
     }
 
 
-def run_all():
+def run_all(use_adaptive_mesh=True):
     """Run all scenarios and print summary."""
     # Ensure solver is loaded
     get_solver_lib()
@@ -327,7 +427,7 @@ def run_all():
     results = []
     
     for sc in scenarios:
-        res = solve_scenario(sc)
+        res = solve_scenario(sc, use_adaptive_mesh=use_adaptive_mesh)
         results.append(res)
         
     print("\n--- Final Summary ---")
@@ -378,11 +478,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Thermal Bridge Simulation Engine")
     parser.add_argument("--geometries-only", action="store_true", help="Generate geometry plots only, skip simulation")
     parser.add_argument("--run-all", action="store_true", help="Run all scenarios (Default)")
+    parser.add_argument("--use-uniform-mesh", action="store_true", help="Use Uniform Mesh instead of Adaptive Mesh")
     
     args = parser.parse_args()
     
     if args.geometries_only:
         generate_geometries()
     else:
-        run_all()
+        # Default behavior matches run_all if no args, but here we pass the flag
+        # We want default to be Adaptive now (use_adaptive_mesh=True if flag not present)
+        # arg.use_uniform_mesh is False by default.
+        run_all(use_adaptive_mesh=not args.use_uniform_mesh)
 
