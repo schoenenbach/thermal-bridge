@@ -326,8 +326,31 @@ with tab_editor:
                     modified_variables[key] = value
             
             # Apply Overrides to active_data
-            if modified_variables:
                 active_data['variables'] = modified_variables
+    
+    # --- Transient Simulation Setup ---
+    st.sidebar.markdown("---")
+    transient_exp = st.sidebar.expander("Transient Simulation", expanded=False)
+    with transient_exp:
+        transient_enabled = st.checkbox("Enable Transient", value=False)
+        
+        if transient_enabled:
+            # Inject into active_data
+            if 'transient' not in active_data:
+                active_data['transient'] = {}
+            
+            active_data['transient']['enabled'] = True
+            
+            dur = st.number_input("Duration (hours)", min_value=0.1, max_value=48.0, value=24.0)
+            active_data['transient']['duration_hours'] = dur
+            
+            dt = st.number_input("Time Step (s)", min_value=1.0, max_value=3600.0, value=300.0)
+            active_data['transient']['dt_seconds'] = dt
+            
+            save_int = st.number_input("Save Interval (frames)", min_value=1, max_value=100, value=1)
+            active_data['transient']['save_interval_steps'] = save_int
+            
+            st.info(f"Total Steps: {int(dur*3600/dt)}")
     
     
     # --- Execution Control ---
@@ -415,10 +438,21 @@ with tab_editor:
                         st.session_state['last_simulation_results'] = simple_results
                                     
                         # Show Result Image
-                        img_path = f"result_{active_name}.png"
-                        if os.path.exists(img_path):
-                            # Force browser reload with unique param
-                            st.image(img_path, caption=f"Result (Ti={active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 'Def')}°C)", output_format="PNG")
+                        if active_data.get('transient', {}).get('enabled'):
+                             gif_path = f"result_{active_name}.gif"
+                             if os.path.exists(gif_path):
+                                 st.image(gif_path, caption=f"Transient Animation ({active_data['transient']['duration_hours']}h)")
+                                 with open(gif_path, "rb") as f:
+                                     st.download_button("Download GIF", data=f, file_name=gif_path, mime="image/gif")
+                                     
+                             final_path = f"result_{active_name}_final.png"
+                             if os.path.exists(final_path):
+                                 st.image(final_path, caption="Final State")
+                        else:
+                            img_path = f"result_{active_name}.png"
+                            if os.path.exists(img_path):
+                                # Force browser reload with unique param
+                                st.image(img_path, caption=f"Result (Ti={active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 'Def')}°C)", output_format="PNG")
                             
                     except Exception as e:
                         st.error(f"Error: {e}")

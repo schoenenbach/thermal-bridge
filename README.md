@@ -68,6 +68,14 @@ streamlit run app.py
 ```
 Open `http://localhost:8501` in your browser.
 
+#### Transient Simulation (Time-Dependent)
+The web interface includes a "Transient Simulation" mode:
+1.  Open the **Scenario Editor** tab.
+2.  In the Sidebar, expand the **"Transient Simulation"** section.
+3.  Check **"Enable Transient"**.
+4.  Configure **Duration** (hours) and **Time Step** (seconds).
+5.  Click "Run Simulation". The result will be displayed as an animated GIF.
+
 ### Docker Support
 Build and run the containerized application:
 ```bash

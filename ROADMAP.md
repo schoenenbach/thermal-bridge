@@ -68,14 +68,15 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   Properties panel to edit dimensions of selected elements.
 *   **Synchronization:** Two-way binding: The canvas updates the YAML state, and YAML edits update the canvas.
 
-## 6. Transient Thermal Simulation
-## 6. Transient Thermal Simulation [x]
+## 6. Transient Thermal Simulation [DONE]
+
 - **Goal**: Enable time-dependent simulations (e.g., summer heat protection).
 - **Tasks**:
   - [x] Implement Heat Equation with time derivative ($\rho c_p \frac{\partial T}{\partial t} = \dots$).
   - [x] Update solver mechanics (implicit stepping for stability).
   - [x] Output: Generate animations (GIF/MP4) of temperature distribution over 24-48 hours.
-- **Status**: Completed. Implemented Implicit Euler solver, added material density/capacity, and GIF generation.
+  - [x] Integrate into Streamlit App (Configuration & Visualization).
+- **Status**: Completed. Implemented Implicit Euler solver, added material density/capacity, GIF generation, and Streamlit UI controls.
 
 ## 7. Mold & Condensation Risk Map
 
