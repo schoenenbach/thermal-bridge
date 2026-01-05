@@ -8,7 +8,7 @@ Provides endpoints for scenario validation, simulation, and data retrieval.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import scenarios, simulation, materials
+from api.routes import scenarios, simulation, materials, websocket
 
 app = FastAPI(
     title="Thermal Bridge Simulator API",
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(scenarios.router, prefix="/api/scenarios", tags=["Scenarios"])
 app.include_router(simulation.router, prefix="/api/simulation", tags=["Simulation"])
 app.include_router(materials.router, prefix="/api/materials", tags=["Materials"])
+app.include_router(websocket.router, prefix="/api/ws", tags=["WebSocket"])
 
 
 @app.get("/")

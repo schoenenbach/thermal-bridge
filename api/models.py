@@ -112,6 +112,21 @@ class OptimizationResult(BaseModel):
     error: Optional[str] = None
 
 
+class JobCreatedResponse(BaseModel):
+    """Response when an async job is created."""
+    job_id: str
+    ws_url: str
+
+
+class ProgressMessage(BaseModel):
+    """Progress update message sent via WebSocket."""
+    phase: str
+    step: int
+    total: int
+    percent: float
+    eta_seconds: Optional[float] = None
+
+
 class MaterialInfo(BaseModel):
     """Material information for API responses."""
     id: str
