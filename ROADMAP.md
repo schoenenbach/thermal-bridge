@@ -206,18 +206,26 @@ uvicorn api.main:app --reload
 # Open http://localhost:8000/docs for OpenAPI UI
 ```
 
-### Phase 2: Frontend Framework [FUTURE]
-- [x] Implement WebSocket for simulation progress updates
-- [x] Use JSON Schema for dynamic form generation
-- [ ] Evaluate React vs. Angular as alternative frontend frameworks
+### Phase 2: Repository Restructuring (Phase 2A) [DONE]
+- [x] Create directory structure (`backend/`, `legacy_app/`, `frontend/`)
+- [x] Separate Core Logic from API and Streamlit UI
+- [x] Update imports and Dockerfile
 
-**Key Features to Implement (not feasible in Streamlit):**
-- [ ] Visual element creation with drag-drop and click-to-place
-- [ ] Resize handles and direct manipulation of geometry
-- [ ] Click-to-select elements on canvas (bidirectional Canvas ↔ Inspector sync)
-- [ ] Real-time collaborative editing (optional)
+### Phase 3: Frontend Implementation (React + Vite)
+**Phase 3A: Setup & Proof of Concept**
+- [x] Initialize React Project
+- [x] Generate TypeScript Client from OpenAPI (Manual Fallback)
+- [x] Implement Basic Scenario List & View
 
-**Note:** This is a significant undertaking requiring architectural changes. Consider as a separate project phase.
+**Phase 3B: Interactive Geometry Editor (The Deep Dive)**
+- [ ] Implement Canvas with `react-konva`
+- [ ] Implement Scene Graph <-> Schema synchronization
+- [ ] Drag-and-Drop and Resize interactions
+
+**Phase 3C: Full Application Replacement**
+- [ ] Re-implement Inspector Panel
+- [ ] Re-implement Simulation Results (Plotly)
+- [ ] Feature Parity with Legacy App
 
 ---
 

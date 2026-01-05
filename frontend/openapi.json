@@ -1,0 +1,1283 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Thermal Bridge Simulator API",
+    "description": "REST API for thermal bridge simulation and analysis",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/scenarios/": {
+      "get": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "List Scenarios",
+        "description": "List all available scenarios.",
+        "operationId": "list_scenarios_api_scenarios__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScenarioSummary"
+                  },
+                  "title": "Response List Scenarios Api Scenarios  Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "Create Scenario",
+        "description": "Save a new scenario.",
+        "operationId": "create_scenario_api_scenarios__post",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Scenario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios/{filename}": {
+      "get": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "Get Scenario",
+        "description": "Get a specific scenario by filename.",
+        "operationId": "get_scenario_api_scenarios__filename__get",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "Update Scenario",
+        "description": "Update an existing scenario.",
+        "operationId": "update_scenario_api_scenarios__filename__put",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Scenario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "Delete Scenario",
+        "description": "Delete a scenario.",
+        "operationId": "delete_scenario_api_scenarios__filename__delete",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios/validate": {
+      "post": {
+        "tags": [
+          "Scenarios"
+        ],
+        "summary": "Validate Scenario",
+        "description": "Validate a scenario definition.",
+        "operationId": "validate_scenario_api_scenarios_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation/run": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Run Simulation",
+        "description": "Run a thermal bridge simulation.",
+        "operationId": "run_simulation_api_simulation_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation/optimize": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Run Optimization",
+        "description": "Run parameter sweep optimization.",
+        "operationId": "run_optimization_api_simulation_optimize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation/results/{result_id}": {
+      "get": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Get Result",
+        "description": "Get a stored simulation result.",
+        "operationId": "get_result_api_simulation_results__result_id__get",
+        "parameters": [
+          {
+            "name": "result_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Result Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulation/run-async": {
+      "post": {
+        "tags": [
+          "Simulation"
+        ],
+        "summary": "Run Simulation Async",
+        "description": "Start simulation job asynchronously. \nReturns job_id to subscribe via WebSocket /api/ws/simulation/{job_id}.",
+        "operationId": "run_simulation_async_api_simulation_run_async_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materials/": {
+      "get": {
+        "tags": [
+          "Materials"
+        ],
+        "summary": "List Materials",
+        "description": "List all materials from the registry.",
+        "operationId": "list_materials_api_materials__get",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by category",
+              "title": "Category"
+            },
+            "description": "Filter by category"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MaterialInfo"
+                  },
+                  "title": "Response List Materials Api Materials  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materials/categories": {
+      "get": {
+        "tags": [
+          "Materials"
+        ],
+        "summary": "List Categories",
+        "description": "List all material categories.",
+        "operationId": "list_categories_api_materials_categories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materials/{material_id}": {
+      "get": {
+        "tags": [
+          "Materials"
+        ],
+        "summary": "Get Material",
+        "description": "Get a specific material by ID.",
+        "operationId": "get_material_api_materials__material_id__get",
+        "parameters": [
+          {
+            "name": "material_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Material Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/materials/lookup/lambda/{material_id}": {
+      "get": {
+        "tags": [
+          "Materials"
+        ],
+        "summary": "Get Lambda",
+        "description": "Get thermal conductivity for a material.",
+        "operationId": "get_lambda_api_materials_lookup_lambda__material_id__get",
+        "parameters": [
+          {
+            "name": "material_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Material Id"
+            }
+          },
+          {
+            "name": "default",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0.0,
+              "title": "Default"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schema/scenario": {
+      "get": {
+        "tags": [
+          "Schema"
+        ],
+        "summary": "Get Scenario Schema",
+        "description": "Get the full JSON Schema for validation and form generation.\n\nArgs:\n    ui_hints: If true, injects 'x-ui-hints' into the schema properties.",
+        "operationId": "get_scenario_schema_api_schema_scenario_get",
+        "parameters": [
+          {
+            "name": "ui_hints",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include UI rendering hints",
+              "default": false,
+              "title": "Ui Hints"
+            },
+            "description": "Include UI rendering hints"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Scenario Schema Api Schema Scenario Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schema/elements": {
+      "get": {
+        "tags": [
+          "Schema"
+        ],
+        "summary": "Get Element Schemas",
+        "description": "Get schemas specifically for element types (walls, windows, etc.).\nUseful for populating a 'Add Element' palette.",
+        "operationId": "get_element_schemas_api_schema_elements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Element Schemas Api Schema Elements Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Health check endpoint.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Detailed health check.",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JobCreatedResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "ws_url": {
+            "type": "string",
+            "title": "Ws Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "ws_url"
+        ],
+        "title": "JobCreatedResponse",
+        "description": "Response when an async job is created."
+      },
+      "MaterialInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "lambda": {
+            "type": "number",
+            "title": "Lambda"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "default": "#808080"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "lambda"
+        ],
+        "title": "MaterialInfo",
+        "description": "Material information for API responses."
+      },
+      "OptimizationPoint": {
+        "properties": {
+          "variable_value": {
+            "type": "number",
+            "title": "Variable Value"
+          },
+          "psi_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Psi Value"
+          },
+          "frsi_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frsi Factor"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variable_value",
+          "success"
+        ],
+        "title": "OptimizationPoint",
+        "description": "Single point in optimization sweep."
+      },
+      "OptimizationRequest": {
+        "properties": {
+          "scenario": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario",
+            "description": "Base scenario definition"
+          },
+          "variable": {
+            "type": "string",
+            "title": "Variable",
+            "description": "Variable name to sweep"
+          },
+          "start": {
+            "type": "number",
+            "title": "Start",
+            "description": "Start value"
+          },
+          "end": {
+            "type": "number",
+            "title": "End",
+            "description": "End value"
+          },
+          "step": {
+            "type": "number",
+            "title": "Step",
+            "description": "Step size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario",
+          "variable",
+          "start",
+          "end",
+          "step"
+        ],
+        "title": "OptimizationRequest",
+        "description": "Request for parameter sweep optimization."
+      },
+      "OptimizationResult": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "variable": {
+            "type": "string",
+            "title": "Variable"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizationPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "optimal_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optimal Value"
+          },
+          "optimal_psi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optimal Psi"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "variable"
+        ],
+        "title": "OptimizationResult",
+        "description": "Result of parameter sweep."
+      },
+      "ScenarioSummary": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count",
+            "default": 0
+          },
+          "has_measurements": {
+            "type": "boolean",
+            "title": "Has Measurements",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "name"
+        ],
+        "title": "ScenarioSummary",
+        "description": "Summary of a saved scenario."
+      },
+      "ScenarioValidationRequest": {
+        "properties": {
+          "yaml_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yaml Content",
+            "description": "Raw YAML content to validate"
+          },
+          "json_content": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Content",
+            "description": "JSON/dict content to validate"
+          }
+        },
+        "type": "object",
+        "title": "ScenarioValidationRequest",
+        "description": "Request to validate a scenario."
+      },
+      "SimulationMetrics": {
+        "properties": {
+          "psi_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Psi Value"
+          },
+          "frsi_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frsi Factor"
+          },
+          "temp_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temp Min"
+          },
+          "temp_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temp Max"
+          },
+          "heat_flux_interior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heat Flux Interior"
+          },
+          "solver_iterations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solver Iterations"
+          },
+          "computation_time_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computation Time Ms"
+          }
+        },
+        "type": "object",
+        "title": "SimulationMetrics",
+        "description": "Key simulation result metrics."
+      },
+      "SimulationRequest": {
+        "properties": {
+          "scenario": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scenario",
+            "description": "Scenario definition"
+          },
+          "use_adaptive_mesh": {
+            "type": "boolean",
+            "title": "Use Adaptive Mesh",
+            "description": "Use adaptive mesh refinement",
+            "default": true
+          },
+          "override_grid_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Grid Size",
+            "description": "Override grid size in mm"
+          },
+          "transient_enabled": {
+            "type": "boolean",
+            "title": "Transient Enabled",
+            "description": "Run transient simulation",
+            "default": false
+          },
+          "mold_analysis": {
+            "type": "boolean",
+            "title": "Mold Analysis",
+            "description": "Include mold risk analysis",
+            "default": false
+          },
+          "indoor_rh": {
+            "type": "number",
+            "title": "Indoor Rh",
+            "description": "Indoor relative humidity for mold analysis (0-1)",
+            "default": 0.5
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario"
+        ],
+        "title": "SimulationRequest",
+        "description": "Request to run a simulation."
+      },
+      "SimulationResult": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulationMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "temperature_map_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature Map Url"
+          },
+          "geometry_map_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry Map Url"
+          },
+          "mold_risk_map_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mold Risk Map Url"
+          },
+          "measurements": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Measurements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "SimulationResult",
+        "description": "Result of a simulation run."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationResult": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "scenario_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid"
+        ],
+        "title": "ValidationResult",
+        "description": "Result of scenario validation."
+      }
+    }
+  }
+}
