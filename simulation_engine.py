@@ -94,53 +94,57 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     # 2. Material Grid & Conductivity
     grid_map, cond = build_material_grid(geom, mesh.xc, mesh.yc)
     
-    # 3. Boundary Conditions
+    # 3. Boundary Conditions & Solver Setup
+    
+    # Defaults
+    t_int = TEMP_INT # 20.0
+    t_ext = TEMP_EXT # -5.0
+    rsi_design = RSI_WALL # 0.13
+    rse = RSE # 0.04
+    rsi_check = RSI_CORNER # 0.25
+    
+    # Check for overrides in YAML
+    # Expecting structure: boundary_conditions: convective: { internal: {T:.., R:..}, ... }
+    bcs = {}
+    if hasattr(geom, 'get_boundary_conditions'):
+        bcs = geom.get_boundary_conditions() or {}
+        
+    if 'convective' in bcs:
+        conv = bcs['convective']
+        # Internal (Design)
+        if 'internal' in conv:
+            t_int = float(conv['internal'].get('T', t_int))
+            rsi_design = float(conv['internal'].get('R', rsi_design))
+        # External
+        if 'external' in conv:
+            t_ext = float(conv['external'].get('T', t_ext))
+            rse = float(conv['external'].get('R', rse))
+        # Internal (Check/Corner) - Optional override
+        if 'internal_check' in conv:
+            rsi_check = float(conv['internal_check'].get('R', rsi_check))
+    
     mask_int = (grid_map == MaterialID.AIR_INT)
     mask_ext = (grid_map == MaterialID.AIR_EXT)
-    
-    # K_eff for Surface Resistance (Using local dx/dy would be best, but mesh arrays are 1D)
-    # For adaptive mesh, we should check surface resistance locally, but simplified here:
-    # Use average or min dx for safety, or better: apply resistance inside conductance calc?
-    # Actually, build_material_grid applies K for solid materials.
-    # Air nodes are fixed to Temp, so K doesn't matter for them *except* near boundary.
-    # But wait, the standard way (ISO 10211) is that the surface resistance is a layer.
-    # In FDM, we often adjust the conductivity of the boundary cell or use a ghost node.
-    # Here, we set K of the air node to be K_eff = dx / (2 * Rsi). This assumes node is centered?
-    # With Adaptive Mesh, dx varies. We need to be careful.
-    
-    # Let's iterate over boundary cells or use the mesh arrays.
-    # mesh.dx_array is 1D (nx columns), mesh.dy_array is 1D (ny rows).
-    # cond is (ny, nx).
     
     # Vectorized K_eff calculation
     # k_eff = dx / (2 * R) where dx is the width of the cell
     dx_grid = np.tile(mesh.dx_array, (mesh.ny, 1))
     
-    # This logic assumes vertical walls (using dx) for horizontal flux?
-    # This "Simple" Boundary Condition handling in the original code:
-    # k_eff_int = dx_m / (2 * RSI_WALL)
-    # cond[mask_int] = k_eff_int
+    # We set K for Pass 1 (Design Rsi)
+    k_eff_int_design = (dx_grid / 1000.0) / (2 * rsi_design)
+    k_eff_ext = (dx_grid / 1000.0) / (2 * rse)
     
-    # This implies that for ALL air nodes, we set this K. 
-    # This is slightly wrong for internal air nodes far from wall, but they are Dirichlet fixed anyway
-    # so their K doesn't affect the solution, ONLY the flux calculation at the boundary.
-    # So yes, we can set K for all air nodes based on their local dx.
+    cond_pass1 = cond.copy()
+    cond_pass1[mask_int] = k_eff_int_design[mask_int]
+    cond_pass1[mask_ext] = k_eff_ext[mask_ext]
     
-    k_eff_int = (dx_grid / 1000.0) / (2 * RSI_WALL)
-    k_eff_ext = (dx_grid / 1000.0) / (2 * RSE)
-    
-    cond[mask_int] = k_eff_int[mask_int]
-    cond[mask_ext] = k_eff_ext[mask_ext]
-    
-    # 4. Conductance Matrices (Use general calculation for non-uniform mesh)
+    # 4. Conductance Matrices (Pass 1)
     from solver import calculate_conductances
-    Gh, Gv = calculate_conductances(cond, mesh.dx_array, mesh.dy_array)
+    Gh, Gv = calculate_conductances(cond_pass1, mesh.dx_array, mesh.dy_array)
     
     # Correction for Anisotropic Mesh at Boundaries
-    # The standard calculation uses scalar k for air, which cannot satisfy RSI for both dx and dy
-    # if the air cell is not square. We explicitly overwrite boundary conductances.
-    
     def apply_boundary_conductances(Gh, Gv, rsi, mask_air):
+
         # Horizontal Interfaces: (i, j) connects j and j+1
         # 1. Air at Left (j), Solid at Right (j+1)
         # mask is (ny, nx), Gh is (ny, nx) [last col unused usually or periodic]
@@ -222,22 +226,22 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
             Gv[y_idx, x_idx] = Gv_new
             
     # Apply corrections for Interior and Exterior
-    apply_boundary_conductances(Gh, Gv, RSI_WALL, mask_int)
-    apply_boundary_conductances(Gh, Gv, RSE, mask_ext)
+    apply_boundary_conductances(Gh, Gv, rsi_design, mask_int)
+    apply_boundary_conductances(Gh, Gv, rse, mask_ext)
 
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
     mask = mask_int | mask_ext
     values = np.zeros_like(cond)
-    values[mask_int] = TEMP_INT
-    values[mask_ext] = TEMP_EXT
+    values[mask_int] = t_int
+    values[mask_ext] = t_ext
     
     temp = np.ones_like(cond) * 10.0
-    temp[mask_int] = TEMP_INT
-    temp[mask_ext] = TEMP_EXT
+    temp[mask_int] = t_int
+    temp[mask_ext] = t_ext
     
     # Pass 1: Solve for Psi (Standard Rsi = 0.13)
-    print(f"  [PASS 1] Solving for Psi-value (Rsi={RSI_WALL})...")
+    print(f"  [PASS 1] Solving for Psi-value (Rsi={rsi_design})...")
     temp_res = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, 
                      batch_size=5000, verbose=True)
     
@@ -255,7 +259,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     m_next_v = mask_int[1:, :]
     flux += np.sum(flow_v[m_curr_v & (~m_next_v)]) + np.sum(flow_v[(~m_curr_v) & m_next_v])
     
-    l2d = flux / (TEMP_INT - TEMP_EXT)
+    l2d = flux / (t_int - t_ext)
     
     # Reference Flow
     l_wall = 0.25
@@ -292,17 +296,17 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     
     # fRsi Pass (Rsi=0.25)
     # Recalculate K_eff for interior with new Rsi
-    k_eff_int_rsi25 = (dx_grid / 1000.0) / (2 * RSI_CORNER)
+    k_eff_int_rsi25 = (dx_grid / 1000.0) / (2 * rsi_check)
     cond_frsi = cond.copy()
     cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
     
     Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, mesh.dx_array, mesh.dy_array)
     
     # Apply corrections for fRsi pass
-    apply_boundary_conductances(Gh_frsi, Gv_frsi, RSI_CORNER, mask_int)
-    apply_boundary_conductances(Gh_frsi, Gv_frsi, RSE, mask_ext)
+    apply_boundary_conductances(Gh_frsi, Gv_frsi, rsi_check, mask_int)
+    apply_boundary_conductances(Gh_frsi, Gv_frsi, rse, mask_ext)
     
-    print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={RSI_CORNER})...")
+    print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={rsi_check})...")
     temp_frsi = temp_res.copy()
     temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
                       tol=1e-7, batch_size=5000, verbose=True)
@@ -343,23 +347,23 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
         
         r1 = dx_local_m / (2*k_solid)
         r2 = rsi_used
-        t_si = (TEMP_INT * r1 + t_node * r2) / (r1 + r2)
+        t_si = (t_int * r1 + t_node * r2) / (r1 + r2)
         return np.min(t_si)
 
-    min_temp = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER)
+    min_temp = get_min_surf(temp_frsi, cond_frsi, rsi_check)
     
     # Calculate specific minimum temperatures
     # Wall Materials: Wall, Insulation, Reveal Ins, Concrete, Wood
     # Note: Wall might be bare (2) or insulated (3, 4)
     wall_mats = [MaterialID.WALL, MaterialID.INSULATION, MaterialID.REVEAL_INS, MaterialID.CONCRETE, MaterialID.WOOD]
-    min_temp_wall = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=wall_mats)
+    min_temp_wall = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=wall_mats)
     
     # MaterialID.FRAME = 5
     # MaterialID.GLASS = 6
-    min_temp_frame = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=5)
-    min_temp_glass = get_min_surf(temp_frsi, cond_frsi, RSI_CORNER, material_filter=6) 
+    min_temp_frame = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=5)
+    min_temp_glass = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=6) 
     
-    frsi = (min_temp - TEMP_EXT) / (TEMP_INT - TEMP_EXT)
+    frsi = (min_temp - t_ext) / (t_int - t_ext)
     
     print(f"  Psi: {psi:.4f} W/mK")
     print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")

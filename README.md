@@ -112,6 +112,22 @@ elements:
 -   `window_detail`: Macro for standard window frames (Sash + Frame + Glass).
 -   `insulation_tapered`: Macro for external insulation with a tapered top edge.
 
+### Boundary Conditions
+You can optionally override the standard boundary conditions (Temperature and Surface Resistance) in the YAML file. If omitted, standard ISO values are used (Int: 20°C/Rsi=0.13, Ext: -5°C/Rse=0.04).
+
+```yaml
+boundary_conditions:
+  convective:
+    internal:
+      T: 20.0
+      R: 0.13  # Design Rsi
+    external:
+      T: -5.0
+      R: 0.04
+    internal_check:
+      R: 0.25  # For fRsi/Condensation check (Pass 2)
+```
+
 ## Project Structure
 
 -   `simulation_engine.py`: Main entry point for running window simulations.
