@@ -166,7 +166,9 @@ class ThermalSolver:
         
         # FIX: Constant Frame Start Y (15mm gap)
         # Allows insulation to overlap frame instead of shifting frame
-        idx_f_y_start = idx_reveal_edge + to_idx(15) 
+        # FIX: Constant Frame Start Y (Flush with Reveal Edge)
+        # Fix "Hole" under frame: Frame should touch the masonry reveal.
+        idx_f_y_start = idx_reveal_edge 
         idx_f_y_end = idx_f_y_start + f_width_idx
         
         # Glass Indices (Generic) based on frame
@@ -295,27 +297,6 @@ class ThermalSolver:
         # So if the window is pushed "inwards" (towards x=0), 
         # The Frame sits at x < w_outer.
         # The "Reveal" (Masonry surface) is the line at y=reveal_edge, from x=w_outer down to x=frame_outer.
-        # THIS is the surface we insulate.
-        
-        # Determine Frame Y Position:
-        # It still sits in the opening (y > reveal_edge).
-        # Does it shift in Y? No, it just shifts in X.
-        
-        idx_f_y_start = idx_reveal_edge + rev_ins_th_idx
-        idx_f_y_end = idx_f_y_start + f_width_idx
-        
-        self.grid_map[idx_f_y_start:idx_f_y_end, idx_f_x_start:idx_f_x_end] = self.ID_FRAME
-        
-        # Update Glass
-        idx_g_y_start = idx_f_y_end
-        idx_g_y_end = self.ny
-        self.grid_map[idx_g_y_start:idx_g_y_end, idx_g_x_start:idx_g_x_end] = self.ID_GLASS
-        
-        # Place Reveal Insulation
-        # Y: [idx_reveal_edge, idx_f_y_end - some_visible_frame?] 
-        # Usually reveal ins covers frame partially.
-        # Let's say it covers 30mm of the frame.
-        # So it extends in Y from reveal_edge to (FrameStart + 30mm).
         # X: [idx_w_outer, idx_w_outer + something?]
         # No, X is along the thickness.
         # The reveal insulation is a board perpendicular to the facade.
@@ -442,6 +423,20 @@ class ThermalSolver:
         # Draw Fixed Frame
         self.grid_map[idx_ff_y_start:idx_ff_y_end, idx_ff_x_start:idx_ff_x_end] = self.ID_FRAME
         
+        # EXTENSION: Universal Blendrahmen Extension (L-Profile)
+        # To maintain consistency across all cases and fill the gap behind the Recessed Sash.
+        # Extends Y from ff_y_end (60mm) to cover the Sash Recess/Insulation Zone.
+        # Let's target 80mm visible height (from reveal edge).
+        ext_y_end = idx_reveal_edge + to_idx(80) # Target 80mm coverage
+        ext_y_start = idx_ff_y_end
+        
+        # Extends X from Sash Outer Face to Frame Outer Face
+        ext_x_start = idx_sash_x_end
+        ext_x_end = idx_win_outer_face
+        
+        if ext_y_end > ext_y_start and ext_x_end > ext_x_start:
+             self.grid_map[ext_y_start:ext_y_end, ext_x_start:ext_x_end] = self.ID_FRAME
+
         # Draw Sash
         self.grid_map[idx_sash_y_start:idx_sash_y_end, idx_sash_x_start:idx_sash_x_end] = self.ID_FRAME
 
@@ -478,19 +473,33 @@ class ThermalSolver:
         # FIX: Simplified Rectangle Logic per User Request
         # (Placed AFTER Rebate to potentially optimize/replace parts of it)
         if self.cfg.reveal_insulation_mm > 0 and not self.cfg.uninsulated_reveal:
+             # DEBUG: Force Fill Rebate Zone with Wall first to prevent "Hoyle"
+             # Even though Section 4 should have done it, we do it again here.
+             idx_reb_y_start = idx_reveal_edge
+             idx_reb_y_end = idx_reveal_edge + to_idx(self.cfg.masonry_rebate_overlap_mm)
+             idx_reb_x_start = idx_win_outer_face
+             idx_reb_x_end = idx_w_outer
+             self.grid_map[idx_reb_y_start:idx_reb_y_end, idx_reb_x_start:idx_reb_x_end] = self.ID_WALL
             
-            rev_ins_th_idx = to_idx(self.cfg.reveal_insulation_mm)
+             rev_ins_th_idx = to_idx(self.cfg.reveal_insulation_mm)
             
-            # Y Range: Sits on the reveal face (Y > Reveal Edge)
-            ri_y_start = idx_reveal_edge
-            ri_y_end = idx_reveal_edge + rev_ins_th_idx
+             # Y Range: User says "Higher up on Y-axis... On the outside".
+             # This implies extending into the opening (Y > Masonry Rebate).
+             # Start at the Tip of the Masonry Rebate.
+             rebate_offset = 0
+             if self.cfg.masonry_rebate_overlap_mm > 0:
+                 rebate_offset = to_idx(self.cfg.masonry_rebate_overlap_mm)
             
-            # X Range: From Window Frame (Outer Edge) to WDVS Corner
-            ri_x_start = idx_win_outer_face
-            ri_x_end = idx_w_outer + to_idx(self.cfg.insulation_thick_min_mm)
+             ri_y_start = idx_reveal_edge + rebate_offset # Sits ON the rebate tip
+             ri_y_end = ri_y_start + rev_ins_th_idx
             
-            # Draw Rectangle
-            self.grid_map[ri_y_start:ri_y_end, ri_x_start:ri_x_end] = self.ID_REVEAL_INS
+             # X Range: From Window Frame (Outer Edge) to WDVS Corner
+             ri_x_start = idx_win_outer_face
+             ri_x_end = idx_w_outer + to_idx(self.cfg.insulation_thick_min_mm)
+            
+             # Draw Rectangle
+             self.grid_map[ri_y_start:ri_y_end, ri_x_start:ri_x_end] = self.ID_REVEAL_INS
+             
         
         # 6. Mark External Air
         # Iterate rows and mark everything to the right of the last material as EXT
@@ -1083,13 +1092,9 @@ if __name__ == "__main__":
         # --- PASS 1: Calculate Psi (Rsi = 0.13) ---
         solver_psi = ThermalSolver(cfg, rsi_value=0.13)
         
-        # JUST PLOT GEOMETRY for checking
-        filename_geo = f"geometry_case_{i+1}.png"
-        solver_psi.plot_geometry(filename_geo)
-        
-        # SKIP SOLVER for rapid iteration
-        print(f"Geometry plotted: {filename_geo} (Skipping Solve)")
-        continue
+        # filename_geo = f"geometry_case_{i+1}.png"
+        # solver_psi.plot_geometry(filename_geo)
+        # print(f"Geometry plotted: {filename_geo}")
         
         solver_psi.solve()
         res_psi = solver_psi.calculate_psi()
