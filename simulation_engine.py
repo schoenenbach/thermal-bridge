@@ -477,6 +477,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # --- Apply Explicit Boundary Conditions from YAML ---
     # This allows ISO tests and custom geometries to override defaults
     if 'dirichlet' in bcs:
+        print(f"[DEBUG] Applying Dirichlet BCs: {bcs['dirichlet']}")
         d_bcs = bcs['dirichlet']
         if 'top' in d_bcs:
             mask[-1, :] = 1
@@ -491,9 +492,13 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
             mask[:, -1] = 1
             values[:, -1] = float(d_bcs['right'])
             
+    print(f"[DEBUG] Mask non-zero count: {np.count_nonzero(mask)}")
+    print(f"[DEBUG] Values unique: {np.unique(values[mask==1])}")
+
     if 'adiabatic' in bcs:
         # Adiabatic means flux=0, which is natural BC in FEM/FDM if not in mask.
         a_bcs = bcs['adiabatic'] # List of sides e.g. ['left', 'top']
+        print(f"[DEBUG] Explicit Adiabatic: {a_bcs}")
         if isinstance(a_bcs, list):
             if 'top' in a_bcs:
                 mask[-1, :] = 0
@@ -523,6 +528,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
 
     temp[mask_int] = t_int
     temp[mask_ext] = t_ext
+    
+    # Apply strict boundary conditions from Dirichlet config (ISO tests etc.)
+    # This ensures the solver sees the boundary values immediately in the first iteration
+    temp[mask == 1] = values[mask == 1]
     
     # Pass 1: Solve for Psi (Standard Rsi = 0.13)
     print(f"  [PASS 1] Solving for Psi-value (Rsi={rsi_design})...")

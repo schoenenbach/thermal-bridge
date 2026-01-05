@@ -186,9 +186,16 @@ if active_data:
                     
                     prog_bar.progress(1.0)
                     status_text.success("Simulation Complete")
-                    st.metric("Psi-Value", f"{results['Psi']:.4f} W/mK")
-                    st.metric("fRsi Factor", f"{results['fRsi']:.4f}")
-                    st.metric("Min Temp", f"{results['MinT']:.2f} °C")
+                    st.metric("Psi-Value", f"{results.get('Psi', 0.0):.4f} W/mK", help="Available if 'Psi' is defined in measurements")
+                    if 'fRsi' in results:
+                        st.metric("fRsi Factor", f"{results['fRsi']:.4f}")
+                    else:
+                        st.info("fRsi not calculated")
+                        
+                    if 'MinT' in results:
+                        st.metric("Min Temp", f"{results['MinT']:.2f} °C")
+                    else:
+                        st.info("Min Temp not available")
                     
                     # Cleanup
                     if os.path.exists(temp_yaml): os.remove(temp_yaml)
