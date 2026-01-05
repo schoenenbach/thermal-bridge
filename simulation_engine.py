@@ -110,6 +110,18 @@ def get_scenarios():
         )
     })
 
+    # 9. 360mm Wall, Reveal 10mm (Thin Reveal Ins)
+    configs.append({
+        "name": "Scenario 9: Wall 360mm (10mm Reveal Ins)",
+        "file_suffix": "scenario_9_thin_reveal",
+        "cfg": CalculationConfig(
+            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
+            reveal_insulation_mm=10, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
+            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID,
+            use_styrodur_variant=True
+        )
+    })
+
     return configs
 
 # --- Solver Core ---
