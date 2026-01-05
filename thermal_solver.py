@@ -790,14 +790,15 @@ class ThermalSolver:
         }
 
     def plot_results(self, filename="result.png"):
-        plt.figure(figsize=(10, 8))
-        plt.imshow(self.temp, cmap='jet', origin='lower', extent=[0, self.width_mm, 0, self.height_mm])
-        plt.colorbar(label='Temperature [°C]')
-        plt.title(f'Temperature Distribution (Thick: {self.cfg.wall_thickness_mm}mm, Grid: {self.cfg.grid_size_mm}mm)')
-        plt.xlabel('Depth [mm]')
-        plt.ylabel('Facade Length [mm]')
-        plt.savefig(filename)
-        plt.close() # Good practice to close figure
+        plot_temperature_map(
+            temp_grid=self.temp,
+            width_mm=self.width_mm,
+            height_mm=self.height_mm,
+            filename=filename,
+            title='Temperature Distribution',
+            wall_thick_mm=self.cfg.wall_thickness_mm,
+            grid_size_mm=self.cfg.grid_size_mm
+        )
 
     def plot_geometry(self, filename="geometry_debug.png"):
         """Plots the Material ID map for rapid visual verification."""
@@ -813,5 +814,59 @@ class ThermalSolver:
         plt.xlabel('Depth [mm]')
         plt.ylabel('Facade Length [mm]')
         plt.grid(True, color='white', alpha=0.3)
-        plt.savefig(filename)
-        plt.close()
+
+# -----------------------------------------------------------------------------
+# Reusable Plotting Function
+# -----------------------------------------------------------------------------
+def plot_temperature_map(temp_grid, width_mm, height_mm, filename, title, 
+                         wall_thick_mm=None, grid_size_mm=None):
+    """
+    Plots the temperature distribution with isotherm contour lines.
+    
+    Args:
+        temp_grid: 2D numpy array of temperatures (degrees Celsius).
+        width_mm: Physical width of the domain in mm.
+        height_mm: Physical height of the domain in mm.
+        filename: Output filename (e.g., 'result.png').
+        title: Title of the plot.
+        wall_thick_mm: Optional, for annotating the title.
+        grid_size_mm: Optional, for annotating the title.
+    """
+    plt.figure(figsize=(10, 8))
+    
+    # Plot temperature map
+    im = plt.imshow(temp_grid, cmap='jet', origin='lower', 
+                    extent=[0, width_mm, 0, height_mm])
+    plt.colorbar(im, label='Temperature [°C]')
+
+    # Add isotherms (Contour lines)
+    min_t = np.min(temp_grid)
+    max_t = np.max(temp_grid)
+    step = 2.0
+    
+    # Ensure we have a valid range
+    if max_t > min_t:
+         levels = np.arange(np.ceil(min_t), np.floor(max_t) + 1, step)
+         
+         # Add specific critical isotherms (e.g., 12.6°C for mold) if within range
+         if min_t < 12.6 < max_t:
+             levels = np.sort(np.append(levels, 12.6))
+             
+         CS = plt.contour(temp_grid, levels=levels, origin='lower', 
+                          extent=[0, width_mm, 0, height_mm],
+                          colors='black', linewidths=0.5, alpha=0.7)
+         plt.clabel(CS, inline=True, fontsize=8, fmt='%1.1f')
+
+    # Construct Title
+    full_title = title
+    if wall_thick_mm is not None or grid_size_mm is not None:
+        extras = []
+        if wall_thick_mm: extras.append(f"Thick: {wall_thick_mm}mm")
+        if grid_size_mm: extras.append(f"Grid: {grid_size_mm}mm")
+        full_title += f"\n({', '.join(extras)})"
+        
+    plt.title(full_title)
+    plt.xlabel('Depth [mm]')
+    plt.ylabel('Facade Length [mm]')
+    plt.savefig(filename, dpi=150)
+    plt.close() # Good practice to close figure

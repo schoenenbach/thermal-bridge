@@ -21,6 +21,7 @@ from geometry import build_material_grid
 from mesh import UniformMesh
 from geometries.iso_case1 import ISOCase1Geometry
 from geometries.iso_case2 import ISOCase2Geometry
+from thermal_solver import plot_temperature_map
 
 # Load C++ Library
 SO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "thermal_solver_core.so"))
@@ -177,12 +178,14 @@ def run_case_1():
     print(f"Result: {status}")
     
     # Save plot
-    plt.figure(figsize=(6, 10))
-    plt.imshow(temp, cmap='jet', origin='lower', extent=[0, mesh.width_mm, 0, mesh.height_mm])
-    plt.colorbar(label='Temperature [°C]')
-    plt.title(f'ISO 10211 Case 1 (Refactored)\nT(150,300)={t_check:.3f}°C')
-    plt.savefig('test_case_1_v2_result.png', dpi=150)
-    plt.close()
+    plot_temperature_map(
+        temp_grid=temp,
+        width_mm=mesh.width_mm,
+        height_mm=mesh.height_mm,
+        filename='test_case_1_v2_result.png',
+        title=f'ISO 10211 Case 1 (Refactored)\nT(150,300)={t_check:.3f}°C',
+        grid_size_mm=mesh.grid_size_mm
+    )
     print("Saved plot to 'test_case_1_v2_result.png'")
     
     return status == "PASS"
@@ -252,13 +255,15 @@ def run_case_2():
     print(f"Result: {status}")
     
     # Save plot
-    plt.figure(figsize=(12, 3))
-    plt.imshow(temp[1:-1], cmap='jet', origin='lower', 
-               extent=[0, mesh.width_mm, 0, mesh.height_mm])
-    plt.colorbar(label='Temperature [°C]')
-    plt.title(f'ISO 10211 Case 2 (Refactored)\nFlux={flux_in:.3f} W/m')
-    plt.savefig('test_case_2_v2_result.png', dpi=150)
-    plt.close()
+    # Exclude boundary cells for plotting
+    plot_temperature_map(
+        temp_grid=temp[1:-1],
+        width_mm=mesh.width_mm,
+        height_mm=mesh.height_mm,
+        filename='test_case_2_v2_result.png',
+        title=f'ISO 10211 Case 2 (Refactored)\nFlux={flux_in:.3f} W/m',
+        grid_size_mm=mesh.grid_size_mm
+    )
     print("Saved plot to 'test_case_2_v2_result.png'")
     
     return status == "PASS"
