@@ -250,8 +250,15 @@ class WindowRevealGeometry(SketchGeometry):
         # So AIR_INT shape overrides AIR_EXT default
         # WALL overrides AIR_INT where it might overlap? (Usually disjoint)
         
-        # Domain: Reduced from 1000mm to focus on relevant area
-        x_dom_max = self.x_wall_ext + 150.0  # e.g. 410 + 150 = 560mm
+        # Domain: Ensure enough space for insulation + exterior air buffer
+        # Base buffer for uninsulated
+        buffer_width = 150.0 
+        if config.insulation_thick_max_mm > 0:
+            # If insulation exists, ensure canvas covers it plus some buffer
+            required_width = float(config.insulation_thick_max_mm) + 50.0 # 50mm air beyond insulation
+            buffer_width = max(buffer_width, required_width)
+            
+        x_dom_max = self.x_wall_ext + buffer_width
         
         self.set_canvas(0.0, x_dom_max, 
                         0.0, self.y_top, 
