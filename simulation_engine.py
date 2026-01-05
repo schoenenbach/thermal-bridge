@@ -320,11 +320,27 @@ def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_m
                          title=f"Transient End State (t={duration_s/3600:.1f}h)",
                          wall_thick_mm=geom.data.get('variables', {}).get('wall_thick', 360))
                          
+    # Calculate Measurements for Final State
+    # Re-build conductivity for probing (we need the map)
+    # grid_map is passed in.
+    # cond needed for probe weighting
+    _, cond = build_material_grid(geom, mesh.xc, mesh.yc)
+    
+    measurements_def = geom.data.get('measurements', {})
+    
+    # We reconstruct mask_int for surface metrics
+    mask_int = (grid_map == MaterialID.AIR_INT)
+    rs_check = 0.25 # Default fallback
+    
+    p1_results = evaluate_measurements(measurements_def, geom, mesh, temp, cond,
+                                      t_int, t_ext, rs_check, grid_map, mask_int)
+                          
     return {
         "name": geom.data.get('name', 'transient'),
         "measurements": p1_results,
-        "measurements_frsi": p2_results,
-        "temp": temp_res,
+        "measurements_frsi": {}, # Not typical for transient
+        "temp": temp,
+        "final_temp": temp, # Alias for test compatibility
         "mesh": {
             "x_coords": mesh.x_coords,
             "y_coords": mesh.y_coords,

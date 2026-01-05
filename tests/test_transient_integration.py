@@ -29,6 +29,11 @@ def test_transient_dispatch():
             "duration_hours": 0.01, # Short duration (36s)
             "dt_seconds": 12.0,
             "save_interval_steps": 1
+        },
+        "measurements": {
+            "point_probes": [
+                {"name": "EndTemp", "x": 50, "y": 50}
+            ]
         }
     }
     

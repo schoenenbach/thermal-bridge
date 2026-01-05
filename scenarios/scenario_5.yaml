@@ -32,7 +32,7 @@ materials:
     color: "#FFFFFF"
   - id: AIR_EXT
     lambda: 0.025
-    color: "#E0F7 FA"
+    color: "#E0F7FA"
   - id: WOOD
     lambda: 0.12
     color: "#8B4513"
