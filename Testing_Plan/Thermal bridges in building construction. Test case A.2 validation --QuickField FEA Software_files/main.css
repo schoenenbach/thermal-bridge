@@ -1,0 +1,187 @@
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 400;
+  src:  url('/Lato-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 800;
+  src: url('/Lato-Heavy.woff2') format('woff2'); 
+  font-display: swap;
+}
+
+:root {  
+--bs-btn-active-color:#076BD5;
+--bs-dropdown-link-active-bg:#076BD5;
+--bs-blue: #076BD5;
+--bs-primary: #076BD5;
+--bs-link-hover-color:#076BD5;
+--bs-primary-rgb: 7, 107, 213;
+}
+
+
+a.dropdown-item:hover {color:var(--bs-blue);}
+a.nav-link.show {background-color: rgba(var(--bs-secondary-bg-rgb),var(--bs-bg-opacity))}
+
+/*a {color:#555; } a:visited */
+a {color:#000; }
+a:hover {color:var(--bs-blue)}
+
+
+
+body {
+font-family: "Lato", sans-serif;
+font-size: 1.15rem;
+color: #000;
+line-height: 2rem;
+}
+
+a.nav-link {
+  color: #555;
+}
+a.nav-link:hover {
+  background-color: var(--bs-gray-200);
+}
+
+.form-control, .form-select{
+	max-width: 600px;
+}
+
+.form-label {
+  margin-bottom: 0;
+}
+
+h1
+{
+line-height: 2.4rem;
+font-size: 1.4rem;
+font-weight: 600;
+color:white;
+padding-left:1rem;
+background-color:var(--bs-blue);
+padding-bottom: 0.2rem;
+}
+
+
+
+.btn-primary:hover {
+  color: var(--bs-btn-bg);
+  background-image:linear-gradient(#eee,#fff,#ddd,#ddd);
+}
+.btn-primary {
+  background-image: linear-gradient(#1683E0,#0565D5);
+}
+
+
+.btn-outline-secondary:hover{
+  background-color:#fff;
+}
+
+.label-required::after { 
+  content: " *";
+  color: red;
+  font-weight: bold;
+}
+
+
+.columns
+{
+column-count:auto;
+column-width:440px;
+column-gap:40px;
+}
+
+.columns > li {margin-bottom:20px; page-break-inside: avoid; display:block; }
+
+.columns>li:before{
+    content: "";
+    display: list-item;
+    position: absolute;
+}
+
+
+
+.QFheader, .QFheader:hover, .QFheader:focus{
+font-size:3.5rem;
+font-weight:900;
+text-shadow:2px 2px 2px #bbb;
+color:#666;
+text-decoration:none;
+line-height:3.6rem;
+font-style: italic;
+}
+
+
+
+.stripe-green
+{	background-color: #EFFFE7;}
+
+.stripe-yellow
+{	background-color: #FFFADD;
+background-color: #FFF2A74F;
+}
+
+
+
+.stripe-blue
+{	background-color: #EBF4FF}
+
+
+
+
+@media (max-width:1560px)
+{
+.btnIcon {width: 0; height:0; margin-bottom: -20px;}
+#mainNav li { font-size: smaller; }
+}
+
+@media (prefers-color-scheme: dark) {
+	
+	h1 { background-color: #036; color: #bbb;}
+	body,.bg-light, .table td,  .table th
+	{
+		background-color: black !important;
+		color: #999 !important;
+	}
+	a {color:#999; }
+	.bg-body-tertiary, .bg-secondary-subtle {
+		background-color: #333 !important;
+	}
+	.bg-body-secondary  {
+		background-color: #777 !important;
+	}
+
+	.bg-body-secondary li a {
+		color: #000 !important;
+	}
+
+	.bg-body-secondary li:hover {
+		background-color: #999 !important;
+	}
+	
+	.btn-outline-light:hover,.btn-outline-light:active {background-color: #999 !important; color:#036;}
+	
+	#pageText, .border .border-light-subtle {border-color: #555 !important;}
+ 
+	.form-control, .form-select, .form-check-input {background-color: #777 !important;}
+	.btn-primary {background-image: linear-gradient(#069,#036);}
+	.btn-primary:hover {background-image: linear-gradient(#036,#000);}
+	a.nav-link{color:#aaa;}
+	
+	.QFheader, .QFheader:hover, .QFheader:focus{
+		text-shadow:none;
+		color:#999;
+
+	}
+	
+	input[aria-label="Search"] {background-color: #999 !important; color:#fff !important;   }
+	input[aria-label="Find"] {background-color: #999 !important; color:#fff !important;   }
+}
+	
+	
+	
+}

@@ -17,7 +17,8 @@ This project is a thermal bridge simulation tool designed to calculate Psi-value
 - `config.py`: Central configuration for material properties (Lambda), boundary conditions (Temperatures, R-values), and `WindowConfig`.
 - `geometry.py`: Base classes (`GeometryBuilder`, `SketchGeometry`) and helper functions (`build_material_grid`).
 - `mesh.py`: Mesh generation logic (`UniformMesh`, `AdaptiveMesh`).
-- `geometries/`: Package containing specific geometry implementations (`window_reveal.py`, `iso_case1.py`, etc.).
+- `scenarios/`: Directory containing all YAML geometry definitions for simulation scenarios.
+- `legacy/geometries/`: Archived Python geometry implementations (superseded by YAML).
 - `legacy/`: Deprecated code (e.g., old `thermal_solver.py`). Do not touch unless necessary.
 
 ## Development & Usage

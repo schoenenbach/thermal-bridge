@@ -1,0 +1,1804 @@
+/*
+Theme Name: Reizend Child
+Description: Ein schönes Childtheme
+Author: Sabine Lamprecht
+Template: reizend
+Version: 1.0.5
+Tags:
+*/
+
+@import url("../reizend/style.css");
+
+/*-------------------------------------------Grundstock-Variante1------------------------------------------------------ */
+
+/* Table of Contents
+------------------------------------------------------- 
+
+	1. Top Bar
+	2. Colophon
+	3. Site-Title
+	4. Headings
+	5. Font Style
+	6. Content Areas
+	7. Header
+	8. Metanavigation
+	9. Breadcrumb
+	10. Top Widgets
+	11. Top Language Navigation
+	12. Meta Top Navigation
+	13. Footer Widgets
+	14. Footer Navigation
+	15. Primary Navigation Wrapper
+	16. leer
+	17. Table Press
+	18. Bilddarstellung
+	19. Darstellung der Beiträge 
+	20. Darstellung auf mobilden Endgeräten 
+	21. Sonstiges
+		
+*/
+
+/* Variablendefinition */
+
+/*:root {
+  --infobox: #cceaea;
+}*/
+
+#frameShop {
+    min-width: 950px;
+}
+
+/* 1. Top Bar
+-------------------------------------------------------	*/
+#top-bar {
+    background: repeat scroll 0px 0px rgb(70, 130, 180);
+    padding: 5px 0;    /* MP: padding: 5px 0;*/
+    position: relative;
+    z-index: 99999;
+/*    display: none;*/
+   height: 8px;
+/*    box-shadow:0 1px 1px #666666;*/
+}
+
+.top-bar-content li:hover> a, .top-bar-content li a:hover, .widget_mslswidget a:hover, .top-bar-content li:active > a, .top-bar-content li a:active, .widget_mslswidget a:active{
+    color: #38668d;
+}
+
+.top-bar-content li a:focus, .widget_mslswidget a:focus{
+    background-color: transparent;
+    color: #38668d;
+	text-decoration: underline;
+}
+
+.top-bar-content .current-menu-item a {
+	color: #38668d !important;
+	text-decoration: underline !important;
+}
+
+.top-bar-content:before {
+        clear: both;
+}
+
+
+
+/* 2. Colophon-------------------------------------------------------	*/
+#colophon {
+    background: none repeat scroll 0 0 #006699;
+    border-bottom: 4px solid #DDDDDD;
+    border-top: 1px solid #DDDDDD;
+    color: #FFFFFF;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 10px;
+    width: auto;
+}
+
+
+/* 3. Site-Title
+-------------------------------------------------------	*/
+/*Seitentitel -> auf durchsichtig gestellt, Höhe des Bereiches über Textgröße anpassbar*/
+
+.site-title a {
+    color: #56AA71;
+    font-size: 30px;
+    opacity: 0;  
+    filter: alpha(opacity = 0);   	/* mpa: for IE */
+    zoom: 1;				/* mpa: for IE */
+    font-weight: 200;
+}
+
+
+
+/* 4. Font Style
+-------------------------------------------------------	*/
+/*Farbe der normalen Schrift*/
+
+.entry-content {
+    color:   	#333333 ;
+    line-height: 1.6em !important;
+}
+
+/*Schriftgrößen*/
+
+body {
+    font-family: Arial,Helvetica,Geneva,Verdana,sans-serif;
+    font-size: 14px;
+    line-height: 1.2em;
+    max-width: 1000px;
+    margin:auto;
+    border: 1px;
+    text-align: justify;
+	/*font-family: Calibri,Candara,Segoe,Segoe UI,Optima,Arial,sans-serif;*/
+}
+
+
+/*Überschriften*/
+h1 small, .h1 small {
+    font-size: 24px;
+}
+h2 small, .h2 small {
+    font-size: 18px;
+}
+h3 small, .h3 small, h4 small, .h4 small {
+    font-size: 14px;
+}
+
+h1, .h1, article h1, h1.page-title {
+    font-size: 180%;
+}
+h2, .h2, article h2 {
+    font-size: 160%;
+}
+h3, .h3, article h3 {
+    font-size: 140%;
+}
+h4, .h4, article h4 {
+    font-size: 120%;
+    padding-bottom: 10px;
+}
+h5, .h5, article h5 {
+    font-size: 110%;
+}
+h6, .h6, article h6 {
+    font-size: 100%;
+}
+
+
+
+/*Seiten- und Widget-Titel Eigenschaften*/
+
+#secondary h1.widget-title, #secondary-left h1.widget-title, .single .entry-h1 .entry-title, .page .entry-h1 .entry-title, h1, .page .entry-h1 h1, h1, .h1, .page-title, h1.page-title {
+    font-family: Helvetica,Arial,Geneva,Verdana,sans-serif;
+    color: #006699;
+    font-weight: normal;
+    margin-bottom: 0px;
+    margin-top: 5px;
+    -ms-hyphens: manual;
+    -webkit-hyphens: manual;
+    -moz-hyphens: manual;
+}
+
+h2, .h2, h3, .h3, h4, .h4, h5, .h5, article h1, article h2, article h3, article h4, article h5, article h6 {
+    font-family: Helvetica,Arial,Geneva,Verdana,sans-serif;
+    /*font-weight: bold;*/
+    margin-bottom: 12px;
+    color: #99999;
+    margin-top: 3px;
+    text-align: left;	
+}
+
+#secondary h1.widget-title, #secondary-left h1.widget-title, .single .entry-h1 h1,.entry-title, .page .entry-h1 .entry-title , .page .entry-h1 h1 {
+    font-size: 180%;
+}
+
+/*Darstellung der Suchergebnisse*/
+
+h1.page-title {
+    border-bottom: 4px double #D9D9D9;
+    display: block;
+    margin-top: 15px;
+    text-transform: none;
+    padding-bottom: 11px !important;
+}
+
+.page-header {
+    margin-bottom: 20px;
+    padding-bottom: 11px;
+    margin-top: 0;
+}
+
+.textwidget {
+    	font-size: 100%;
+	line-height: 1.5em !important;
+}
+
+.add_posts ul {
+    margin-left: 0px !important;
+    padding-left: 0px !important;
+} 
+
+a {
+    color: #444444;
+    text-decoration: underline;
+}
+
+/*Links*/
+
+a:hover,
+a:focus,
+a:active {
+  color: #000000;
+}
+
+/*Aufzählung in selber Schriftart wie anderer Text*/
+article blockquote {
+    font-family: inherit;
+}
+.h2 {
+    padding-bottom: 4px;
+}
+
+.h3 a {
+    color: #333333;
+    text-decoration: none;
+}
+
+
+h3 a {
+    color: #333333;
+    font-variant: normal;
+    text-decoration: none;
+}
+
+/*Absatnd nach Liste*/
+
+.content .ul {
+    margin-bottom: 10px;
+    margin-top: 0;
+}
+
+
+/* 5. Content Areas
+-------------------------------------------------------	*/
+
+#secondary ul li, #secondary-left ul li {
+    margin-bottom: 15px;
+}
+
+#secondary .widget a, #secondary-left .widget a {
+    color: #444444;
+}
+
+#secondary-left .widget a {
+    color: #444444;
+    font-size: 18px;
+}
+
+
+.entry-content ul {
+	padding-left: 30px;
+	margin-bottom: 20px;
+}
+
+
+
+
+/*Content-Bereich vergrößern - Funktioniert nur, wenn Sidebar-bereich verkleinert wird*/
+
+/* mpa: container width (vom ganzen content 1400px max)  */
+
+.col-md-6 {
+     min-width: 73%;
+}
+
+/*.col-md-3 {*/
+
+/*Sidebar-Bereich verkleinern*/
+
+
+#secondary-left {
+	position: relative;
+    	padding: 28px 0px 28px 10px;
+    	margin: 0px;
+visibility:hidden;
+}
+
+#secondary {
+	position: relative;
+    	padding: 28px 10px 28px 0px;
+    	margin: 0px 0px 0px 5px !important;
+}
+
+/*Kompletten beschreibbaren Bereich der Seite verändern, evtl. auf 1600px -> auf anderen Browsern testen*/
+
+.col-md-12 {
+    /* width: 100%; */
+  padding: 0px;
+}
+ #secondary h1.widget-title, #secondary-left h1.widget-title {
+    border-bottom: 4px double #D9D9D9;
+    font-weight: normal;
+    margin-top: 0;
+    padding: 0 5px;
+    padding-bottom: 11px;
+}
+
+#secondary {
+    margin: 0;
+    padding: 5px 10px 28px 0;
+    position: relative;
+    min-width: 26%;
+}
+
+#content {
+   word-wrap: break-word;
+   -webkit-hyphens: auto;
+   -moz-hyphens: auto;
+   hyphens: auto;
+}
+
+strong { 
+   -moz-hyphens: manual;
+   -o-hyphens: manual;
+   -webkit-hyphens: manual;
+   -ms-hyphens: manual;
+   hyphens: manual; 
+}
+
+a { 
+   -moz-hyphens: manual;
+   -o-hyphens: manual;
+   -webkit-hyphens: manual;
+   -ms-hyphens: manual;
+   hyphens: manual; 
+}
+
+#page {
+   margin-top: 5px;
+   margin-bottom: 30px;
+   box-shadow: 5px 5px 20px #888888;
+}
+
+
+
+#secondary-left {
+	position: relative;
+    	padding: 28px 0px 28px 10px;
+    	margin: 0px;
+    	width: 0%;
+}
+
+/*Kompletten beschreibbaren Bereich der Seite verändern, evtl. auf 1600px -> auf anderen Browsern testen*/
+.container {
+    max-width: 1600px;
+}
+
+
+
+
+/* 6. Header
+-------------------------------------------------------	*/
+
+#masthead {
+    margin: 0px !important;
+    height: 100px;
+    max-height: 100px;
+}
+
+#parallax-bg {
+    border: 0px solid #ffffff;
+    background: url("/de/wp-content/uploads/sites/9/2015/03/20x405_Hintergrund.jpg") repeat-x scroll center top rgba(0, 0, 0, 0) !important;
+}
+
+
+.site-header {
+    background-image: url(/de/wp-content/uploads/sites/9/2021_WUFI-header.png);
+    /*background-image: url(/de/wp-content/uploads/sites/9/2015/04/Header-WUFI-21.png);*/
+    background-position: left center;
+}
+
+.top-bar-content {
+	width: 75%;
+	float: left;
+	text-align: right;
+	position: relative;
+	margin-top: -5px;
+}
+
+.top-bar-content .current_page_item {
+	background-color: transparent;
+}
+
+#advanced_menu-5 {
+	text-align: right;
+}
+
+#advanced_menu-5:after {
+   clear:both;
+}
+
+#mslswidget-2 {
+   position: relative;
+   float:right;
+   margin:0;
+   padding-right:0px;
+   margin-bottom: 5px;
+}
+
+.menu-meta-menue-container {
+    float: right;
+}
+
+
+.site-description {
+    height: 45px;
+    margin-bottom: 10px;
+	padding: 0px;
+}
+
+.top-bar-content .top-widget {
+	float: right; 
+
+}
+ .top-widget + .top-widget {
+ 	margin-right: 5px;
+}
+
+
+/* top widget title ausblenden */
+.top-widget-title {
+	font-size: 0px;
+	opacity: 0;
+	font-weight: 200;
+        filter: alpha(opacity = 0);   	/* mpa: for IE */
+        zoom: 1;				/* mpa: for IE */
+
+} 
+
+ul, ol {
+    margin: 0 ;
+}
+
+/* 7. Metanavigation-------------------------------------------------------	*/
+
+
+.metanavbar {
+	clear: both;
+	margin: 0 auto;
+	position: absolute;
+	right: 20px;
+	top: 10px;
+}
+
+
+ul.metanavbar,
+div.metanavbar > ul {
+	clear: both;
+	margin: 0;
+	padding: 0 0 0 0;
+}
+
+.metanavbar li {
+	display: inline-block;
+	position: relative;
+}
+
+.metanavbar li a {
+	color: #141412;
+	display: block;
+	font-size: 14px;
+	line-height: 1;
+	padding: 10px 10px;
+	text-decoration: none;
+}
+
+.metanavbar li:hover > a,
+.metanavbar li a:hover {
+	background-color: #220e10;
+	color: #fff;
+}
+
+
+
+
+
+/* 8. Breadcrumb-------------------------------------------------------	*/
+
+.breadcrumbs {
+	display: block;
+	max-width: 1400px;
+	text-align: left;
+	margin: 0 2% 3px;
+        padding-bottom: 3px;
+	color: #333333;
+	border-bottom: 1px solid #DDDDDD;
+	font-size: 90%;
+	vertical-align: middle;
+}
+
+.breadcrumbs > a {
+	color: #333333;
+	text-decoration: none;
+}
+
+
+/* 9. Top Widgets
+-------------------------------------------------------	*/
+
+/*zusätzlichen Pfeil vor Link in Widget entfernen*/
+#secondary ul li:before, #secondary-left ul li:before {
+    content: none;
+}
+
+/* 10. Top Language Navigation
+-------------------------------------------------------	*/
+
+.widget_mslswidget a {
+	color: #000000;
+        display: inline;
+	font-size: 14px;
+	line-height: 1;
+	padding: 4px 10px;
+	text-decoration: none;
+}
+
+.widget_mslswidget a:hover {
+	background-color: #220e10;
+	color: #fff;
+}
+
+
+/* 10. Meta Top Navigation
+-------------------------------------------------------	*/
+
+.top-bar-content widget_advanced_menu {
+
+	margin: 0 auto;
+	position: absolute;
+	right: 20px;
+	top: 0px;
+}
+
+ul.top-bar-content,
+div.top-bar-content > ul {
+	
+	margin: 0;
+	padding: 0 0 0 0;
+}
+
+.top-bar-content li {
+	display: inline-block;
+	position: relative;
+}
+
+.top-bar-content li a {
+	color: #000000;
+        display: inline;
+	font-size: 14px;
+	line-height: 1;
+	padding: 4px 10px;
+	text-decoration: none;
+}
+
+.top-bar-content li:hover > a, .top-bar-content li a:hover, .widget_mslswidget a:hover {
+	background-color: transparent;
+	color: #2A6496;
+}
+
+.top-bar-content li:active > a, .top-bar-content li a:active, .widget_mslswidget a:active {
+	background-color: transparent;
+	color: #2A6496;
+}
+
+
+
+/* 11. Footer Widgets
+-------------------------------------------------------	*/
+.footer-bar-content {
+	display: block;
+	max-width: 1400px;
+	margin: auto;
+	padding: 0px 32px 20px 32px;
+	text-align: left;
+}
+
+.footer-bar-content .footer-widget {
+	float: left;
+
+}
+
+.footer-bar-content .footer-widget + .footer-widget {
+ 	margin-right: 5px;
+}
+
+
+/* top widget title ausblenden */
+.footer-widget-title {
+	font-size: 0px;
+	opacity: 0;
+	font-weight: 200;
+        filter: alpha(opacity = 0);   	/* mpa: for IE */
+        zoom: 1;				/* mpa: for IE */
+
+}
+
+
+/* 11. Footer Navigation
+-------------------------------------------------------	*/
+.footer-widget widget_nav_menu {
+	clear: both;
+	margin: 0 auto;
+	position: absolute;
+	right: 20px;
+	top: 0px;
+}
+
+ul.footer-widget,
+div.footer-widget > ul {
+	clear: both;
+	margin: 0;
+	padding: 0 0 0 0;
+}
+
+.footer-widget li {
+	display: block;
+	position: relative;
+}
+
+.footer-widget li a {
+	color: #141412;
+	display: block;
+	font-size: 14px;
+	line-height: 1;
+	padding: 4px 10px;
+	text-decoration: none;
+}
+
+.footer-widget li:hover > a,
+.footer-widget li a:hover {
+	background-color: #220e10;
+	color: #fff;
+}
+
+.footer-widget li:hover > a, .footer-widget li a:hover {
+	background-color: #38668d!important;
+}
+/* 15. Primary Navigation Wrapper
+-------------------------------------------------------	*/
+#primary-nav-wrapper {
+    background: none repeat scroll 0 0 #006699;
+    margin-bottom: 10px;
+    padding-top: 0px;
+    text-align: left;
+    padding-left: 0cm;
+/*    border: 1px solid #2B6484;*/
+    height: 38px;
+    text-align: left;
+    position: relative;
+    clear: both;
+/*    box-shadow: 0 1px 1px #666666;*/
+}
+
+
+
+#primary-navigation {
+    margin: 0 0 0 0cm;
+    text-transform: normal;
+
+}
+
+#primary-nav-wrapper .container {
+    background: none repeat scroll 0 0 transparent;
+    height: 1em;
+    max-width: 100%;
+}
+
+
+
+#primary-navigation li:hover > a {
+    background: none repeat scroll 0 0 #009999;
+    color: #ffffff;
+}
+
+#primary-navigation a {
+    color: #ffffff;
+    display: block;
+    font-size: 108%;
+    margin-bottom: -10px;
+    padding: 10px 20px;
+    text-decoration: none;
+    transition: all 0.4s ease 0s;
+/*    border-left: 1px solid #8db3d2;*/
+/*    border-right: 2px solid #38668d;*/
+    font-weight: 100;
+
+}
+
+/*Darstellung des aktiven Menüpunktes*/
+
+.current_menu_item {
+    height: 1em;
+    background-color: #009999;
+}
+
+.page_item {
+    height: 1em;
+    background-color: #009999;
+    }
+
+.page_item_387 {
+    height: 1em;
+    background-color: #009999;
+    }
+
+.current_page_item {
+    height: 1em;
+    background-color: #009999;
+    }
+
+.page-item_188 {
+    height: 1em;
+    background-color: #009999;
+    }
+
+.current_page_parent {
+    height: 1em;
+    background-color: #009999;
+    }
+
+ #primary-navigation ul li {
+    height: 37px;
+    font-weight: bold;
+}
+
+ #primary-navigation ul ul li:before {
+     clear: both;
+}
+
+ #primary-navigation ul ul li {
+    margin: 0px;
+    padding: 0px;
+    border-bottom: solid 1px #009999;
+    border-top: solid 1px #588ebb;
+    clear: both;
+    font-weight: none;
+    height: 30px;
+}
+
+
+/*Abstand von Content */
+
+#primary {
+    padding: 0px 2%;
+    margin-top: 10px;
+}
+
+/*Farbe des Submenüs*/
+
+#primary-navigation ul ul {
+    background: none repeat scroll 0 0 #006699 ;
+/*    box-shadow: 0 5px 4px -4px #4A4A4A;*/
+    display: none;
+    float: left;
+    left: 0;
+    padding-top: 0;
+    position: absolute;
+    text-align: justify;
+    top: 2.5999em;
+    z-index: 99999;
+    border: 1px solid #588ebb;
+    opacity: .95; 
+    text-transform: none;
+}
+
+
+#primary-navigation ul ul a {
+    font-size: 100%px;
+    font-family: Helvetica,Arial,Geneva,Verdana,sans-serif;
+    font-variant: normal;
+    min-width:260px;
+    max-width: 260px;
+}
+
+#primary-navigation ul ul li:hover >a {
+    background: none repeat scroll 0 0 #009999;
+    border-top: medium none;
+    color: #EEEEEE;
+    padding: 8px 20px;
+    height: 30px;
+    margin: 0px;
+}
+
+#primary-navigation li {
+    clear: right;
+    float: left;
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.container {
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0px;
+    padding-right: 15px;
+}
+
+.menu-item {
+    float: left;
+}
+.menu-item:before {
+ clear:both;
+}
+
+#primary-navigation a {
+    font-family: Arial ,Helvetica, Geneva,Verdana,sans-serif;
+    font-variant: normal;
+}
+
+/* 17. Table Press-------------------------------------------------------	*/
+
+#secondary ul ul li:before, #secondary-left ul ul li:before {
+	content: none;
+}
+
+/*Tabellen mit 4 gleichmäßigen Spalten*/
+#tablepress-52 .column-1, #tablepress-52 .column-2, #tablepress-52 .column-3, #tablepress-52 .column-4, #tablepress-54 .column-1, #tablepress-54 .column-2, #tablepress-54 .column-3, #tablepress-54 .column-4, 
+#tablepress-55 .column-1, #tablepress-55 .column-2, #tablepress-55 .column-3, #tablepress-55 .column-4 {
+	width: 24%;
+}
+
+/*Erste Zeile fett*/
+#tablepress-52 .row-1 td, #tablepress-53 .row-1 td, #tablepress-54 .row-1 td, #tablepress-55 .row-1 td {
+	font-weight: bold;
+}
+
+/*Tabelle auf Preise Seite*/
+#tablepress-53 .row-2 .column-1, #tablepress-53 .row-2 .column-2, #tablepress-53 .row-2 .column-3, #tablepress-53 .row-3 .column-1, #tablepress-53 .row-3 .column-2, #tablepress-53 .row-3 .column-3, #tablepress-53 .row-4 .column-1, #tablepress-53 .row-4 .column-2, #tablepress-53 .row-4 .column-3, #tablepress-53 .row-5 .column-1, #tablepress-53 .row-5 .column-2, #tablepress-53 .row-5 .column-3 {
+	text-align: center;
+}
+
+
+
+/*Tabelle detaillierte Produktübersicht*/
+
+#tablepress-29, #tablepress-32 {
+	max-width: 100% !important;
+}
+
+#tablepress-29 .column-1, #tablepress-32 .column-1{
+	width: 25%;
+	border-right: 1px solid grey;
+}
+
+#tablepress-29 .column-2, #tablepress-29 .column-3, #tablepress-29 .column-4, #tablepress-29 .column-5, #tablepress-29 .column-6, #tablepress-29 .column-7, #tablepress-32 .column-2, #tablepress-32 .column-1#tablepress-32 .column-3, #tablepress-32 .column-4, #tablepress-32 .column-5, #tablepress-32 .column-6, #tablepress-32 .column-7 {
+	width: 12%;
+}
+
+#tablepress-29 .column-4, #tablepress-32 .column-4 {
+	border-right: 1px solid grey;
+	border-left: 1px solid grey;
+}
+
+
+#tablepress-29 .row-85 .column-1, #tablepress-29 .row-86 .column-1, #tablepress-32 .row-85 .column-1, #tablepress-32 .row-86 .column-1 {
+	border-right: none;
+}
+
+#tablepress-29 .row-2 td, #tablepress-32 .row-2 td {
+	background-color: #d9edf7;
+	height: 12px;
+        line-height: 120%;
+/*	font-size: 80%;*/
+	border-top: none;
+	text-align: center;
+}
+
+#tablepress-29 .row-1 td, #tablepress-32 .row-1 td {
+	background-color: #d9edf7;
+	font-weight: bold;
+	text-align: center;
+        line-height: 120%;
+}
+
+#tablepress-29 .row-3 td, #tablepress-29 .row-14 td,  #tablepress-29 .row-29 td, #tablepress-29 .row-41 td, #tablepress-29 .row-49 td, #tablepress-29 .row-56 td, #tablepress-29 .row-60 td, #tablepress-29 .row-71 td, #tablepress-29 .row-77 td, #tablepress-29 .row-80 td, #tablepress-32 .row-3 td, #tablepress-32 .row-14 td,  #tablepress-32 .row-29 td, #tablepress-32 .row-41 td, #tablepress-32 .row-49 td, #tablepress-32 .row-56 td, #tablepress-32 .row-60 td, #tablepress-32 .row-71 td, #tablepress-32 .row-77 td, #tablepress-32 .row-80 td {
+	background-color: #31708F;
+	color: #ffffff;
+}
+
+
+
+/*Ende Produktübersichtstabelle*/
+
+/*Tabelle Lizenzen*/
+
+#tablepress-30 .column-1,
+#tablepress-31 .column-1,
+#tablepress-33 .column-1,
+#tablepress-40 .column-1,
+#tablepress-34 .column-1
+ {
+	width: 25% !important;
+}
+
+/*#tablepress-30 .row-1 td {
+	font-weight: bold;
+	font-size: 120%;
+}*/
+
+#tablepress-34 .row-6 td,
+#tablepress-34 .row-2 td,
+#tablepress-34 .row-3 td,
+#tablepress-34 .row-5 td {
+	vertical-align: text-top;
+} 
+
+#tablepress-34 .row-3 td,
+#tablepress-34 .row-6 td {
+	border: none;
+} 
+
+
+
+#menu-item-1128 {
+    display:none;
+}
+
+
+.tablepress tbody td {
+    vertical-align: middle;    
+}
+
+.tablepress td, .tablepress th {
+    background-color: #ffffff;
+}
+
+/*Tabellen auf der FAQ-Seite*/
+
+#tablepress-44,
+#tablepress-45,
+#tablepress-47,
+#tablepress-48,
+#tablepress-49 {
+	margin-top: 30px !important;
+	margin-bottom: 30px !important;
+        border: 1px solid #dddddc;
+}
+
+
+/*3 Spalten*/
+#tablepress-44 .column-1, 
+#tablepress-45 .column-1,
+#tablepress-47 .column-1,
+#tablepress-48 .column-1 {
+	width: 25% !important;
+	vertical-align: top;
+}
+
+#tablepress-44 .column-2, 
+#tablepress-45 .column-2,
+#tablepress-47 .column-2,
+#tablepress-48 .column-2,
+#tablepress-44 .column-3, 
+#tablepress-45 .column-3,
+#tablepress-47 .column-3,
+#tablepress-48 .column-3 {
+	width: 37% !important;
+	vertical-align: top;
+}
+
+
+
+/*2 Spalten*/
+#tablepress-49 .column-1 {
+	width: 25% !important;
+	vertical-align: top;
+}
+
+#tablepress-52 {
+	width: 100% !important;
+}
+
+#tablepress-24 {
+	width: 100% !important;
+}
+
+/*Überschriften auf der FAQ-Seite*/
+
+.post-5469 h4, .post-5469 h1, .post-3805 h4, .post-3805 h1  {
+	color: #069;
+}
+
+/* 18. Bilddarstellung-------------------------------------------------------	*/
+
+/*Bildbeschreibung Text verkleinern*/
+.wp-caption .wp-caption-text {
+    font-size: 85%;
+    line-height: 140%;
+}
+
+.wp-caption {
+    margin: auto;
+    padding: 5px;
+    border: none;
+}
+
+/*MA-Fotos sollen nebeneinabder dargestellt werden*/
+
+#post-233 .wp-caption {
+	float: left;
+	margin-right: 28px;
+	margin-bottom: 28px;
+	height: 270px;
+	background-color: #cceaea;
+}
+
+
+
+/* registered trademark */
+.reg {
+	/*font-size:75%;
+	vertical-align:super;
+	text-decoration:none;
+	*/
+	-webkit-font-feature-settings: "sups";
+    -moz-webkit-font-feature-settings: "sups";
+    font-feature-settings: "sups";
+    font-family: Calibri,Candara,Segoe,Segoe UI,Optima,Arial,sans-serif;
+}
+
+.menu-item .reg {
+    display: none;
+}
+
+.site-header {
+	min-width: 100%;
+	background-repeat: no-repeat;
+	background-color: #F7F7F8;
+}
+
+.site-title {
+	padding: 0px;
+	margin-top: 0px;
+}
+
+
+/* 18. Anpassung der Shortcodes Ultimate-------------------------------------------------------	*/
+
+/*Boxen*/
+
+.su-box-title {
+    height: 45px;
+    text-align: center;
+}
+
+.su-box-content {
+    min-height: 220px;
+}
+
+.su-box {
+    margin: 1.5em 0 1.5em;
+    line-height: 1.2em;
+}
+
+.su-button {
+	color: black !important;
+}
+
+/* WUFI Pro Seite Header */
+.su-box-header .su-box-title {
+	display: none !important;
+}
+
+
+/*Reiterdarstellung*/
+
+.su-tabs-nav span {
+  /*  font-weight: bold;*/
+    margin-right: 5px !important;
+    color: #ffffff !important;
+    font-size: 100% !important;
+    border-radius: 3px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    background-color: #848484;
+    width: 15%;
+}
+
+/*Höhe der Tabs*/
+.su-tabs-nav span:after {
+	clear: both;
+}
+
+.su-tabs {
+    background: none !important;
+}
+.su-tabs-pane {
+    background: none repeat scroll 0 0 #CCEAEA !important;
+}
+
+.su-tabs-nav span.su-tabs-current {
+	color: #333333 !important;
+        background-color: #CCEAEA !important;
+}
+
+.su-tabs-nav span:hover {
+      color: #5b5b5b !important;
+}
+
+/*Text einrücken, damits zu Ausklapptext passt*/
+.su-tabs-panes p {
+	padding-left: 30px;
+}
+
+.su-spoiler-style-fancy {
+    border: none !important;
+    background: none !important;
+}
+
+.su-spoiler-style-fancy > .su-spoiler-title {
+    border-bottom: none !important; 
+}
+
+.su-spoiler-style-fancy > .su-spoiler-title {
+    background: none repeat scroll 0 0 transparent !important;
+}
+
+
+/*-----------------------Darstellung der blauen Boxen -----------------------*/
+/* infoboxen gestalten*/
+
+#post-330 .infobox .su-column {
+	height: 600px;
+}
+
+/*Höhe der Zielgruppenboxen auf der WUFI-Passive Seite anpassen*/
+#post-502 .infobox .su-column {
+	height: 900px;
+}
+
+/* Darstellung der Boxen mit Spalten aber von unterschiedlichen Klassen */
+.infobox-update-1 .su-column, .infobox-update-2 .su-column, .infobox .su-column, .home .su-column, .infobox-plus .su-column {
+	background-color: #cceaea;
+	margin-left: 0px !important;
+	margin-right: 5px !important;
+	position: relative;
+	height: 450px;
+	padding: 10px 5px 5px;
+	font-weight: normal !important;
+	text-align: left;
+
+}
+
+/* Höhe und Breite der Boxen bei der Update-Übersicht */
+.infobox-update-1 .su-column {
+	height: auto;
+}
+
+.infobox-update-2 .su-column {
+	height: 150px;
+}
+
+.infobox-update-1 .su-column-size-1-4, .infobox-update-2 .su-column-size-1-4 {
+    min-width: 24.5% !important;
+    margin-bottom: 15px !important;
+}
+
+
+.home .su-row {
+	padding-bottom: 20px;
+}
+
+.home .su-column {
+	min-height: 550px;
+	padding: 10px 14px 14px;
+	text-align: justify;
+	border: 1px solid #DBDBDB;
+}
+
+.infoline {
+    background-color: #cceaea;
+    padding: 10px 5px 5px;
+    margin-left: 5px;
+    margin-left: 0px;
+    font-weight: 300 !important;
+    text-align: left;
+    min-height: 150px;
+}
+
+.infobox .su-column-size-1-4 {
+    min-width: 24.25% !important;
+    max-width: 260px;
+}
+
+.infobox .su-column-size-1-3 {
+    min-width: 32.6%;
+    max-width: 450px;
+}
+
+.home .su-column-size-1-2 {
+    max-width: 450px;
+    min-width: 200px;
+}
+
+.infobox p {
+	margin-bottom: 16px !important;
+	line-height: 16px;
+}
+
+
+/*richtige Darstellung der Bilder in den blauen Boxen*/
+
+.infobox .su-column img {
+	/*padding: 45px 0px !important;*/
+	/*position: absolute;*/
+	top: 50px;
+}
+.infobox .su-column img:after {
+	clear: both;
+}
+
+.infoline {
+	margin-left: 0px !important;
+	margin-right: 5px !important;
+}
+
+
+
+/*Design der blauen Boxen*/
+
+.infobox .su-column p, .infoline, .home {
+    margin-bottom: 5px;
+    /*font-family: Arial Narrow, Arial, Sans serif;*/
+    /*font-weight: bold;*/
+    /*position: absolute;*/
+    top: 300px;
+}
+
+/*Erzeugt gleichen Abstand der Bilder in den Boxen von oben, indem für die Überschrift eine feste Höhe definiert wird */
+
+.infobox h3 {
+	height: 60px;	
+}
+
+
+.infoline h {
+	font-weight: bold;
+}
+
+
+.su-row {
+    clear: both;
+    margin-bottom: 5px !important;
+}
+
+.su-expand-link {
+    padding-left: 30px;
+}
+
+/* 19. Darstellung der Beiträge-------------------------------------------------------	*/
+
+
+
+.post-content {
+   margin-top: 15px;
+   min-height: 120px;
+}
+
+footer.entry-meta {
+   display: none;
+}
+
+#primary .byline {
+   display: none;
+}
+
+/*Unterdrückt Datumsanzeige in der Beitragsansicht*/
+.category-allgemein .posted-on, .category-programmerweiterungen .posted-on, .category-anwendung .posted-on, .category-validierung .posted-on {
+   display: none;
+}
+
+/*Ermöglicht Datumsanzeige bei News-Beiträgen*/
+.category-news .posted-on {
+   display: inline;}
+
+/*Unterdrückt Anzeige des Bildes (Anzeige nur in Teaser auf Startseite*/
+#post-6345 img, #post-4128 img {
+	display: none;
+}
+
+
+
+/*20. Darstellung auf mobilen Endgeräten__________________________________________________________*/
+
+
+/*Tablets (Portrait)*/
+
+@media only screen and
+(min-device-width:768px) and
+(max-device-width:1024px) and
+(orientation:portrait){
+	#secondary {
+		width: 100%;
+	}
+}
+
+/*Tablets (Landscape)*/
+
+@media only screen and
+(min-device-width:768px) and
+(max-device-width:1024px) and
+(orientation: landscape){}
+
+/*Smartphones*/
+
+@media only screen and
+(min-device-width:320px) and
+(max-device-width:650px){ /*früher 480px*/
+	#primary {
+		width: 100%;
+	}
+	.entry-content {
+		*max-width: 100%;
+		font-size: 130%;
+		text-align: left !important;
+	}
+	.csColumn{
+		display: block;
+		margin: 0 !important;
+		text-align: none !important;
+	}
+	/*.widget_mslswidget a {
+		font-size: 150%;
+		color: red;
+	}*/
+	.textwidget {
+		font-size: 150%;
+	}
+	#secondary h1.widget-title, #secondary-left h1.widget-title, .single .entry-h1 h1, .entry-title, .page 	  .entry-h1 .entry-title, .page .entry-h1 h1 {
+		font-size: 250%;
+	}
+	button, input, select, textarea {
+		font-size: 180% !important;
+		height: auto;
+	}
+	.mobileMenu{
+		height: auto;
+		width: 100%;
+	}
+	#primary-nav-wrapper {
+		height: 80px;
+	}
+	#secondary {
+		width: 100%;
+	}
+	#colophon a {
+		font-size: 180%;
+	}
+	.su-box-title {
+		height: auto;
+	}
+	.su-button span {
+ 		  text-transform: none !important;
+		  font-size: 120% !important;
+		vertical-align: middle !important;
+		/*padding-top: 40px !important;*/
+		
+	}
+	.fa-angle-double-right:before {
+		font-size: 160% !important;
+
+	}
+	.su-tabs-nav, .su-tabs-nav span, .su-tabs-panes, .su-tabs-pane {
+		font-size: 90% !important;
+	}
+	.keyword-filter, .language-filter {
+		font-size: 90% !important;
+	}
+	span.column-11 img, a.column-12 img, a.column-13 img, #tablepress-form img  {
+		height: 20px;
+	}
+	.top-bar-content {
+		margin-top: 5px;
+	}
+	.mobileMenu {
+		/*width: 50%;*/
+	}
+	.infobox .su-column {
+		height: auto;
+		background-color: #cceaea;
+	}
+	.home .su-column {
+		height: auto !important;
+	}
+	.infoline {
+		max-width: 450px !important;
+	}
+	.su-column {
+		text-align: left !important;
+	}
+
+
+}
+
+@media only screen and
+(min-device-width:320px) and
+(max-device-width:480px) and
+(orientation: portrait){
+	page {
+		width: 100%;
+	}
+	#mobileMenu {
+		max-width: 5px;
+	}
+}
+
+
+
+@media only screen and
+(min-device-width:480px) and
+(max-device-width:600px) {
+	.site-title {
+		padding: 0px;
+		margin-top: 12px;
+	}
+}
+/*@media (max-device-width:991px) {
+	#secondary {
+		width: 100%;
+	}
+}*/
+
+/*------------------------------------------Sonstiges---------------------------------------------------*/
+
+.fa-clock-o:before {
+	display: none !important;
+}
+
+h5, .h5, article h5 {
+	color: #444444;
+}
+
+/*ANpassungen für Filterbox bei Literatur*/
+fieldset {
+	margin: 7px 15px 13px 0px !important;
+	min-width: 100%;
+}
+
+#input_All {
+	margin-bottom: 5px;
+}
+
+/*Ende: ANpassungen für Filterbox bei Literatur*/
+
+legend {
+	font-weight: bold;
+}
+
+#masthead {
+    margin: 0px;
+}
+
+hr {
+	border: none;
+	background-color: transparent !important;
+	border-bottom: 3px double #D9D9D9 !important;
+}
+
+
+/*Rahmen um Widgets*/
+
+/*Rahmen um Twitter Widget auf englischer Seite entfernen*/
+
+
+#secondary .widget, #secondary-left .widget {
+    border: 1px solid #dbdbdb;
+/*    border-radius: 8px !important;*/
+ /*   box-shadow: 1px 1px 5px 1px #999999;*/
+    margin-top: 4px !important;
+    padding: 5px !important;
+    text-align: left;
+}
+
+/*.wp-caption img[class*="wp-image-"] {
+	border: 1px solid grey;
+}*/
+
+.wp-caption {
+/*	border: 1px solid grey;*/
+	margin-bottom: 5px;
+}
+#post-233 .wp-caption, #post-233 .wp-caption img[class*="wp-image-"] {
+	border: none;
+}
+
+.add_posts_content strong {
+	font-weight: normal;
+}
+
+.add_posts_content .alignleft {
+	width: 150px;
+	height: auto;
+}
+
+article table {
+	background-color: #E9EFF2 ;
+
+}
+
+article table td {
+	border-color: white;
+}
+
+/* Zeige leeres Text-Widget nicht an (dient nur dazu, dass nicht automatisch Widgets eingefügt werden, wenn selbst keins eingefügt wird)*/
+#text-18 {
+	display: none;
+}
+
+alignleft wp-image-1377 size-full {
+	margin: 0 !important;
+}
+
+.shortcodes-ultimate {
+	border: none !important;
+	box-shadow: none !important;
+}
+
+/*Verringere den Abstand zwischen den Widgets*/
+#secondary .widget > div, #secondary-left .widget > div {
+    padding: 0px;
+    padding-bottom: 7px;
+}
+
+/*.shortcodes-ultimate {
+    margin-left: -5px !important;
+}*/
+
+#shortcodes-ultimate-3 {
+    border: 1px solid #dbdbdb !important;
+    /*box-shadow: 2px 2px 2px 2px #808080 !important;*/
+}
+
+
+
+.smalltitle {
+	font-size: 70%;
+	text-decoration: none !important;
+}
+
+/*Widget auf Literatur/Filterfunktionen anpassen*/
+#text-21 {
+	height: 460px;
+}
+
+
+.input_field {
+	float: none;
+	margin-bottom: 3px;
+}
+
+/*richtige Darstellung der Reiter*/
+.su-tabs-nav {
+    display: table;
+    border-spacing: 3px 0;
+    width: 100%;
+}
+
+.su-tabs-nav span {
+    display: table-cell !important;
+    width: auto;
+}
+
+
+
+/*Bei Videos keine Leiste oben für Social PLugins anzeigen*/
+
+.fvp-share-bar {
+	display: none !important;
+}
+
+.banner {
+    margin: -10px -14px 14px !important;
+}
+
+/*Suchfeld anpassen*/
+
+#search-4, #search-3 {
+	border: none !important;
+	box-shadow: none !important;
+	margin-bottom: 0 !important;
+}
+
+.row .search-form {
+	margin-left: -30px !important;
+}
+
+/*
+.search-field {
+	margin-left: 0px !important;
+
+}
+
+
+#secondary .widget_search input[type="text"], #secondary-left .widget_search input[type="text"] {
+	margin-left: 5px;
+
+}
+
+.su-button-wide {
+	margin: 0px;
+}*/
+
+#tablepress-1 {
+	display: none;
+}
+
+
+
+a strong .reg {
+    vertical-align: text-bottom;
+}
+
+/*Zeige bei einzelnen Beiträgen das rest Foto (links ausgerichtet) nur in der Teaser-Übersicht an, nicht aber im Beitrag selber) (Anwendungsbeispiele)*/
+#post-2779 .alignleft, #post-2779 .alignleft, #post-3658 .alignleft, #post-4718 .alignleft {
+    display: none;
+}
+
+/*Darstellung der Partner Logos auf der Partner-Seite*/
+#post-108 img {
+	box-shadow: 1px 1px 4px #a9a9a9 !important;
+	margin-right: 20px;
+}
+
+
+
+
+/*Druckausgabe*/
+
+@media print {
+	#primary-nav-wrapper {
+		display: none;
+	}
+	a[href]:after {
+    		content: none !important;
+  	}
+	.site-header {
+		display: block !important;
+		background-image: url("/de/wp-content/uploads/sites/9/2015/04/Header-WUFI-21.png");
+    		background-position: left center;
+	}
+	.site-header {
+		display: none !important;
+	}
+	.breadcrumbs {
+		display: block !important;
+	}
+	h1, h2, h3, h4, h5, h6 { 
+		page-break-inside:avoid !important; 
+	}
+	img { 
+		page-break-inside:avoid !important; 
+	}
+	blockquote, table, pre { 
+		page-break-inside:avoid !important; 
+	}
+	ul, ol, dl  { 
+		page-break-before:avoid !important; 
+	}
+}
+
+
+/*Sonderregeln zur Darstellung des Webshops während des AKtionszeitraums*/
+
+/*Sonderregeln für FAQs
+.post-5469 .tablepress, .post-5469 .fa, .post-5469 a, .post-3805 .tablepress, .post-3805 .fa, .post-3805 a {
+	margin-left: 30px;
+}
+
+*/
+
+.post-5469 .tablepress, .post-5469 .fa, .post-5469 .su-list a, .post-3805 .tablepress, .post-3805 .fa, .post-3805 .su-list a {
+	margin-left: 30px;
+}
+
+/*Sonderregeln Jubiläumsbanner*/
+
+#text-36 {
+	border: none !important;
+}
+
+#text-33 {
+	border: none !important;
+}
+/* Newsletter */
+
+#text-40 {
+	border: none !important;
+}
+
+#text-34 {
+	border: none !important;
+}
+
+/*Höhe des masthead festlegen um Flaggenspringen zu verhinder*/
+.site-header {
+	min-height: 95px;
+}
+
+/*Abstand bei mittigen Bildern*/
+
+.aligncenter {
+	margin: 20px auto;
+}
+
+/*Bild in der News nicht anzeigen - nur in Nesübersicht*/
+
+#post-5813 img {
+	display: none;
+}
+
+/*Ausklappen darstellen wie Aufzählung auf der Seite Workshops*/
+.post-192 .su-expand-link {
+	padding-left: 5px;
+}
+
+.post-192 .su-expand-link i {
+	padding-right: 12px;
+}
+
+/*Gestaltung der Link-Boxen auf den Landingpages*/
+.su-button-link {
+    background-color: #cceaea !important;
+    float: left;
+    height: 60px;
+    margin-bottom: 10px;
+    margin-left: 11px;
+    margin-right: 11px;
+    width: 30% !important;
+    line-height: 50 !important;
+    padding-top: 10px;
+}
+
+.su-button-link span {
+    font-size: 18px !important;
+    hyphens: auto;
+}
+
+/*Gestlatung der Boxen innerhalb der Slider-boxen auf Startseite*/
+
+.slider_titel_h1 {
+    font-size: 20px;
+    font-weight: bold ;
+    font-family: Helvetica;
+	padding-bottom: 20px;
+}
+
+.slider_titel_text {
+    font-size: 18px;
+}
+
+
+.su-slider-slide-title {
+    width: 400px;
+    height: 150px;
+    left: 140px !important;
+	padding: 20px !important;
+    text-align: center;
+}
+
+/* +-Symbol an Galerie-Bildern */
+.su-custom-gallery-slide a::after {
+   content : '+';
+   text-align : center;
+   line-height : 1em;
+   letter-spacing : 0em;
+   color : #fff;
+   background-color : #069;
+   position : absolute;
+   top : 0em;
+   right : 0em;
+   padding : 0.1875em 0.25em;
+   z-index : 100;
+}
+.su-custom-gallery-slide a:hover::after {
+   background-color : #099;
+}
