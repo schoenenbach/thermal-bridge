@@ -19,111 +19,44 @@ import yaml
 # --- Scenarios ---
 def get_scenarios():
     configs = []
-    # Common Parameters
-    GRID = 2.5 # 2.5mm Grid for faster runs (was 1.0mm)
     
-    # 1. 360mm Wall, No Insulation
-    configs.append({
-        "name": "Scenario 1: Wall 360mm (No Ins)",
-        "file_suffix": "scenario_1",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=0, insulation_thick_min_mm=0,
-            reveal_insulation_mm=0, taper_length_mm=0, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID
-        )
-    })
+    # Discovery from scenarios/ directory
+    import glob
+    import os
+    import re
     
-    # 2. 450mm Wall, No Insulation
-    configs.append({
-        "name": "Scenario 2: Wall 450mm (No Ins)",
-        "file_suffix": "scenario_2",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=450, insulation_thick_max_mm=0, insulation_thick_min_mm=0,
-            reveal_insulation_mm=0, taper_length_mm=0, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID
-        )
-    })
+    # Match scenario_*.yaml
+    yaml_files = glob.glob("scenarios/scenario_*.yaml")
     
-    # 3. 360mm Wall, Ext Ins 200mm, Taper 150mm No Reveal Ins
-    configs.append({
-        "name": "Scenario 3: Wall 360mm (Ext Ins, No Rev)",
-        "file_suffix": "scenario_3",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=0, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID
-        )
-    })
+    # Sort by number: scenario_1.yaml -> 1
+    def extract_num(fname):
+        match = re.search(r"scenario_(\d+)", fname)
+        return int(match.group(1)) if match else 999
+        
+    yaml_files.sort(key=extract_num)
     
-    # 4. 450mm Wall, Ext Ins 200mm, Taper 150mm No Reveal Ins
-    configs.append({
-        "name": "Scenario 4: Wall 450mm (Ext Ins, No Rev)",
-        "file_suffix": "scenario_4",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=450, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=0, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID
-        )
-    })
-    
-    # 5. 360mm Wall, Full Ins (Ext 200mm + Reveal 30mm)
-    configs.append({
-        "name": "Scenario 5: Wall 360mm (Full Ins)",
-        "file_suffix": "scenario_5",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=30, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID
-        )
-    })
-    
-    # 6. 450mm Wall, Full Ins (Ext 200mm + Reveal 30mm)
-    configs.append({
-        "name": "Scenario 6: Wall 450mm (Full Ins)",
-        "file_suffix": "scenario_6",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=450, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=30, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID
-        )
-    })
-
-    # 7. 360mm Wall, Full Ins (Styrodur Variant)
-    configs.append({
-        "name": "Scenario 7: Wall 360mm (Styrodur Variant)",
-        "file_suffix": "scenario_7_styrodur",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=30, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID,
-            use_styrodur_variant=True
-        )
-    })
-
-    # 8. 360mm Wall, Styrodur Taper, No Reveal Ins
-    configs.append({
-        "name": "Scenario 8: Wall 360mm (Styrodur, No Rev)",
-        "file_suffix": "scenario_8_styrodur_norev",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=0, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=True, grid_size_mm=GRID,
-            use_styrodur_variant=True
-        )
-    })
-
-    # 9. 360mm Wall, Reveal 10mm (Thin Reveal Ins)
-    configs.append({
-        "name": "Scenario 9: Wall 360mm (10mm Reveal Ins)",
-        "file_suffix": "scenario_9_thin_reveal",
-        "cfg": CalculationConfig(
-            wall_thickness_mm=360, insulation_thick_max_mm=200, insulation_thick_min_mm=100,
-            reveal_insulation_mm=10, taper_length_mm=150, window_position_from_exterior_masonry_mm=150,
-            masonry_rebate_overlap_mm=50, uninsulated_reveal=False, grid_size_mm=GRID,
-            use_styrodur_variant=True
-        )
-    })
-
+    for fpath in yaml_files:
+        fname = os.path.basename(fpath).replace('.yaml', '')
+        # Read name from YAML content for better display?
+        # Or just use filename?
+        # Let's peek at name field
+        name = fname
+        try:
+            with open(fpath, 'r') as f:
+                # Read first few lines or safe load
+                # safe_load is fine
+                data = yaml.safe_load(f)
+                if 'name' in data:
+                    name = data['name']
+        except Exception as e:
+            print(f"[WARNING] Failed to parse name from {fpath}: {e}")
+            
+        configs.append({
+            "name": name,
+            "file_suffix": fname,
+            "cfg": fpath
+        })
+        
     return configs
 
 # --- Solver Core ---
@@ -513,7 +446,13 @@ def generate_geometries():
         cfg = sc['cfg']
         
         # Instantiate
-        geom = WindowRevealGeometry(cfg)
+        if isinstance(cfg, str) and cfg.endswith('.yaml'):
+            with open(cfg, 'r') as f:
+                data = yaml.safe_load(f)
+            geom = DeclarativeGeometry(data)
+        else:
+            geom = WindowRevealGeometry(cfg)
+            
         mesh = AdaptiveMesh(geom)
         mesh.generate()
         

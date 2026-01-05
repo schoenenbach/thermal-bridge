@@ -7,7 +7,7 @@ import yaml
 import os
 import re
 from typing import Dict, Any, List, Union
-from geometry import SketchGeometry, MaterialID
+from geometry import SketchGeometry, MaterialID, RefinementZone
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
     MAT_SPACER_SWISS_ULTIMATE, MAT_SPACER_STAINLESS, MAT_SPACER_ALUMINUM, MAT_STYRODUR,
@@ -215,5 +215,28 @@ class DeclarativeGeometry(SketchGeometry):
                     name=name
                 )
             
-            else:
-                print(f"[WARNING] Unknown element type: {el_type}")
+    def get_refinement_zones(self) -> List[RefinementZone]:
+        zones_data = self.data.get('refinement_zones', [])
+        zones = []
+        for z in zones_data:
+            zones.append(RefinementZone(
+                x_min=float(z.get('x_min', 0)),
+                x_max=float(z.get('x_max', 0)),
+                y_min=float(z.get('y_min', 0)),
+                y_max=float(z.get('y_max', 0)),
+                target_dx=float(z.get('target_dx', 1.0)),
+                target_dy=float(z.get('target_dy', z.get('target_dx', 1.0))),
+                priority=int(z.get('priority', 0))
+            ))
+        
+        # Add default hardcoded zones if none provided? No, declarative should be explicit.
+        # But if we are running specific legacy scenarios ported to YAML, we might want to manually include them in YAML.
+        return zones
+
+    def get_boundary_conditions(self) -> dict:
+        # Check if YAML has explicit BCs
+        if 'boundary_conditions' in self.data:
+            return self.data['boundary_conditions']
+            
+        # Fallback for Window Scenarios (Standard)
+        return super().get_boundary_conditions()

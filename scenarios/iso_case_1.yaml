@@ -1,0 +1,27 @@
+name: "ISO Case 1: Half Column"
+description: "ISO 10211 Test Case 1"
+
+canvas:
+  bounds: [0, 200, 0, 400]
+  grid: 1.0
+
+boundary_conditions:
+  dirichlet:
+    top: 20.0
+    right: 0.0
+    bottom: 0.0
+  adiabatic: [left]
+  # surface_resistance empty implies defaults (none if not specified?)
+  # logic in solver depends on keys. empty dict is fine.
+  surface_resistance: {}
+
+elements:
+  - type: rect
+    name: "SolidColumn"
+    material: 100
+    lambda: 0.1
+    params:
+       x: 0.0
+       y: 0.0
+       width: 200.0
+       height: 400.0

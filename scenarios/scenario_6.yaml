@@ -1,0 +1,185 @@
+name: "Scenario 6: Wall 450mm (Full Ins)"
+description: "Reference Scenario: 450mm Wall, Full Insulation"
+
+variables:
+  # Geometry Config
+  wall_thick: 450.0
+  ins_thick_max: 200.0
+  ins_thick_min: 100.0
+  reveal_ins_mm: 30.0
+  taper_len: 150.0
+  win_pos: 150.0
+  rebate_overlap: 50.0
+  
+  # Offsets
+  off_x: 50.0
+  off_y: 250.0
+  
+  # Canvas
+  grid_size: 2.5
+  
+  # Derived
+  x_wall_int: 50.0
+  x_wall_ext: 500.0 
+  x_win_outer: 350.0 
+  
+  y_bottom: 0.0
+  y_reveal: 250.0
+  y_top: 500.0
+  
+  x_f_start: 280.0
+  y_sash_start: 310.0
+  y_sash_end: 380.0
+  x_sash_start: 250.0
+  x_glass_start: 273.0
+  
+  # Reveal Shift (30mm)
+  reveal_shift: 30.0
+  y_reveal_shifted: 220.0
+
+  # Window details
+  f_depth: 70.0
+  f_width: 70.0
+  sash_overlap: 10.0
+  sash_depth: 70.0
+  sash_width: 70.0
+  sash_recess: 30.0
+  glass_thick: 24.0
+
+canvas:
+  bounds: [0, 750, 0, 500] 
+  grid: ${grid_size}
+
+points:
+  AirInt_BL: [0.0, "${y_bottom}"]
+  Wall_BL: ["${x_wall_int}", "${y_bottom}"]
+  Wall_TL: ["${x_wall_int}", "${y_reveal}"]
+  Frame_BL: ["${x_f_start}", "${y_reveal}"]
+  Frame_Int_Step: ["${x_f_start}", "${y_sash_start}"]
+  Sash_BL: ["${x_sash_start}", "${y_sash_start}"]
+  Sash_TL: ["${x_sash_start}", "${y_sash_end}"]
+  Sash_Glass_Step: ["${x_glass_start}", "${y_sash_end}"]
+  Glass_TL: ["${x_glass_start}", "${y_top}"]
+  AirInt_TopLeft: [0.0, "${y_top}"]
+
+  # Reveal Ins Points
+  RevIns_BL: ["${x_win_outer}", 270.0]
+  RevIns_BR: [600.0, 270.0] # 500 + 100
+  RevIns_TR: [580.0, 300.0] # 600 - 20, 270+30
+  RevIns_TL: ["${x_win_outer}", 300.0]
+
+elements:
+  - type: polygon
+    name: "Interior Air Polygon"
+    material: AIR_INT
+    points: 
+      - AirInt_BL
+      - Wall_BL
+      - Wall_TL
+      - Frame_BL
+      - Frame_Int_Step
+      - Sash_BL
+      - Sash_TL
+      - Sash_Glass_Step
+      - Glass_TL
+      - AirInt_TopLeft
+
+  # Wall (Interior Part)
+  - type: wall
+    params:
+      x: ${x_wall_int}
+      y: ${y_bottom}
+      width: 300.0 
+      height: ${y_reveal}
+
+  # Wall (Exterior/Reveal Part)
+  - type: wall
+    params:
+      x: ${x_win_outer}
+      y: ${y_bottom}
+      width: 150.0 
+      height: ${y_reveal_shifted}
+
+  # Rebate
+  - type: rect
+    name: "Rebate"
+    material: WALL
+    params:
+      x: ${x_win_outer}
+      y: ${y_reveal_shifted}
+      width: 150.0 
+      height: ${rebate_overlap}
+
+  # Ext Insulation (Tapered)
+  - type: insulation_tapered
+    material: INSULATION
+    params:
+      x_base: ${x_wall_ext}
+      y_bottom: ${y_bottom}
+      y_top: 270.0 # 220+50
+      thick_main: ${ins_thick_max}
+      thick_taper: ${ins_thick_min}
+      taper_start_y: 120.0
+      
+  # Reveal Insulation
+  - type: polygon
+    name: "Reveal Insulation"
+    material: REVEAL_INS
+    points: [RevIns_BL, RevIns_BR, RevIns_TR, RevIns_TL]
+
+  # Window Assembly
+  - type: window_detail
+    params:
+      x_frame_start: ${x_f_start}
+      y_frame_start: ${y_reveal}
+      frame_depth: ${f_depth}
+      frame_width: ${f_width}
+      sash_depth: ${sash_depth}
+      sash_width: ${sash_width}
+      sash_overlap: ${sash_overlap}
+      sash_recess: ${sash_recess}
+      glass_thickness: ${glass_thick}
+      y_top: ${y_top}
+      
+  # Shutter Rails
+  - type: rect
+    name: "ISG_Alu"
+    material: ALUMINUM
+    params:
+       x: 350.0
+       y: 303.0
+       width: 22.0
+       height: 53.0
+  - type: rect
+    name: "ISG_Air"
+    material: CAVITY
+    params:
+       x: 352.0
+       y: 305.0
+       width: 18.0
+       height: 49.0
+  - type: rect
+    name: "ISG_Seal"
+    material: AIR_EXT
+    lambda: 0.25
+    params:
+       x: 372.0
+       y: 303.0
+       width: 1.0
+       height: 53.0
+  - type: rect
+    name: "Shutter_Alu"
+    material: ALUMINUM
+    params:
+       x: 373.0
+       y: 303.0
+       width: 22.0
+       height: 53.0
+  - type: rect
+    name: "Shutter_Air"
+    material: CAVITY
+    params:
+       x: 375.0
+       y: 305.0
+       width: 18.0
+       height: 49.0

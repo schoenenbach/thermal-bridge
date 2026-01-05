@@ -8,22 +8,20 @@ Usage:
     python3 run_iso_tests.py [1|2|all]
 """
 
-import argparse
+import yaml
+import os
 import sys
-import time
 import numpy as np
 
 # Local imports
 from geometry import build_material_grid
 from mesh import UniformMesh, AdaptiveMesh
-from geometries.iso_case1 import ISOCase1Geometry
-from geometries.iso_case2 import ISOCase2Geometry
+from declarative_geometry import DeclarativeGeometry
 from solver import (
     get_solver_lib,
     solve,
     plot_temperature_map
 )
-
 
 def calculate_conductances(cond, dx_in, dy_in):
     """Wrapper for conductance calculation using updated solver logic."""
@@ -47,20 +45,26 @@ def calculate_conductances(cond, dx_in, dy_in):
 def run_case_1(use_adaptive=False):
     """Run ISO 10211 Test Case 1 using new geometry structure."""
     print("\n" + "="*60)
-    print("ISO 10211 Test Case 1: 2D Half Column (Refactored)")
+    print("ISO 10211 Test Case 1: 2D Half Column (YAML)")
     if use_adaptive:
         print("Mesh Type: AdaptiveMesh")
     else:
         print("Mesh Type: UniformMesh")
     print("="*60)
     
-    # Create geometry and mesh
-    geometry = ISOCase1Geometry(grid_mm=1.0)
+    # Load YAML
+    fpath = os.path.abspath("scenarios/iso_case_1.yaml")
+    with open(fpath, 'r') as f:
+        data = yaml.safe_load(f)
+    geometry = DeclarativeGeometry(data)
+    
+    # Extract grid size from geometry
+    grid_mm = geometry.get_canvas_config().default_dx_mm
     
     if use_adaptive:
         mesh = AdaptiveMesh(geometry)
     else:
-        mesh = UniformMesh(geometry, grid_size_mm=1.0)
+        mesh = UniformMesh(geometry, grid_size_mm=grid_mm)
         
     mesh.generate()
     
@@ -217,20 +221,39 @@ def probe_temperature(mesh, temp_padded, cond, x, y):
 def run_case_2(use_adaptive=False):
     """Run ISO 10211 Test Case 2 using new geometry structure."""
     print("\n" + "="*60)
-    print("ISO 10211 Test Case 2: Multi-Material Bridge (Refactored)")
+    print("ISO 10211 Test Case 2: Multi-Material Bridge (YAML)")
     if use_adaptive:
         print("Mesh Type: AdaptiveMesh")
     else:
         print("Mesh Type: UniformMesh")
     print("="*60)
     
-    # Create geometry and mesh
-    geometry = ISOCase2Geometry(grid_mm=0.25)
+    # Load YAML
+    fpath = os.path.abspath("scenarios/iso_case_2.yaml")
+    with open(fpath, 'r') as f:
+        data = yaml.safe_load(f)
+    geometry = DeclarativeGeometry(data)
+    
+    # Extract RSi/RSe from YAML data
+    rsi = 0.11
+    rse = 0.06
+    try:
+        bcs = data.get('boundary_conditions', {})
+        conv = bcs.get('convective', {})
+        if 'bottom' in conv:
+            rsi = float(conv['bottom']['R'])
+        if 'top' in conv:
+            rse = float(conv['top']['R'])
+    except Exception as e:
+        print(f"[WARNING] Could not parse RSI/RSE from YAML, using defaults: {e}")
+        
+    # Extract grid size from geometry
+    grid_mm = geometry.get_canvas_config().default_dx_mm
     
     if use_adaptive:
         mesh = AdaptiveMesh(geometry)
     else:
-        mesh = UniformMesh(geometry, grid_size_mm=0.25)
+        mesh = UniformMesh(geometry, grid_size_mm=grid_mm)
         
     mesh.generate()
     
@@ -273,7 +296,7 @@ def run_case_2(use_adaptive=False):
     # Link index 0 in Gv connects row 0 and row 1.
     # G = Area / R = (dx * 1) / RSI
     dx_m = dx_array / 1000.0
-    Gv_p[0, :] = dx_m / geometry.rsi
+    Gv_p[0, :] = dx_m / rsi
     
     # Top Boundary (Row NY -> Row NY+1): Surface Resistance RSE
     # Row NY is Exterior Surface, Row NY+1 is Air (0C).
@@ -282,7 +305,7 @@ def run_case_2(use_adaptive=False):
     # Gv has size (ny_p, nx). Valid links 0..ny_p-2.
     # We want link connecting index (ny_p-2) and (ny_p-1).
     # That is index ny_p-2.
-    Gv_p[ny_p-2, :] = dx_m / geometry.rse
+    Gv_p[ny_p-2, :] = dx_m / rse
     
     # Disable lateral flow in air layers to prevent short circuits
     Gh_p[0, :] = 0.0
@@ -377,8 +400,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run ISO 10211 Tests (Refactored)')
     parser.add_argument('test', nargs='?', default='all', choices=['1', '2', 'all'],
                         help='Test case to run (1, 2, or all)')
-    parser.add_argument('--mesh', default='uniform', choices=['uniform', 'adaptive'],
-                        help='Mesh type to use (default: uniform)')
+    parser.add_argument('--mesh', default='adaptive', choices=['uniform', 'adaptive'],
+                        help='Mesh type to use (default: adaptive)')
     args = parser.parse_args()
     
     # Initialize solver (lazy loading handled by get_solver_lib)
