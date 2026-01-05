@@ -152,7 +152,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 
 ---
 
-## 12. UI Validation Layer [WIP]
+## 12. UI Validation Layer [DONE]
 
 **Objective:** Provide real-time schema validation feedback in the Streamlit editor.
 
@@ -162,7 +162,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 - [x] Show element-specific hints (e.g., "rect requires x, y, width, height")
 
 **Remaining Tasks:**
-- [ ] Color-code YAML text area based on validity (green/red border)
+- [x] Color-code YAML text area based on validity (green/red border)
 
 **Effort Estimate:** 1-2 hours remaining
 

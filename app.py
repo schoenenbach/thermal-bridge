@@ -120,6 +120,18 @@ with tab_studio:
         from ui_validation import validate_scenario_yaml, get_element_hints
         validation_res = validate_scenario_yaml(yaml_input)
         
+        # Dynamic CSS for validation feedback
+        # Green (#28a745) for valid, Red (#dc3545) for invalid
+        border_color = "#28a745" if validation_res.is_valid else "#dc3545"
+        st.markdown(f"""
+        <style>
+            div[data-testid="stTextArea"] textarea {{
+                border: 2px solid {border_color} !important;
+                box-shadow: 0 0 5px {border_color}33; 
+            }}
+        </style>
+        """, unsafe_allow_html=True)
+        
         if validation_res.is_valid:
             active_data = validation_res.data
             active_name = active_data.get('name', "Custom")
