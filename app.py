@@ -91,7 +91,7 @@ grid_override = st.sidebar.number_input("Override Grid Size (mm)",
 
 # --- Main Editor Area ---
 # --- Main Area Tabs ---
-tab_editor, tab_builder, tab_opt = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization"])
+tab_editor, tab_builder, tab_opt, tab_compare = st.tabs(["Scenario Editor", "Geometry Builder", "Optimization", "Compare"])
 
 with tab_builder:
     st.header("Interactive Geometry Builder")
@@ -657,6 +657,224 @@ with tab_opt:
                 st.error(msg)
         else:
             st.warning("Please run the simulation first to generate results.")
+
+with tab_compare:
+    st.header("Side-by-Side Comparison")
+    st.info("Select two scenarios to compare their thermal performance and temperature fields.")
+
+    comp_col1, comp_col2 = st.columns(2)
+    
+    # helper to find file
+    def get_scen_path(name):
+        if name == "(New Empty)": return None
+        try:
+            # Reconstruct path logic same as sidebar
+            # scenario_files is available in global scope of script
+            idx = display_names.index(name) - 1
+            if 0 <= idx < len(scenario_files):
+                return scenario_files[idx]
+        except:
+            pass
+        return None
+
+    with comp_col1:
+        st.subheader("Reference Scenario")
+        # Default to first available
+        r_idx = 1 if len(display_names) > 1 else 0
+        ref_sel = st.selectbox("Select Reference", display_names, index=r_idx, key="comp_ref")
+        
+    with comp_col2:
+        st.subheader("Proposed Scenario")
+        # Default to second available or same
+        p_idx = 2 if len(display_names) > 2 else r_idx
+        prop_sel = st.selectbox("Select Proposed", display_names, index=p_idx, key="comp_prop")
+        
+    if st.button("Run Comparison", type="primary"):
+        ref_path = get_scen_path(ref_sel)
+        prop_path = get_scen_path(prop_sel)
+        
+        if not ref_path or not prop_path:
+            st.error("Please select valid scenarios (not New Empty).")
+        else:
+            # Run Simulations
+            # We need to run them one by one.
+            import pandas as pd
+            
+            res_ref = None
+            res_prop = None
+            
+            try:
+                # 1. Reference
+                with st.spinner(f"Simulating Reference: {ref_sel}..."):
+                     # Load config
+                     with open(ref_path, 'r') as f:
+                        cfg_ref = yaml.safe_load(f)
+                        
+                     # Unique name to avoid overwrite
+                     ref_run_name = f"{ref_sel}_REF"
+                     cfg_ref['name'] = ref_run_name
+                        
+                     defprog = {"name": ref_run_name, "file_suffix": "ref", "cfg": cfg_ref}
+                     res_ref = solve_scenario(defprog, use_adaptive_mesh=True)
+                
+                # 2. Proposed
+                with st.spinner(f"Simulating Proposed: {prop_sel}..."):
+                     with open(prop_path, 'r') as f:
+                        cfg_prop = yaml.safe_load(f)
+                        
+                     prop_run_name = f"{prop_sel}_PROP"
+                     cfg_prop['name'] = prop_run_name
+                        
+                     defprog = {"name": prop_run_name, "file_suffix": "prop", "cfg": cfg_prop}
+                     res_prop = solve_scenario(defprog, use_adaptive_mesh=True)
+                     
+                st.success("Simulations Complete!")
+                
+                # --- Analysis ---
+                
+                # Table
+                st.subheader("Performance Comparison")
+                
+                # Extract Metrics
+                def get_metric(res, name):
+                    return res.get('measurements', {}).get(name, {}).get('value')
+                
+                metrics = []
+                # Psi
+                psi_r = get_metric(res_ref, "Psi")
+                psi_p = get_metric(res_prop, "Psi")
+                if psi_r is not None and psi_p is not None:
+                    diff = psi_p - psi_r
+                    pct = (diff / psi_r * 100.0) if psi_r != 0 else 0.0
+                    metrics.append({"Metric": "Psi-Value [W/mK]", "Reference": psi_r, "Proposed": psi_p, "Diff": diff, "% Change": pct})
+                    
+                # fRsi
+                frsi_r = get_metric(res_ref, "fRsi")
+                frsi_p = get_metric(res_prop, "fRsi")
+                if frsi_r is not None and frsi_p is not None:
+                    diff = frsi_p - frsi_r
+                    pct = (diff / frsi_r * 100.0) if frsi_r != 0 else 0.0
+                    metrics.append({"Metric": "fRsi Factor", "Reference": frsi_r, "Proposed": frsi_p, "Diff": diff, "% Change": pct})
+                
+                df_metrics = pd.DataFrame(metrics)
+                st.dataframe(df_metrics.style.format({
+                    "Reference": "{:.4f}", 
+                    "Proposed": "{:.4f}", 
+                    "Diff": "{:+.4f}", 
+                    "% Change": "{:+.2f}%"
+                }))
+                
+                # Visuals
+                st.subheader("Temperature Distribution")
+                v_col1, v_col2 = st.columns(2)
+                
+                import matplotlib.pyplot as plt
+                
+                def plot_temp_fast(res, title, key_salt):
+                     # Check for file generated by solver
+                     # The solver uses geom.data['name'] for filename
+                     target = f"result_{res['name']}{'_final' if res.get('final_temp') is not None else ''}.png"
+                     if os.path.exists(target):
+                         return target
+                     target = f"result_{res['name']}.png"
+                     if os.path.exists(target): return target
+                     return None
+
+                img_r = plot_temp_fast(res_ref, "Reference", "ref")
+                img_p = plot_temp_fast(res_prop, "Proposed", "prop")
+                
+                with v_col1:
+                    st.caption(f"Reference: {ref_sel}")
+                    if img_r: st.image(img_r)
+                with v_col2:
+                    st.caption(f"Proposed: {prop_sel}")
+                    if img_p: st.image(img_p)
+                    
+                # Delta Map
+                st.subheader("Difference Map (Proposed - Reference)")
+                
+                delta = None
+                interpolated_used = False
+                
+                # Direct match check
+                if res_ref['temp'].shape == res_prop['temp'].shape:
+                    delta = res_prop['temp'] - res_ref['temp']
+                
+                # Interpolation Fallback
+                elif 'mesh' in res_ref and 'mesh' in res_prop:
+                     try:
+                         from scipy.interpolate import RegularGridInterpolator
+                         
+                         # Reference Mesh (Target)
+                         ref_x = res_ref['mesh']['x_coords'] # Edges
+                         ref_y = res_ref['mesh']['y_coords'] # Edges
+                         # We need cell centers for RegularGridInterp? 
+                         # No, temp is defined at nodes. But finite volume... 
+                         # Usually temp is (ny, nx). mesh.x_coords is (nx+1).
+                         # Let's use cell centers.
+                         
+                         def get_centers(edges):
+                             return (edges[:-1] + edges[1:]) / 2.0
+                             
+                         ref_xc = get_centers(np.array(ref_x))
+                         ref_yc = get_centers(np.array(ref_y))
+                         
+                         # Proposed Mesh (Source)
+                         prop_x = res_prop['mesh']['x_coords']
+                         prop_y = res_prop['mesh']['y_coords']
+                         prop_xc = get_centers(np.array(prop_x))
+                         prop_yc = get_centers(np.array(prop_y))
+                         
+                         # Create Interpolator (y, x) -> z
+                         # Data shape is (ny, nx) -> (y, x)
+                         interp = RegularGridInterpolator((prop_yc, prop_xc), res_prop['temp'], 
+                                                          bounds_error=False, fill_value=None)
+                         
+                         # Grid to interpolate onto (Reference)
+                         # mesgrid 'ij' indexing for (y, x)
+                         Y_ref, X_ref = np.meshgrid(ref_yc, ref_xc, indexing='ij')
+                         
+                         # Interpolate
+                         prop_resampled = interp((Y_ref, X_ref))
+                         
+                         delta = prop_resampled - res_ref['temp']
+                         interpolated_used = True
+                         
+                     except ImportError:
+                         st.warning("Scipy not found. Cannot perform interpolation for mismatched grids.")
+                     except Exception as e:
+                         st.warning(f"Interpolation failed: {e}")
+                
+                if delta is not None:
+                    if interpolated_used:
+                        st.info("ℹ️ Grids differed in size. 'Proposed' result was resampled to match 'Reference' grid for this plot.")
+                    
+                    # Plot Delta
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    # centered CMAP
+                    # Handle NaNs from interpolation (if bounds mismatch)
+                    mask_nan = np.isnan(delta)
+                    if np.any(mask_nan):
+                         delta = np.nan_to_num(delta, nan=0.0)
+                         
+                    limit = np.max(np.abs(delta))
+                    if limit < 1e-3: limit = 0.1 # Avoid singular colorbar
+                    
+                    im = ax.imshow(delta, cmap='bwr', vmin=-limit, vmax=limit, origin='lower')
+                    plt.colorbar(im, ax=ax, label="Temperature Difference [K]")
+                    ax.set_title(f"Delta: {prop_sel} - {ref_sel}")
+                    ax.axis('off')
+                    
+                    st.pyplot(fig)
+                    plt.close(fig)
+                else:
+                    st.warning(f"Grids differ in size ({res_ref['temp'].shape} vs {res_prop['temp'].shape}) and interpolation data unavailable. Cannot compute difference map.")
+
+            except Exception as e:
+                st.error(f"Comparison Failed: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
 
 
 

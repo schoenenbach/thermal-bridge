@@ -322,8 +322,15 @@ def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_m
                          
     return {
         "name": geom.data.get('name', 'transient'),
-        "measurements": {"EndTemp": {"value": np.mean(temp)}},
-        "final_temp": temp
+        "measurements": p1_results,
+        "measurements_frsi": p2_results,
+        "temp": temp_res,
+        "mesh": {
+            "x_coords": mesh.x_coords,
+            "y_coords": mesh.y_coords,
+            "dx": mesh.dx_array,
+            "dy": mesh.dy_array
+        }
     }
 
 
@@ -882,7 +889,12 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     
     return {
         "name": scenario_def['name'],
-        "measurements": combined_results
+        "measurements": combined_results,
+        "temp": temp_for_plot,
+        "mesh": {
+            "x_coords": mesh.x_coords,
+            "y_coords": mesh.y_coords
+        }
     }
 
 
