@@ -1,6 +1,46 @@
 name: "Scenario 9: Wall 360mm (10mm Reveal Ins)"
 description: "Reference Scenario: 360mm Wall, Styrodur, 10mm Reveal Insulation"
 
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+  - id: CONCRETE
+    lambda: 2.0
+    color: "#999999"
+  - id: INSULATION
+    lambda: 0.035
+    color: "#FFCC00"
+  - id: STYRODUR
+    lambda: 0.025
+    color: "#00CED1"
+    description: "Styrodur XPS insulation (WLS 025)"
+  - id: REVEAL_INS
+    lambda: 0.035
+    color: "#FFD700"
+  - id: FRAME
+    lambda: 0.13
+    color: "#444444"
+  - id: GLASS
+    lambda: 0.0325
+    color: "#88CCFF"
+  - id: ALUMINUM
+    lambda: 160.0
+    color: "#CCCCCC"
+  - id: CAVITY
+    lambda: 0.25
+    color: "#EEFFFF"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+  - id: WOOD
+    lambda: 0.12
+    color: "#8B4513"
+
 variables:
   # Geometry Config
   wall_thick: 360.0
@@ -50,6 +90,12 @@ canvas:
   bounds: [0, 660, 0, 500] 
   grid: ${grid_size}
 
+boundary_conditions:
+  convective:
+    internal: {T: 20.0, R: 0.13}
+    external: {T: -5.0, R: 0.04}
+    internal_check: {R: 0.25}
+
 measurements:
   surface_metrics:
     - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
@@ -59,7 +105,6 @@ measurements:
   derived:
     - { name: "Psi", formula: psi_value }
     - { name: "fRsi", formula: frsi }
-
 
 points:
   AirInt_BL: [0.0, "${y_bottom}"]
@@ -96,6 +141,7 @@ elements:
       - AirInt_TopLeft
 
   - type: wall
+    material: WALL
     params:
       x: ${x_wall_int}
       y: ${y_bottom}
@@ -103,6 +149,7 @@ elements:
       height: ${y_reveal}
 
   - type: wall
+    material: WALL
     params:
       x: ${x_win_outer}
       y: ${y_bottom}
@@ -146,6 +193,8 @@ elements:
       sash_recess: ${sash_recess}
       glass_thickness: ${glass_thick}
       y_top: ${y_top}
+      mat_frame_lambda: 0.13
+      mat_glass_lambda: 0.0325
       
   # Shutter Rails
   - type: rect

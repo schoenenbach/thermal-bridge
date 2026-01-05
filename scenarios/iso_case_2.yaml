@@ -14,9 +14,56 @@ description: |
   - Point temperatures A-I (see measurements)
   - Heat flux through interior surface should be 9.5 W/m ± 0.5W/m
 
+# Explicit Material Definitions
+materials:
+  - id: INSULATION
+    lambda: 0.029
+    color: "#FFCC00"
+    solver_id: 200
+  - id: CONCRETE
+    lambda: 1.15
+    color: "#999999"
+    solver_id: 201
+  - id: WOOD
+    lambda: 0.12
+    color: "#8B4513"
+    solver_id: 202
+  - id: ALUMINUM
+    lambda: 230.0
+    color: "#CCCCCC"
+    solver_id: 203
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+    solver_id: 204
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+    solver_id: 205
+
+# Parametric Variables
+variables:
+  # Canvas dimensions
+  grid_size: 0.25
+  
+  # Layer heights
+  concrete_top: 41.5
+  concrete_height: 6.0
+  wood_top: 36.5
+  wood_height: 5.0
+  alu_head_top: 35.0
+  alu_head_height: 1.5
+  alu_leg_bottom: 1.5
+  alu_leg_height: 33.5
+  alu_plate_height: 1.5
+  
+  # Widths
+  wood_width: 15.0
+  alu_leg_width: 1.5
+
 canvas:
   bounds: [0, 500, 0, 47.5]
-  grid: 0.25
+  grid: ${grid_size}
 
 boundary_conditions:
   convective:
@@ -42,7 +89,6 @@ measurements:
   boundary_flux:
     - { name: "Interior Heat Flux", boundary: bottom, expected: 9.5, tolerance: 0.5 }
 
-
 refinement_zones:
   - x_min: 0.0
     x_max: 20.0
@@ -55,8 +101,7 @@ elements:
   # 1. Base Insulation
   - type: rect
     name: "InsulationBase"
-    material: 200
-    lambda: 0.029
+    material: INSULATION
     params:
        x: 0.0
        y: 0.0
@@ -66,54 +111,49 @@ elements:
   # 2. Concrete Top Layer
   - type: rect
     name: "ConcreteLayer"
-    material: 201
-    lambda: 1.15
+    material: CONCRETE
     params:
        x: 0.0
-       y: 41.5
+       y: ${concrete_top}
        width: 500.0
-       height: 6.0
+       height: ${concrete_height}
 
   # 3. Wood Block
   - type: rect
     name: "WoodBlock"
-    material: 202
-    lambda: 0.12
+    material: WOOD
     params:
        x: 0.0
-       y: 36.5
-       width: 15.0
-       height: 5.0
+       y: ${wood_top}
+       width: ${wood_width}
+       height: ${wood_height}
 
   # 4. Aluminum Head
   - type: rect
     name: "AluminumHead"
-    material: 203
-    lambda: 230.0
+    material: ALUMINUM
     params:
        x: 0.0
-       y: 35.0
-       width: 15.0
-       height: 1.5
+       y: ${alu_head_top}
+       width: ${wood_width}
+       height: ${alu_head_height}
 
   # 5. Aluminum Leg
   - type: rect
     name: "AluminumLeg"
-    material: 203
-    lambda: 230.0
+    material: ALUMINUM
     params:
        x: 0.0
-       y: 1.5
-       width: 1.5
-       height: 33.5
+       y: ${alu_leg_bottom}
+       width: ${alu_leg_width}
+       height: ${alu_leg_height}
 
   # 6. Aluminum Plate
   - type: rect
     name: "AluminumPlate"
-    material: 203
-    lambda: 230.0
+    material: ALUMINUM
     params:
        x: 0.0
        y: 0.0
        width: 500.0
-       height: 1.5
+       height: ${alu_plate_height}

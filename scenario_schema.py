@@ -84,9 +84,17 @@ class MeasurementsConfig(BaseModel):
 
 # --- Boundary Conditions ---
 
+
+class ConvectiveBCParams(BaseModel):
+    T: float = Field(20.0, description="Temperature in Celsius")
+    R: float = Field(0.13, description="Thermal resistance in m²K/W")
+
 class BoundaryConditions(BaseModel):
     dirichlet: Dict[str, float] = Field(default_factory=dict) # e.g. {'top': 20.0}
     adiabatic: List[str] = Field(default_factory=list)
+    convective: Dict[str, Union[ConvectiveBCParams, Dict[str, float]]] = Field(default_factory=dict, description="Convective BCs per side (top, bottom, etc) or named override.")
+    surface_resistance: Dict[Union[int, str], float] = Field(default_factory=dict, description="Surface resistance overrides by material ID.")
+
 
 # --- Reusable Definitions ---
 

@@ -68,7 +68,11 @@ def get_scenarios():
 def probe_temperature(mesh, temp_field, cond, x, y, y_offset=0, x_offset=0):
     """
     Probe temperature at (x, y) according to ISO 10211 rules.
+    
     y_offset and x_offset handle padding if the temp_field is larger than the mesh.
+    
+    IMPORTANT: cond should be the ORIGINAL (unpadded) conductivity array for correct
+    ISO 10211 weighting. temp_field may be padded and offset is applied only to it.
     """
     eps = 1e-5
     
@@ -96,7 +100,9 @@ def probe_temperature(mesh, temp_field, cond, x, y, y_offset=0, x_offset=0):
             if s < 1e-9:
                 return temp_field[j + y_offset, i + x_offset]
             
-            lam = cond[j + y_offset, i + x_offset]
+            # Use original cond (no offset) for material conductivity weighting
+            # Apply offset only to temp_field which may be padded
+            lam = cond[j, i]
             t_cell = temp_field[j + y_offset, i + x_offset]
             
             w = lam / s
@@ -260,6 +266,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # 2. Material Grid & Conductivity
     grid_map, cond = build_material_grid(geom, mesh.xc, mesh.yc)
     
+    # Store original cond for ISO 10211 probe temperature calculations
+    # (probing should use actual material conductivities, not padded air values)
+    cond_original = cond.copy()
+    
     # --- Auto-Padding for Convective BCs (ISO Case 2 Support) ---
     bcs = geom.data.get('boundary_conditions', {})
     conv_bcs = bcs.get('convective', {})
@@ -386,7 +396,40 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     
 
     from solver import calculate_conductances
-    Gh, Gv = calculate_conductances(cond_pass1, dx_array, dy_array)
+    
+    # For padded scenarios (ISO Case 2 style), use original cond values instead of k_eff
+    # since we explicitly override boundary conductances. The k_eff approach is for
+    # internal air regions in scenarios 1-11, not for explicit boundary layer padding.
+    if has_padding:
+        Gh, Gv = calculate_conductances(cond, dx_array, dy_array)
+    else:
+        Gh, Gv = calculate_conductances(cond_pass1, dx_array, dy_array)
+    
+    # Explicit Boundary Conductance Overrides for Convective BCs (ISO Case 2 Compatibility)
+    # When we have padding, explicitly set boundary conductances to match ISO 10211 requirements
+    if has_padding:
+        dx_m = dx_array / 1000.0
+        
+        # Bottom Boundary (if padded)
+        if pad_bottom:
+            # Link index 0 connects row 0 (air) and row 1 (surface)
+            # G = Area / R = dx / RSI
+            r_bottom = float(conv_bcs.get('bottom', {}).get('R', rsi_design))
+            Gv[0, :] = dx_m / r_bottom
+            # Disable lateral flow in bottom air layer
+            Gh[0, :] = 0.0
+            
+        # Top Boundary (if padded)
+        if pad_top:
+            # Link at ny_new-2 connects row (ny_new-2) and row (ny_new-1)
+            # where ny_new-1 is the top air layer
+            r_top = float(conv_bcs.get('top', {}).get('R', rse))
+            Gv[cond.shape[0]-2, :] = dx_m / r_top
+            # Disable lateral flow in top air layer
+            Gh[cond.shape[0]-1, :] = 0.0
+            
+        # Left/Right boundaries (if needed in future)
+        # For now ISO Case 2 only uses top/bottom
     
     # Correction for Anisotropic Mesh at Boundaries
     def apply_boundary_conductances(Gh, Gv, rsi, mask_air):
@@ -473,8 +516,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
             Gv[y_idx, x_idx] = Gv_new
             
     # Apply corrections for Interior and Exterior
-    apply_boundary_conductances(Gh, Gv, rsi_design, mask_int)
-    apply_boundary_conductances(Gh, Gv, rse, mask_ext)
+    # Skip if we have padding - explicit conductances already set above
+    if not has_padding:
+        apply_boundary_conductances(Gh, Gv, rsi_design, mask_int)
+        apply_boundary_conductances(Gh, Gv, rse, mask_ext)
 
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
@@ -639,7 +684,8 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     
     # Pass 1 measurements (for Psi)
     # Validation checkpoints and Flux should be checked against Design conditions
-    p1_results = evaluate_measurements(measurements_def, geom, mesh, temp_res, cond_pass1,
+    # Use original 'cond' for probing (ISO 10211 methodology), not padded cond with air values
+    p1_results = evaluate_measurements(measurements_def, geom, mesh, temp_res, cond_original,
                                      t_int, t_ext, rsi_design, grid_map, mask_int,
                                      y_off, x_off, Gh=Gh, Gv=Gv,
                                      categories=['point_probes', 'boundary_flux'])

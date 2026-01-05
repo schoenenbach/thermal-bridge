@@ -1,6 +1,18 @@
 name: "Scenario 10: Building Corner (360mm meets 450mm)"
 description: "External Corner: Wall 360mm meets Wall 450mm. No Insulation."
 
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+
 variables:
   # Geometry Dimensions
   wall_thick_v: 450.0  # Vertical Wall Thickness
@@ -32,6 +44,18 @@ variables:
 canvas:
   bounds: ["${x_min}", "${x_max}", "${y_min}", "${y_max}"] 
   grid: 10.0
+
+boundary_conditions:
+  convective:
+    internal: {T: 20.0, R: 0.13}
+    external: {T: -5.0, R: 0.04}
+  # Cut-off boundaries should be adiabatic (symmetry/infinity assumption)
+  adiabatic:
+    - top
+    - right
+  
+  # Exterior boundaries (left and bottom) will default to AIR_EXT temperature/surface resistance
+  # inherited from the implicit AIR_EXT material filling the canvas margin.
 
 points:
   # Reference Points (optional, but good for debugging/schema)
@@ -72,15 +96,6 @@ elements:
        y: ${y_outer}
        width: ${wall_h_width}
        height: ${wall_thick_h}
-
-boundary_conditions:
-  # Cut-off boundaries should be adiabatic (symmetry/infinity assumption)
-  adiabatic:
-    - top
-    - right
-  
-  # Exterior boundaries (left and bottom) will default to AIR_EXT temperature/surface resistance
-  # inherited from the implicit AIR_EXT material filling the canvas margin.
 
 measurements:
   surface_metrics:

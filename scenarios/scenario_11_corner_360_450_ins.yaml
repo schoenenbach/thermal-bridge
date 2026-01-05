@@ -1,6 +1,22 @@
 name: "Scenario 11: Building Corner (360mm meets 450mm) + 200mm Insulation"
 description: "External Corner: Wall 360mm meets Wall 450mm. 200mm WLS 035 Insulation."
 
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+  - id: INSULATION
+    lambda: 0.035
+    color: "#FFCC00"
+    description: "Standard insulation WLS 035"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+
 variables:
   # Geometry Dimensions
   wall_thick_v: 450.0  # Vertical Wall Thickness
@@ -45,6 +61,19 @@ variables:
 canvas:
   bounds: ["${x_min}", "${x_max}", "${y_min}", "${y_max}"] 
   grid: 10.0
+
+boundary_conditions:
+  convective:
+    internal: {T: 20.0, R: 0.13}
+    external: {T: -5.0, R: 0.04}
+  # Cut-off boundaries
+  adiabatic:
+    - top
+    - right
+  
+  # Exterior boundaries (left and bottom) will default to AIR_EXT
+  # The canvas margin is filled with AIR_EXT by default in SketchGeometry if not covered.
+  # Here, we cover the bulk, but the margin outside x_ins_outer and y_ins_outer will be AIR_EXT.
 
 points:
   # Reference Points
@@ -102,16 +131,6 @@ elements:
        y: ${y_ins_outer}
        width: ${ins_h_width}
        height: ${ins_thick}
-
-boundary_conditions:
-  # Cut-off boundaries
-  adiabatic:
-    - top
-    - right
-  
-  # Exterior boundaries (left and bottom) will default to AIR_EXT
-  # The canvas margin is filled with AIR_EXT by default in SketchGeometry if not covered.
-  # Here, we cover the bulk, but the margin outside x_ins_outer and y_ins_outer will be AIR_EXT.
 
 measurements:
   surface_metrics:

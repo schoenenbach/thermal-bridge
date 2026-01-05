@@ -1,6 +1,27 @@
 name: Demo New Elements
 description: Comparison of new architectural macros.
 
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+  - id: CONCRETE
+    lambda: 2.0
+    color: "#999999"
+  - id: INSULATION
+    lambda: 0.035
+    color: "#FFCC00"
+  - id: WOOD
+    lambda: 0.12
+    color: "#8B4513"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+
 variables:
    wall_width: 360
    sim_width: 1000
@@ -10,43 +31,46 @@ canvas:
   bounds: [-100, "${sim_width}", -100, "${sim_height}"]
   grid: 10
 
+boundary_conditions:
+  convective:
+    internal: {T: 20.0, R: 0.13}
+    external: {T: -5.0, R: 0.04}
+
 elements:
   # 1. Main Wall
   - type: wall
-    x: 0
-    y: 0
-    width: ${wall_width}
-    height: ${sim_height}
+    material: WALL
+    params:
+      x: 0
+      y: 0
+      width: ${wall_width}
+      height: ${sim_height}
 
   # 2. Window Sill
   - type: window_sill
     name: MySill
-    x: ${wall_width} # Outer edge of wall? (No, usually 0 is int, wall_width is ext?)
-    # Let's assume standard coords: x=0 (interior), x=360 (exterior)
-    # Sill at x=360?
-    # Actually let's assume geometry: x=0 is interior finish.
-    x: ${wall_width}
-    y: 400
-    width: ${wall_width}
-    depth_ext: 160
-    depth_int: 200
+    params:
+      # Let's assume standard coords: x=0 (interior), x=360 (exterior)
+      # Sill at x=360?
+      # Actually let's assume geometry: x=0 is interior finish.
+      x: ${wall_width}
+      y: 400
+      width: ${wall_width}
+      depth_ext: 160
+      depth_int: 200
 
   # 3. Venetian Blind Box (Top)
   - type: venetian_blind
-    x: ${wall_width}
-    y: 1500 # Top of window
-    width: 160
-    height: 300
-    insulation_thickness: 40
+    params:
+      x: ${wall_width}
+      y: 1500 # Top of window
+      width: 160
+      height: 300
+      insulation_thickness: 40
 
   # 4. Roof Junction (Top of wall)
   - type: roof_junction
-    x_wall: 0
-    y_wall_top: ${sim_height}
-    wall_width: ${wall_width}
-
-boundary_conditions:
-  T_int: 20.0
-  T_ext: -5.0
-  Rsi_wall: 0.13
-  Rse: 0.04
+    params:
+      x_wall: 0
+      y_wall_top: ${sim_height}
+      wall_width: ${wall_width}
