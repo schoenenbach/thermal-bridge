@@ -3,6 +3,31 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as nd
 from typing import List, Tuple, Dict
 from config import *
+import ctypes
+import os
+
+# Load C++ Library
+try:
+    so_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "thermal_solver_core.so"))
+    lib = ctypes.CDLL(so_path)
+
+    
+    # solve_optimized(double* temp, const double* cond, const int* fixed_mask, const double* fixed_values, int rows, int cols, int iterations)
+    lib.solve_optimized.argtypes = [
+        ctypes.POINTER(ctypes.c_double), # temp (in/out)
+        ctypes.POINTER(ctypes.c_double), # cond
+        ctypes.POINTER(ctypes.c_int),    # fixed_mask
+        ctypes.POINTER(ctypes.c_double), # fixed_values
+        ctypes.c_int, # rows
+        ctypes.c_int, # cols
+        ctypes.c_int  # iterations
+    ]
+    lib.solve_optimized.restype = ctypes.c_double
+    USE_CPP = True
+    print("[INFO] C++ Accelerated Solver Loaded.")
+except Exception as e:
+    print(f"[WARNING] C++ Solver not found/loaded: {e}. Using pure Python.")
+    USE_CPP = False
 
 class ThermalSolver:
     def __init__(self, config: CalculationConfig, rsi_value: float = 0.13):
@@ -343,72 +368,141 @@ class ThermalSolver:
         self.cond[self.grid_map == self.ID_AIR_INT] = 0.025 # Approx static air
         # Boundaries handled in solve loop
         
-    def solve(self, max_iter=10000, tol=1e-5):
+
+    def solve(self, max_iter=60000, tol=1e-5):
         # Explicit or Iterative solver (Jacobi/SOR)
         
-        for k in range(max_iter):
-            t_old = self.temp.copy()
-            
-            # Define neighbors
-            t_up = np.roll(self.temp, -1, axis=0)
-            t_dn = np.roll(self.temp, 1, axis=0)
-            t_lf = np.roll(self.temp, -1, axis=1)
-            t_rt = np.roll(self.temp, 1, axis=1)
-            
-            k_c = self.cond
-            k_up = np.roll(k_c, -1, axis=0)
-            k_dn = np.roll(k_c, 1, axis=0)
-            k_lf = np.roll(k_c, -1, axis=1)
-            k_rt = np.roll(k_c, 1, axis=1)
-            
-            def harm(k1, k2): return 2*k1*k2/(k1+k2+1e-12)
-            
-            g_up = harm(k_c, k_up)
-            g_dn = harm(k_c, k_dn)
-            g_lf = harm(k_c, k_lf)
-            g_rt = harm(k_c, k_rt)
-            
-            # Sum of conductances
-            g_sum = g_up + g_dn + g_lf + g_rt
-            
-            # Update internal nodes
-            t_new = (g_up*t_up + g_dn*t_dn + g_lf*t_lf + g_rt*t_rt) / (g_sum + 1e-12)
-            
-            # Apply Boundaries
-            
-            # 1. Adiabatic Cut-off (Top of Window, Bottom of Wall)
-            # Top (y=max): Adiabatic -> T_top = T_below
-            t_new[-1, :] = t_new[-2, :]
-            # Bottom (y=0): Adiabatic -> T_bot = T_above
-            t_new[0, :] = t_new[1, :]
-            # Inner Cut (x=0): Adiabatic (Symmetry/Cut)
-            t_new[:, 0] = TEMP_INT
-            
-            # 2. Surface Boundaries (Convection)
-            # Identify Air Regions
-            mask_int = self.grid_map == self.ID_AIR_INT
-            mask_ext = self.grid_map == self.ID_AIR_EXT
-            
-            t_new[mask_int] = TEMP_INT
-            t_new[mask_ext] = TEMP_EXT
-            
-            # Correction:
-            k_eff_int = self.dx / (2 * self.rsi_value) # USE DYNAMIC RSI
-            k_eff_ext = self.dx / (2 * RSE)
-            
-            self.cond[mask_int] = k_eff_int
-            self.cond[mask_ext] = k_eff_ext
-            
-            self.temp = t_new
-            self.temp[mask_int] = TEMP_INT
-            self.temp[mask_ext] = TEMP_EXT
-            
-            if k % 1000 == 0:
-                diff = np.max(np.abs(self.temp - t_old))
-                if diff < tol:
-                    break
+        # Identify Fixed Nodes (Dirichlet)
+        # 1. Air (Interior/Exterior) -> Fixed at TEMP_INT/TEMP_EXT
+        # 2. Adiabatic Boundaries are NOT fixed values, but dependent.
+        #    However, our C++ solver handles Adiabatic by copying neighbors.
+        #    It relies on FixedMask to know where NOT to update from neighbors but FORCE value.
         
-        return self.temp
+        mask_int = (self.grid_map == self.ID_AIR_INT).astype(np.int32)
+        mask_ext = (self.grid_map == self.ID_AIR_EXT).astype(np.int32)
+        
+        fixed_mask = (mask_int | mask_ext).astype(np.int32)
+        
+        # Prepare Fixed Values
+        fixed_values = np.zeros_like(self.temp)
+        fixed_values[mask_int == 1] = TEMP_INT
+        fixed_values[mask_ext == 1] = TEMP_EXT
+        
+        # Pre-set temperature field
+        self.temp[mask_int == 1] = TEMP_INT
+        self.temp[mask_ext == 1] = TEMP_EXT
+        
+        # Correction for Boundary Coefficients (Python side logic ported logic)
+        # The C++ solver uses the conductance map passed to it.
+        # We must ensure self.cond has the adjusted effective conductivities for air nodes
+        # BEFORE passing it.
+        # (Lines 396-400 in original code did this dynamically inside loop, but Rsi is constant)
+        
+        k_eff_int = self.dx / (2 * self.rsi_value)
+        k_eff_ext = self.dx / (2 * RSE)
+        
+        self.cond[mask_int == 1] = k_eff_int
+        self.cond[mask_ext == 1] = k_eff_ext
+        
+        if USE_CPP:
+            # Prepare C pointers
+            # Ensure contiguous F-contiguous or C-contiguous? 
+            # Ctypes expects C-contiguous usually.
+            
+            temp_c = np.ascontiguousarray(self.temp, dtype=np.float64)
+            cond_c = np.ascontiguousarray(self.cond, dtype=np.float64)
+            mask_c = np.ascontiguousarray(fixed_mask, dtype=np.int32)
+            fixed_val_c = np.ascontiguousarray(fixed_values, dtype=np.float64)
+            
+            rows, cols = self.temp.shape
+            
+            # Pointer casts
+            p_temp = temp_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            p_cond = cond_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            p_mask = mask_c.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+            p_fval = fixed_val_c.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            
+            # Batch iterations to reduce overhead
+            batch_size = 1000
+            
+            for k in range(0, max_iter, batch_size):
+                diff = lib.solve_optimized(p_temp, p_cond, p_mask, p_fval, rows, cols, batch_size)
+                
+                if diff < tol:
+                    print(f"Converged in {k + batch_size} iterations (Diff: {diff:.6f})")
+                    break
+                if k % 5000 == 0:
+                     print(f"Iter {k}: Diff {diff:.6f}")
+                     
+            self.temp = temp_c
+            return self.temp
+            
+        else:
+            # Fallback to Python Slow Solver
+            print("Using Python Solver...")
+            for k in range(max_iter):
+                t_old = self.temp.copy()
+                
+                # Define neighbors
+                t_up = np.roll(self.temp, -1, axis=0)
+                t_dn = np.roll(self.temp, 1, axis=0)
+                t_lf = np.roll(self.temp, -1, axis=1)
+                t_rt = np.roll(self.temp, 1, axis=1)
+                
+                k_c = self.cond
+                k_up = np.roll(k_c, -1, axis=0)
+                k_dn = np.roll(k_c, 1, axis=0)
+                k_lf = np.roll(k_c, -1, axis=1)
+                k_rt = np.roll(k_c, 1, axis=1)
+                
+                def harm(k1, k2): return 2*k1*k2/(k1+k2+1e-12)
+                
+                g_up = harm(k_c, k_up)
+                g_dn = harm(k_c, k_dn)
+                g_lf = harm(k_c, k_lf)
+                g_rt = harm(k_c, k_rt)
+                
+                # Sum of conductances
+                g_sum = g_up + g_dn + g_lf + g_rt
+                
+                # Update internal nodes
+                t_new = (g_up*t_up + g_dn*t_dn + g_lf*t_lf + g_rt*t_rt) / (g_sum + 1e-12)
+                
+                # Apply Boundaries
+                
+                # 1. Adiabatic Cut-off (Top of Window, Bottom of Wall)
+                # Top (y=max): Adiabatic -> T_top = T_below
+                t_new[-1, :] = t_new[-2, :]
+                # Bottom (y=0): Adiabatic -> T_bot = T_above
+                t_new[0, :] = t_new[1, :]
+                # Inner Cut (x=0): Adiabatic (Symmetry/Cut)
+                t_new[:, 0] = TEMP_INT
+                
+                # 2. Surface Boundaries (Convection)
+                # Identify Air Regions
+                mask_int = self.grid_map == self.ID_AIR_INT
+                mask_ext = self.grid_map == self.ID_AIR_EXT
+                
+                t_new[mask_int] = TEMP_INT
+                t_new[mask_ext] = TEMP_EXT
+                
+                # Correction:
+                k_eff_int = self.dx / (2 * self.rsi_value) # USE DYNAMIC RSI
+                k_eff_ext = self.dx / (2 * RSE)
+                
+                self.cond[mask_int] = k_eff_int
+                self.cond[mask_ext] = k_eff_ext
+                
+                self.temp = t_new
+                self.temp[mask_int] = TEMP_INT
+                self.temp[mask_ext] = TEMP_EXT
+                
+                if k % 1000 == 0:
+                    diff = np.max(np.abs(self.temp - t_old))
+                    if diff < tol:
+                        break
+            
+            return self.temp
 
     def calculate_psi(self):
         # 1. Total Heat Flow L2D

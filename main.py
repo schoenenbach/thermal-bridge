@@ -6,6 +6,7 @@ if __name__ == "__main__":
 
     # Define High-Fidelity Configurations for Verification
     # Case A: 36cm Wall, No Insulation, Old Window (Stainless Spacer) - Baseline
+    # Case A: 36cm Wall, No Insulation, Old Window (Stainless Spacer) - Baseline
     config_old = CalculationConfig(
         wall_thickness_mm=360,
         insulation_thick_max_mm=0,
@@ -15,7 +16,7 @@ if __name__ == "__main__":
         window_position_from_exterior_masonry_mm=150,
         masonry_rebate_overlap_mm=50,
         uninsulated_reveal=True,
-        grid_size_mm=5.0,           # High Res (adjusted for speed)
+        grid_size_mm=2.5,           # High Res (adjusted for speed)
         spacer_type=SpacerType.STAINLESS_STEEL # "Old" (Ug 1.1)
     )
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
         window_position_from_exterior_masonry_mm=150,
         masonry_rebate_overlap_mm=50,
         uninsulated_reveal=True,
-        grid_size_mm=5.0,           # High Res (adjusted for speed)
+        grid_size_mm=2.5,           # High Res (adjusted for speed)
         spacer_type=SpacerType.SWISS_ULTIMATE 
     )
 
@@ -41,23 +42,24 @@ if __name__ == "__main__":
     
     results = []
     
-    print("Starting High-Fidelity Thermal Bridge Calculation (1mm Grid)...")
+    print("Starting High-Fidelity Thermal Bridge Calculation (2.5mm Grid)...")
     
     for name, cfg in run_configs:
         print(f"Calculating: {name} (Grid: {cfg.grid_size_mm}mm, Spacer: {cfg.spacer_type})...")
+        case_id = name.replace(" ", "_").replace("(", "").replace(")", "").lower()
         
         # --- PASS 1: Calculate Psi (Rsi = 0.13) ---
         solver_psi = ThermalSolver(cfg, rsi_value=0.13)
-        solver_psi.solve()
+        solver_psi.plot_geometry(f"debug_geometry_{case_id}.png") # Visual Check
+        solver_psi.solve(max_iter=60000)
         res_psi = solver_psi.calculate_psi()
         
         # --- PASS 2: Calculate fRsi (Rsi = 0.25) ---
         solver_frsi = ThermalSolver(cfg, rsi_value=0.25)
-        solver_frsi.solve()
+        solver_frsi.solve(max_iter=60000)
         res_frsi = solver_frsi.calculate_psi()
         
         # Plotting
-        case_id = name.replace(" ", "_").replace("(", "").replace(")", "").lower()
         fn = f"temp_dist_{case_id}.png"
         solver_psi.plot_results(fn)
         
