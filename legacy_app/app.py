@@ -64,9 +64,16 @@ scenario_files = glob.glob("scenarios/scenario_*.yaml") + glob.glob("scenarios/i
 scenario_files.sort()
 display_names = ["(New Empty)"] + [os.path.basename(f) for f in scenario_files]
 
+# Determine default index for iso_case_1.yaml
+default_scen_name = "iso_case_1.yaml"
+default_idx = 0
+if default_scen_name in display_names:
+    default_idx = display_names.index(default_scen_name)
+
 # Use session state to handle template loading without overwriting edits accidentally
 if "yaml_editor" not in st.session_state:
-    st.session_state.yaml_editor = """name: "My Custom Geometry"
+    # Try to load default scenario
+    default_content = """name: "My Custom Geometry"
 canvas:
   bounds: [0, 500, 0, 500]
   grid: 10.0
@@ -79,6 +86,20 @@ elements:
         width: 360
         height: 500
 """
+    if default_idx > 0: # 0 is (New Empty)
+         try:
+             # Find the path
+             # recreating the path logic from below mainly to get content
+             # display_names mapped from scenario_files
+             # indices: 0 -> None, 1 -> file[0]
+             file_path = scenario_files[default_idx - 1]
+             with open(file_path, 'r') as f:
+                 default_content = f.read()
+         except Exception as e:
+             print(f"Failed to load default scenario: {e}")
+
+    st.session_state.yaml_editor = default_content
+    st.session_state.template_selector_idx = default_idx
 
 def load_template():
     selected = st.session_state.template_selector
@@ -99,7 +120,7 @@ grid_override = 0.0
 
 # --- Main Editor Area ---
 # --- Main Area Tabs ---
-tab_studio, tab_compare, tab_opt, tab_import = st.tabs(["Scenario Studio", "Compare", "Optimization", "Import DXF"])
+tab_studio, tab_compare, tab_opt, tab_import, tab_help = st.tabs(["Scenario Studio", "Compare", "Optimization", "Import DXF", "Help & Reference"])
 
 with tab_studio:
     st.header("Scenario Studio")
@@ -110,7 +131,12 @@ with tab_studio:
     # but full width is fine too.
     col_sel, col_dummy = st.columns([1, 1])
     with col_sel:
-        template = st.selectbox("Load Scenario", display_names, key="template_selector", on_change=load_template)
+        # Use index to set default
+        idx = st.session_state.get('template_selector_idx', 0)
+        # Ensure index is valid
+        if idx >= len(display_names): idx = 0
+        
+        template = st.selectbox("Load Scenario", display_names, index=idx, key="template_selector", on_change=load_template)
 
     # --- Three-Column Layout ---
     col_yaml, col_preview, col_inspector = st.columns([1.2, 1.5, 1.0])
@@ -969,3 +995,87 @@ with tab_import:
             with st.expander("Error Details"):
                 st.code(traceback.format_exc())
 
+
+with tab_help:
+    st.header("📚 Configuration Reference")
+    st.info("The scenario configuration is based on a YAML schema. Below are the available element types and parameters.")
+    
+    from backend.core.scenario_schema import (
+        Scenario, CanvasConfig, MaterialDef,
+        RectParams, WallParams, AirParams, 
+        InsulationTaperedParams, WindowDetailParams, 
+        WindowSillParams, VenetianBlindParams, RoofJunctionParams
+    )
+    from pydantic import BaseModel
+    import inspect
+    
+    def get_field_info(model: BaseModel):
+        infos = []
+        schema = model.model_json_schema()
+        props = schema.get('properties', {})
+        required = schema.get('required', [])
+        
+        for name, detail in props.items():
+            desc = detail.get('description', '')
+            typ = detail.get('type', 'any')
+            if 'anyOf' in detail:
+                typ = " | ".join([t.get('type', 'ref') for t in detail['anyOf']])
+            
+            # Default
+            default = detail.get('default', None)
+            
+            req_str = "Required" if name in required else "Optional"
+            
+            infos.append({
+                "Name": f"`{name}`",
+                "Type": f"`{typ}`",
+                "Required": req_str,
+                "Description": desc,
+                "Default": f"`{default}`" if default is not None else "-"
+            })
+        return infos
+
+    # 1. Structure
+    st.subheader("1. Scenario Structure")
+    st.markdown("""
+    A scenario file consists of several top-level sections:
+    - **`name`**: Name of the scenario
+    - **`canvas`**: Canvas dimensions and grid settings
+    - **`materials`**: Custom material definitions
+    - **`elements`**: List of geometry elements
+    - **`boundary_conditions`**: Thermal boundary conditions
+    - **`transient`**: Settings for time-dependent simulation
+    """)
+    
+    # 2. ElementsTable
+    st.subheader("2. Element Types")
+    
+    element_map = {
+        "rect": RectParams,
+        "wall": WallParams,
+        "air": AirParams,
+        "insulation_tapered": InsulationTaperedParams,
+        "window_detail": WindowDetailParams,
+        "window_sill": WindowSillParams,
+        "venetian_blind": VenetianBlindParams,
+        "roof_junction": RoofJunctionParams
+    }
+    
+    cols = st.columns([1, 3])
+    with cols[0]:
+        st.markdown("**Select Element Type**")
+        selected_el_type = st.radio("Type", list(element_map.keys()), label_visibility='collapsed')
+        
+    with cols[1]:
+        st.markdown(f"### `{selected_el_type}` Parameters")
+        model = element_map[selected_el_type]
+        infos = get_field_info(model)
+        st.table(infos)
+        
+    # 3. Canvas
+    st.subheader("3. Canvas Config")
+    st.table(get_field_info(CanvasConfig))
+    
+    # 4. Materials
+    st.subheader("4. Material Definition")
+    st.table(get_field_info(MaterialDef))
