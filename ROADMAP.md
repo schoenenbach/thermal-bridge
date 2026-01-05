@@ -175,7 +175,7 @@ Upload DXF → Map Layers → Preview (with stats) → Adjust Settings → Conve
 
 ---
 
-## 13. Frontend Migration (React/Angular) [FUTURE]
+## 13. Frontend Migration (React/Angular) [WIP - Phase 1 Done]
 
 **Objective:** Migrate from Streamlit to a modern SPA framework for better UX.
 
@@ -183,9 +183,30 @@ Upload DXF → Map Layers → Preview (with stats) → Adjust Settings → Conve
 - Schema Architecture (Done - Item 11)
 - REST API design based on Pydantic models
 
-**Proposed Tasks:**
-- [ ] Design REST API contract (`/api/scenarios/validate`, `/api/simulate`, etc.)
-- [ ] Generate OpenAPI spec from Pydantic + FastAPI
+### Phase 1: REST API Foundation [DONE]
+- [x] Design REST API contract (`/api/scenarios/validate`, `/api/simulate`, etc.)
+- [x] Implement FastAPI application with CORS support
+- [x] Scenarios endpoints (CRUD, validate, list)
+- [x] Simulation endpoint (run, optimize)
+- [x] Materials endpoint (list, lookup)
+- [x] Generate OpenAPI spec (auto at `/docs`)
+- [x] Add 11 API unit tests
+
+**Files Added:**
+- `api/main.py` - FastAPI application
+- `api/models.py` - Request/Response Pydantic models
+- `api/routes/scenarios.py` - Scenario CRUD and validation
+- `api/routes/simulation.py` - Simulation execution
+- `api/routes/materials.py` - Material registry access
+- `tests/test_api.py` - API unit tests
+
+**Run the API:**
+```bash
+uvicorn api.main:app --reload
+# Open http://localhost:8000/docs for OpenAPI UI
+```
+
+### Phase 2: Frontend Framework [FUTURE]
 - [ ] Implement WebSocket for simulation progress updates
 - [ ] Use JSON Schema for dynamic form generation
 - [ ] Evaluate React vs. Angular as alternative frontend frameworks
