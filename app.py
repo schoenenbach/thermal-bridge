@@ -794,29 +794,36 @@ with tab_import:
     # Session state for generated yaml to persist across reruns
     if "dxf_yaml_preview" not in st.session_state:
         st.session_state.dxf_yaml_preview = ""
+    if "dxf_importer" not in st.session_state:
+        st.session_state.dxf_importer = None
 
     if dxf_file:
         try:
-            # Instantiate Importer (loads file)
-            # Streamlit file_uploader returns BytesIO, our updated importer handles it via tempfile
-            importer = DXFImporter(dxf_file)
+            # Instantiate Importer (loads file) - cache in session state
+            if st.session_state.dxf_importer is None or st.session_state.get('dxf_filename') != dxf_file.name:
+                dxf_file.seek(0)  # Reset stream position
+                st.session_state.dxf_importer = DXFImporter(dxf_file)
+                st.session_state.dxf_filename = dxf_file.name
+                st.session_state.dxf_yaml_preview = ""  # Reset on new file
+                
+            importer = st.session_state.dxf_importer
             layers = importer.get_layers()
             
-            st.success(f"Loaded DXF. Found {len(layers)} layers.")
+            st.success(f"✅ Loaded DXF: **{dxf_file.name}** | {len(layers)} layers found")
             
-            # Layer Mapping UI
-            st.subheader("Layer to Material Mapping")
-            st.caption("Map DXF layers to Simulation Materials. Leave empty to ignore a layer.")
+            # Two-column layout: Settings | Preview
+            col_settings, col_preview = st.columns([1, 1.5])
             
-            # Common Materials
-            common_mats = ["", "WALL", "INSULATION", "FRAME", "GLASS", "AIR_INT", "AIR_EXT", "CONCRETE", "ALUMINUM", "REVEAL_INS"]
-            
-            mapping = {}
-            
-            # Grid layout for mapping
-            cols = st.columns(3)
-            for i, layer in enumerate(layers):
-                with cols[i % 3]:
+            with col_settings:
+                # Layer Mapping UI
+                st.subheader("📋 Layer Mapping")
+                st.caption("Map DXF layers to simulation materials. Leave empty to ignore.")
+                
+                # Common Materials
+                common_mats = ["", "WALL", "INSULATION", "FRAME", "GLASS", "AIR_INT", "AIR_EXT", "CONCRETE", "ALUMINUM", "REVEAL_INS"]
+                
+                mapping = {}
+                for layer in layers:
                     # Intelligent default based on name
                     default_idx = 0
                     u_layer = layer.upper()
@@ -829,33 +836,130 @@ with tab_import:
                     selection = st.selectbox(f"{layer}", common_mats, index=default_idx, key=f"map_{layer}")
                     if selection:
                         mapping[layer] = selection
+                
+                st.markdown("---")
+                
+                # Import Settings
+                st.subheader("⚙️ Import Settings")
+                simplify_tol = st.slider(
+                    "Simplification Tolerance (mm)", 
+                    min_value=0.1, max_value=10.0, value=1.0, step=0.1,
+                    help="Higher = fewer vertices, simpler geometry. Lower = more detail preserved."
+                )
+                min_area = st.slider(
+                    "Min Polygon Area (mm²)", 
+                    min_value=1.0, max_value=100.0, value=5.0, step=1.0,
+                    help="Polygons smaller than this will be filtered out."
+                )
             
+            with col_preview:
+                st.subheader("🔍 Geometry Preview")
+                
+                if mapping:
+                    try:
+                        # Get preview data
+                        preview_data = importer.get_preview_data(mapping, simplify_tol, min_area)
+                        polys = preview_data['polygons']
+                        stats = preview_data['stats']
+                        bounds = preview_data['bounds']
+                        
+                        # Statistics
+                        stat_cols = st.columns(3)
+                        with stat_cols[0]:
+                            st.metric("Polygons", stats['polygon_count'])
+                        with stat_cols[1]:
+                            st.metric("Points", stats['point_count'])
+                        with stat_cols[2]:
+                            area_m2 = stats['total_area_mm2'] / 1e6
+                            st.metric("Total Area", f"{area_m2:.3f} m²")
+                        
+                        st.caption(f"Materials: {', '.join(stats['materials_used'])}")
+                        
+                        # Matplotlib preview
+                        import matplotlib.pyplot as plt
+                        from matplotlib.patches import Polygon as MplPolygon
+                        from matplotlib.collections import PatchCollection
+                        
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        
+                        # Color map for materials
+                        mat_colors = {
+                            'WALL': '#8B4513',
+                            'INSULATION': '#FFD700',
+                            'FRAME': '#4169E1',
+                            'GLASS': '#87CEEB',
+                            'AIR_INT': '#E6E6FA',
+                            'AIR_EXT': '#B0E0E6',
+                            'CONCRETE': '#808080',
+                            'ALUMINUM': '#C0C0C0',
+                            'REVEAL_INS': '#FFA500'
+                        }
+                        
+                        patches = []
+                        colors = []
+                        for p in polys:
+                            patch = MplPolygon(p['coords'], closed=True)
+                            patches.append(patch)
+                            colors.append(mat_colors.get(p['material'], '#CCCCCC'))
+                        
+                        if patches:
+                            collection = PatchCollection(patches, facecolors=colors, edgecolors='black', linewidths=0.5, alpha=0.7)
+                            ax.add_collection(collection)
+                            ax.set_xlim(bounds[0], bounds[1])
+                            ax.set_ylim(bounds[2], bounds[3])
+                            ax.set_aspect('equal')
+                            ax.set_xlabel('X (mm)')
+                            ax.set_ylabel('Y (mm)')
+                            ax.set_title('DXF Import Preview')
+                        else:
+                            ax.text(0.5, 0.5, 'No polygons extracted', ha='center', va='center', transform=ax.transAxes)
+                        
+                        st.pyplot(fig)
+                        plt.close(fig)
+                        
+                    except Exception as e:
+                        st.warning(f"Preview error: {e}")
+                else:
+                    st.info("Map at least one layer to see the preview.")
+            
+            # Action Buttons
             st.markdown("---")
-            col_dxf_act1, col_dxf_act2 = st.columns(2)
+            col_dxf_act1, col_dxf_act2, col_dxf_act3 = st.columns(3)
             
             with col_dxf_act1:
-                if st.button("Convert to Scenario", type="primary"):
+                if st.button("Convert to Scenario", type="primary", use_container_width=True):
                     if mapping:
-                        scen_dict = importer.extract_scenario(mapping)
+                        scen_dict = importer.extract_scenario(mapping, simplify_tol, min_area)
                         yaml_str = yaml.dump(scen_dict, sort_keys=False)
                         st.session_state.dxf_yaml_preview = yaml_str
                         st.toast("Conversion Successful!", icon="✅")
                     else:
                         st.warning("Please map at least one layer to a material.")
-                        
-            # Show Preview if available
-            if st.session_state.dxf_yaml_preview:
-                st.subheader("Generated YAML Preview")
-                st.code(st.session_state.dxf_yaml_preview, language='yaml')
-                
-                with col_dxf_act2:
-                    st.write("") # Spacer
-                    st.write("")
-                    if st.button("Load into Editor Tab"):
+            
+            with col_dxf_act2:
+                if st.session_state.dxf_yaml_preview:
+                    if st.button("Load into Editor", use_container_width=True):
                         st.session_state.yaml_editor = st.session_state.dxf_yaml_preview
-                        # Reset selector to avoid overwrite
-                        # st.session_state.template_selector = "(New Empty)" 
-                        st.success("Loaded into Editor! Switch to 'Scenario Editor' tab to view.")
+                        st.success("Loaded into Editor! Switch to 'Scenario Studio' tab.")
+            
+            with col_dxf_act3:
+                if st.session_state.dxf_yaml_preview:
+                    st.download_button(
+                        "Download YAML", 
+                        data=st.session_state.dxf_yaml_preview,
+                        file_name=f"imported_{dxf_file.name.replace('.dxf', '')}.yaml",
+                        mime="text/yaml",
+                        use_container_width=True
+                    )
+                        
+            # Show YAML Preview if available
+            if st.session_state.dxf_yaml_preview:
+                with st.expander("📄 Generated YAML", expanded=False):
+                    st.code(st.session_state.dxf_yaml_preview, language='yaml')
                         
         except Exception as e:
             st.error(f"Failed to process DXF: {e}")
+            import traceback
+            with st.expander("Error Details"):
+                st.code(traceback.format_exc())
+

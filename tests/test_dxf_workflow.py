@@ -66,3 +66,75 @@ def test_dxf_to_scenario_flow():
 
 if __name__ == "__main__":
     test_dxf_to_scenario_flow()
+
+
+def test_simplification_tolerance_affects_output():
+    """Verify that different simplification tolerances produce different vertex counts."""
+    dxf_path = "Testing_Plan/sample_dxf/03016.dxf"
+    if not os.path.exists(dxf_path):
+        pytest.skip("Sample DXF not found")
+    
+    mapping = {
+        'Xella 025': 'INSULATION',
+        'Xella 035': 'WALL',
+    }
+    
+    with open(dxf_path, "rb") as f:
+        importer = DXFImporter(f)
+    
+    # Low tolerance (more detail)
+    result_low = importer.extract_scenario(mapping, simplify_tolerance=0.5, min_area_threshold=5.0)
+    
+    with open(dxf_path, "rb") as f:
+        importer2 = DXFImporter(f)
+    
+    # High tolerance (less detail)
+    result_high = importer2.extract_scenario(mapping, simplify_tolerance=5.0, min_area_threshold=5.0)
+    
+    # Count total vertices
+    def count_vertices(scenario):
+        return sum(len(el.get('points', [])) for el in scenario.get('elements', []))
+    
+    vertices_low = count_vertices(result_low)
+    vertices_high = count_vertices(result_high)
+    
+    print(f"Vertices at tolerance 0.5: {vertices_low}")
+    print(f"Vertices at tolerance 5.0: {vertices_high}")
+    
+    # Higher tolerance should result in fewer vertices (or same in edge cases)
+    assert vertices_high <= vertices_low, "Higher tolerance should simplify geometry"
+
+
+def test_preview_data_method():
+    """Verify get_preview_data returns expected structure."""
+    dxf_path = "Testing_Plan/sample_dxf/03016.dxf"
+    if not os.path.exists(dxf_path):
+        pytest.skip("Sample DXF not found")
+    
+    mapping = {
+        'Xella 025': 'INSULATION',
+        'Xella 035': 'WALL',
+    }
+    
+    with open(dxf_path, "rb") as f:
+        importer = DXFImporter(f)
+    
+    preview = importer.get_preview_data(mapping)
+    
+    # Check structure
+    assert 'polygons' in preview
+    assert 'stats' in preview
+    assert 'bounds' in preview
+    
+    # Check stats
+    stats = preview['stats']
+    assert 'polygon_count' in stats
+    assert 'total_area_mm2' in stats
+    assert 'materials_used' in stats
+    assert 'point_count' in stats
+    
+    assert stats['polygon_count'] > 0
+    assert len(stats['materials_used']) > 0
+    
+    print(f"Preview stats: {stats}")
+

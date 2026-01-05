@@ -99,22 +99,29 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   **Delta Map:** Compute $T_{diff} = T_{proposed} - T_{reference}$ and plot the difference field to highlight heat flow changes.
     *   **Table:** Side-by-side comparison of Psi-values and fRsi factors with % improvement calculation.
 
-## 9. DXF/CAD Import Integration [WIP]
+## 9. DXF/CAD Import Integration [DONE]
 
 **Objective:** Integrate with existing CAD workflows by allowing import of geometry from DXF files.
 
-**Implementation Strategy:**
-*   **Parsing:** Use `ezdxf` library to parse ASCII DXF files.
-*   **Mapping UI:**
-    *   User uploads DXF.
-    *   System lists layers found (e.g., "Layer_Brick", "Layer_Insulation").
-    *   User maps Layers to Material IDs.
-*   **Geometry Conversion:**
-    *   Extract polylines/polygons from layers.
-    *   Convert to internal `Polygon` representation in `geometry.py`.
-    *   (Optional) Simplify geometry (douglass-peucker) to remove excessive detail (e.g., screw threads) that complicates meshing.
+**Completed Tasks:**
+- [x] DXF parsing with `ezdxf` library (HATCH, POLYLINE, LINE, ARC entities)
+- [x] Layer-to-Material mapping UI with intelligent defaults
+- [x] Polygon extraction and stitching from disconnected lines
+- [x] **Configurable simplification** (Douglas-Peucker tolerance slider: 0.1-10mm)
+- [x] **Configurable min area threshold** (filter small polygons: 1-100mm²)
+- [x] **Live geometry preview** with matplotlib visualization before conversion
+- [x] **Import statistics** (polygon count, point count, total area, materials used)
+- [x] Scenario generation with proper canvas bounds and boundary conditions
+- [x] "Load into Editor" and "Download YAML" actions
+- [x] Unit tests for tolerance and preview functionality
+
+**UI Flow:**
+```
+Upload DXF → Map Layers → Preview (with stats) → Adjust Settings → Convert → Load/Download
+```
 
 *   **Note on DWG:** Direct DWG support requires external converters (e.g., ODA or LibreDWG). Current solution supports native DXF. Convert DWG to DXF before import.
+
 
 ## 10. Cloud & CI/CD Readiness [DONE]
 

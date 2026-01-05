@@ -41,12 +41,61 @@ class DXFImporter:
             layers.add(entity.dxf.layer)
         return sorted(list(layers))
 
-    def extract_scenario(self, layer_mapping: Dict[str, str]) -> Dict[str, Any]:
+    def get_preview_data(self, layer_mapping: Dict[str, str], 
+                         simplify_tolerance: float = 1.0,
+                         min_area_threshold: float = 5.0) -> Dict[str, Any]:
+        """
+        Get preview data for visualization without full scenario conversion.
+        
+        Returns:
+            Dict with 'polygons' (list of {material, coords, area}), 'stats', and 'bounds'
+        """
+        # Reuse extract logic but return intermediate data
+        scenario = self.extract_scenario(layer_mapping, simplify_tolerance, min_area_threshold)
+        
+        # Build preview polygons from scenario
+        preview_polys = []
+        points = scenario.get('points', {})
+        for el in scenario.get('elements', []):
+            if el.get('type') == 'polygon':
+                coords = [points[p] for p in el.get('points', [])]
+                if len(coords) >= 3:
+                    from shapely.geometry import Polygon as ShapelyPolygon
+                    poly = ShapelyPolygon(coords)
+                    preview_polys.append({
+                        'material': el.get('material', 'unknown'),
+                        'name': el.get('name', ''),
+                        'coords': coords,
+                        'area': poly.area
+                    })
+        
+        # Calculate stats
+        bounds = scenario.get('canvas', {}).get('bounds', [0, 500, 0, 500])
+        total_area = sum(p['area'] for p in preview_polys)
+        materials_used = set(p['material'] for p in preview_polys)
+        
+        return {
+            'polygons': preview_polys,
+            'stats': {
+                'polygon_count': len(preview_polys),
+                'total_area_mm2': total_area,
+                'materials_used': list(materials_used),
+                'point_count': len(points)
+            },
+            'bounds': bounds
+        }
+
+
+    def extract_scenario(self, layer_mapping: Dict[str, str], 
+                         simplify_tolerance: float = 1.0,
+                         min_area_threshold: float = 5.0) -> Dict[str, Any]:
         """
         Convert mapped layers into a Scenario dictionary.
         
         Args:
             layer_mapping: Dict mapping DXF Layer Name -> Material ID (string)
+            simplify_tolerance: Douglas-Peucker simplification tolerance in mm (default: 1.0)
+            min_area_threshold: Minimum polygon area in mm² to include (default: 5.0)
             
         Returns:
             Dict matching the Scenario schema.
@@ -170,9 +219,9 @@ class DXFImporter:
 
                 
             for part in final_parts:
-                if part.area < 5.0: continue
+                if part.area < min_area_threshold: continue
                 
-                simplified = part.simplify(1.0, preserve_topology=True)
+                simplified = part.simplify(simplify_tolerance, preserve_topology=True)
                 
                 if simplified.is_empty: continue
                 
