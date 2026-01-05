@@ -5,12 +5,14 @@ from geometry import RectangularRegion, PolygonShape, MaterialID
 def test_declarative_variable_resolution():
     """Test variable substitution in YAML."""
     data = {
+        "name": "TestVariableResolution",
         "variables": {
             "width": 100,
             "height": 50
         },
         "canvas": {
-            "bounds": [0, "${width}", 0, "${height}"]
+            "bounds": [0, "${width}", 0, "${height}"],
+            "grid": 10.0
         },
         "elements": []
     }
@@ -23,7 +25,11 @@ def test_declarative_variable_resolution():
 
 def test_declarative_material_resolution():
     """Test resolving material IDs from strings."""
-    data = {"elements": []}
+    data = {
+        "name": "TestMatRes",
+        "canvas": {"bounds": [0, 10, 0, 10], "grid": 1},
+        "elements": []
+    }
     geom = DeclarativeGeometry(data)
     
     # Test built-in lookup logic (private method access)
@@ -42,6 +48,8 @@ def test_declarative_material_resolution():
 def test_declarative_elements_parsing():
     """Test parsing of rectangular elements."""
     data = {
+        "name": "TestElements",
+        "canvas": {"bounds": [0, 10, 0, 10], "grid": 1},
         "elements": [
             {
                 "type": "rect",

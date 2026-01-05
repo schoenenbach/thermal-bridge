@@ -9,6 +9,7 @@ def test_full_simulation_pipeline(solver_lib):
     """Run a minimal full simulation integration test."""
     # Simple geometry: 20x20 canvas, single material block
     data = {
+        "name": "TestIntegration",
         "canvas": {"bounds": [0, 20, 0, 20], "grid": 2.0},
         "elements": [
             {

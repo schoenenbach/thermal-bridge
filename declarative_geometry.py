@@ -192,8 +192,12 @@ class DeclarativeGeometry(SketchGeometry):
             "AIR_EXT": (MaterialID.AIR_EXT, 0.025),
             "CAVITY": (MaterialID.CAVITY, MAT_CAVITY_ISO)
         }
-        if mat_val in MAT_MAP:
-            return MAT_MAP[mat_val]
+
+        
+        # Case-insensitive lookup for legacy map
+        mat_upper = str(mat_val).upper()
+        if mat_upper in MAT_MAP:
+            return MAT_MAP[mat_upper]
             
         print(f"[WARNING] Unknown material '{mat_val}', defaulting to WALL")
         return (MaterialID.WALL, MAT_WALL)

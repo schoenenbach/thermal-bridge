@@ -17,6 +17,7 @@ from solver import get_solver_lib
 from geometry_builder import generate_scenario, COLOR_MAP, scenario_to_canvas
 
 from streamlit_drawable_canvas import st_canvas
+from mold_analysis import calculate_surface_humidity, plot_mold_risk_map
 
 # ... (Previous imports)
 
@@ -351,6 +352,14 @@ with tab_editor:
             active_data['transient']['save_interval_steps'] = save_int
             
             st.info(f"Total Steps: {int(dur*3600/dt)}")
+            
+    # --- Mold & Condensation Risk ---
+    st.sidebar.markdown("---")
+    mold_exp = st.sidebar.expander("Mold & Condensation Risk", expanded=False)
+    with mold_exp:
+        show_mold_map = st.checkbox("Show Mold Risk Map", value=False)
+        indoor_rh = st.slider("Indoor Relative Humidity (%)", min_value=30, max_value=80, value=50, step=5)
+    
     
     
     # --- Execution Control ---
@@ -453,6 +462,59 @@ with tab_editor:
                             if os.path.exists(img_path):
                                 # Force browser reload with unique param
                                 st.image(img_path, caption=f"Result (Ti={active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 'Def')}°C)", output_format="PNG")
+
+                        # --- Mold Analysis Plot ---
+                        if show_mold_map and not active_data.get('transient', {}).get('enabled'):
+                             st.markdown("---")
+                             st.subheader("Mold Risk Analysis")
+                             
+                             if 'temp' in results:
+                                 # Retrieve Temperature Field
+                                 temp_field = results['temp']
+                                 
+                                 # Get Internal Temperature (Robust fallback)
+                                 t_int_val = active_data.get('boundary_conditions', {}).get('convective', {}).get('internal', {}).get('T', 20.0)
+                                 
+                                 # Calculate RH Field
+                                 rh_grid = calculate_surface_humidity(temp_field, t_int_val, indoor_rh / 100.0)
+                                 
+                                 # Mesh Coords
+                                 x_c, y_c = None, None
+                                 if 'mesh' in results:
+                                     x_c = results['mesh'].get('x_coords')
+                                     y_c = results['mesh'].get('y_coords')
+                                 else:
+                                     # Backward compatibility for uniform mesh without mesh object return
+                                     # We know width/height from config
+                                     pass 
+                                     
+                                 mold_filename = f"mold_risk_{active_name}.png"
+                                 
+                                 # Determine dimensions for plotting
+                                 if x_c is not None and y_c is not None:
+                                      # Adaptive mesh: dimensions are handled by coordinates
+                                      w_mm = 0
+                                      h_mm = 0
+                                 else:
+                                      # Uniform mesh fallback: need explicit dimensions
+                                      b = active_data.get('canvas', {}).get('bounds', [0, 500, 0, 500])
+                                      if len(b) >= 4:
+                                          w_mm = b[1] - b[0]
+                                          h_mm = b[3] - b[2]
+                                      else:
+                                          w_mm = 500
+                                          h_mm = 500
+                                 
+                                 plot_mold_risk_map(rh_grid, 
+                                                    width_mm=w_mm,
+                                                    height_mm=h_mm,
+                                                    filename=mold_filename,
+                                                    x_coords=x_c,
+                                                    y_coords=y_c)
+                                                    
+                                 st.image(mold_filename, caption=f"Mold Risk (Ti={t_int_val}°C, RHi={indoor_rh}%)")
+                             else:
+                                 st.warning("Temperature field data not found in results. Unable to calculate Mold Risk.")
                             
                     except Exception as e:
                         st.error(f"Error: {e}")
