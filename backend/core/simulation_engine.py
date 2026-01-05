@@ -229,7 +229,7 @@ def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond,
 
 # --- Solver Core ---
 
-def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_map, t_int, t_ext, cfg):
+def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_map, t_int, t_ext, cfg, return_plot_data=False):
     """
     Run transient simulation and generate animation frames.
     """
@@ -315,10 +315,11 @@ def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_m
         frames[0].save(gif_name, save_all=True, append_images=frames[1:], optimize=True, duration=100, loop=0)
     
     # Plot final state
-    plot_temperature_map(temp, 
+    final_plot_filename = f"result_{geom.data.get('name', 'transient')}_final.png" if not return_plot_data else None
+    final_plot_output = plot_temperature_map(temp, 
                          geom.get_canvas_config().width_mm, 
                          geom.get_canvas_config().height_mm,
-                         f"result_{geom.data.get('name', 'transient')}_final.png", 
+                         final_plot_filename, 
                          title=f"Transient End State (t={duration_s/3600:.1f}h)",
                          wall_thick_mm=geom.data.get('variables', {}).get('wall_thick', 360))
                          
@@ -337,7 +338,7 @@ def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_m
     p1_results = evaluate_measurements(measurements_def, geom, mesh, temp, cond,
                                       t_int, t_ext, rs_check, grid_map, mask_int)
                           
-    return {
+    result_dict = {
         "name": geom.data.get('name', 'transient'),
         "measurements": p1_results,
         "measurements_frsi": {}, # Not typical for transient
@@ -347,12 +348,25 @@ def solve_transient_scenario(geom, mesh, temp_init, Gh, Gv, mask, values, grid_m
             "x_coords": mesh.x_coords,
             "y_coords": mesh.y_coords,
             "dx": mesh.dx_array,
-            "dy": mesh.dy_array
         }
     }
+    
+    if return_plot_data:
+        # If we collected frames for GIF, we might want to return them or the GIF bytes
+        # For now, let's just return the final plot buffer
+        result_dict["plot_buffer"] = final_plot_output
+        if frames:
+            # Create GIF in memory
+            import io
+            gif_buf = io.BytesIO()
+            frames[0].save(gif_buf, save_all=True, append_images=frames[1:], optimize=True, duration=100, loop=0, format='GIF')
+            gif_buf.seek(0)
+            result_dict["anim_buffer"] = gif_buf
+
+    return result_dict
 
 
-def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None):
+def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None, return_plot_data=False):
     """Solve a thermal bridge scenario and return results."""
     print(f"\nrunning {scenario_def['name']}...")
     cfg = scenario_def['cfg']
@@ -711,7 +725,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # --- Transient Simulation Dispatch ---
     trans_cfg = geom.data.get('transient', {})
     if trans_cfg.get('enabled'):
-        return solve_transient_scenario(geom, mesh, temp, Gh, Gv, mask, values, grid_map, t_int, t_ext, trans_cfg)
+        return solve_transient_scenario(geom, mesh, temp, Gh, Gv, mask, values, grid_map, t_int, t_ext, trans_cfg, return_plot_data=return_plot_data)
     
     # Pass 1: Solve for Psi (Standard Rsi = 0.13)
     print(f"  [PASS 1] Solving for Psi-value (Rsi={rsi_design})...")
@@ -772,7 +786,11 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     ref_flow = u_wall_1d * l_wall + u_frame * l_frame + u_glass * l_glass
     psi = l2d - ref_flow
     
-    # --- Measurements ---
+    # 7. Plotting
+    # If return_plot_data is True, we get a BytesIO buffer.
+    # Otherwise we get a filename (or None) and it saves to disk.
+    
+
     measurements_def = geom.data.get('measurements', {})
 
     # Pass 2 (fRsi) - Optional
@@ -895,17 +913,19 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # Format Title to include Temperature Setup
     plot_title = f"{scenario_def['name']}\n(Ti={t_int}°C, Te={t_ext}°C)"
 
-    plot_temperature_map(temp_for_plot, 
+    plot_filename = f"result_{scenario_def['name']}.png" if not return_plot_data else None
+
+    plot_out = plot_temperature_map(temp_for_plot, 
                          geom.get_canvas_config().width_mm, 
                          geom.get_canvas_config().height_mm,
-                         f"result_{scenario_def['name']}.png", 
+                         plot_filename, 
                          title=plot_title,
                          wall_thick_mm=wall_th,
                          grid_size_mm=getattr(mesh, 'grid_size_mm', None),
                          x_coords=mesh.x_coords,
                          y_coords=mesh.y_coords)
     
-    return {
+    results = {
         "name": scenario_def['name'],
         "measurements": combined_results,
         "temp": temp_for_plot,
@@ -921,6 +941,11 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
             "y_coords": mesh.y_coords
         }
     }
+
+    if return_plot_data:
+        results['plot_buffer'] = plot_out
+
+    return results
 
 
 def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):

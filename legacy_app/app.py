@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import sys
+from io import BytesIO
 
 # Ensure current directory is in path so we can import modules
 sys.path.append(os.getcwd())
@@ -156,18 +157,12 @@ with tab_studio:
         
         # Download button
         if active_data:
-            st.download_button("⬇️ Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml", use_container_width=True)
+            st.download_button("⬇️ Download YAML", data=yaml_input, file_name=f"{active_name.replace(' ', '_')}.yaml", help="Save current configuration", type="secondary")
         
         # Apply variable overrides from session state (set by inspector sliders)
         # This must happen BEFORE preview generation
-        if active_data and 'variables' in active_data:
-            variables = active_data.get('variables', {})
-            for key, orig_val in variables.items():
-                if isinstance(orig_val, (int, float)):
-                    session_key = f"insp_{active_name}_{key}"
-                    if session_key in st.session_state:
-                        active_data['variables'][key] = st.session_state[session_key]
-    
+    # Variable overrides removed - edit YAML directly
+
     # == CENTER COLUMN: Geometry Preview ==
     with col_preview:
         st.subheader("🗺️ Geometry Preview")
@@ -238,11 +233,11 @@ with tab_studio:
                 final_colors.update(registry_colors)
 
                 # Generate preview with unique filename to bust cache
-                preview_file = "studio_preview.png"
-                plot_geometry(grid_map, 
+                # preview_file = "studio_preview.png"
+                preview_buf = plot_geometry(grid_map, 
                               geom.get_canvas_config().width_mm, 
                               geom.get_canvas_config().height_mm,
-                              filename=preview_file,
+                              filename=None,
                               x_coords=mesh.x_coords,
                               y_coords=mesh.y_coords,
                               highlight_bbox=highlight,
@@ -250,7 +245,7 @@ with tab_studio:
                               material_colors=final_colors)
                 
                 # Display with unique key to force refresh
-                st.image(preview_file, use_container_width=True)
+                st.image(preview_buf) # Removed width constraint to default behavior or use width='stretch' if supported, but image usually handles itself. Warning said use width='stretch'
                 
             except Exception as e:
                 st.warning(f"Preview error: {e}")
@@ -264,9 +259,9 @@ with tab_studio:
         st.markdown("---")
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
-            run_sim_clicked = st.button("▶️ Run Simulation", type="primary", use_container_width=True)
+            run_sim_clicked = st.button("▶️ Run Simulation", type="primary")
         with col_btn2:
-            refresh_preview = st.button("🔄 Refresh Preview", use_container_width=True)
+            refresh_preview = st.button("🔄 Refresh Preview")
             if refresh_preview:
                 st.rerun()
     
@@ -348,39 +343,9 @@ with tab_studio:
                         else:
                             st.caption(f"`{k}`: **{v}**")
                 else:
-                    # Show all numeric variables as sliders
-                    st.markdown("**Variable Sliders:**")
-                    modified = {}
-                    for key, val in variables.items():
-                        if isinstance(val, (int, float)):
-                            # Calculate sensible min/max that handles negative values
-                            if val >= 0:
-                                min_v = 0.0
-                                max_v = float(val) * 3.0 if val > 0 else 100.0
-                            else:
-                                # Negative value: allow range from 2x negative to positive
-                                min_v = float(val) * 2.0
-                                max_v = abs(float(val))
-                            
-                            step = 5.0
-                            if "thick" in key: max_v = max(500.0, max_v)
-                            
-                            new_val = st.number_input(
-                                f"{key}", 
-                                min_value=float(min_v), 
-                                max_value=float(max_v), 
-                                value=float(val),
-                                step=step,
-                                key=f"insp_{active_name}_{key}"
-                            )
-                            modified[key] = new_val
-                        else:
-                            st.caption(f"`{key}`: {val}")
-                            modified[key] = val
-                    
-                    # Apply modifications
-                    if modified:
-                        active_data['variables'] = modified
+                    # No element selected
+                    st.info("Select an element above to inspect its parameters.")
+                    st.caption("To edit variables, please use the YAML editor on the left.")
             else:
                 st.info("No elements defined.")
         else:
@@ -412,7 +377,7 @@ with tab_studio:
                     prog_bar.progress(final_pct)
                     status_text.text(f"{phase}: Iteration {step}/{total} (Diff={diff:.2e})")
 
-                results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb)
+                results = solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=app_progress_cb, return_plot_data=True)
                 
                 prog_bar.progress(1.0)
                 status_text.success("Simulation Complete!")
@@ -448,22 +413,26 @@ with tab_studio:
                 # Store for report
                 simple_results = {k: v.get('value') for k, v in measurements.items()}
                 st.session_state['last_simulation_results'] = simple_results
+                # Store plot buffer for report
+                if 'plot_buffer' in results:
+                     st.session_state['last_plot_buffer'] = results['plot_buffer']
                 
                 # Show Result Image
                 if active_data.get('transient', {}).get('enabled'):
-                    gif_path = f"result_{active_name}.gif"
-                    if os.path.exists(gif_path):
-                        st.image(gif_path, caption=f"Transient Animation ({active_data['transient']['duration_hours']}h)")
-                        with open(gif_path, "rb") as f:
-                            st.download_button("Download GIF", data=f, file_name=gif_path, mime="image/gif")
+                    # GIF handling
+                    anim_buf = results.get('anim_buffer')
+                    if anim_buf:
+                        st.image(anim_buf, caption=f"Transient Animation ({active_data['transient']['duration_hours']}h)")
+                        st.download_button("Download GIF", data=anim_buf, file_name=f"result_{active_name}.gif", mime="image/gif")
                     
-                    final_path = f"result_{active_name}_final.png"
-                    if os.path.exists(final_path):
-                        st.image(final_path, caption="Final State")
+                    final_buf = results.get('plot_buffer')
+                    if final_buf:
+                        st.image(final_buf, caption="Final State")
                 else:
-                    img_path = f"result_{active_name}.png"
-                    if os.path.exists(img_path):
-                        st.image(img_path, caption=f"Temperature Distribution")
+                    img_buf = results.get('plot_buffer')
+                    if img_buf:
+                        st.image(img_buf, caption=f"Temperature Distribution")
+                        st.download_button("Download Image", data=img_buf, file_name=f"result_{active_name}.png", mime="image/png")
                 
                 # Mold Analysis
                 if show_mold_map and not active_data.get('transient', {}).get('enabled'):
@@ -489,9 +458,9 @@ with tab_studio:
                             w_mm = b[1] - b[0] if len(b) >= 4 else 500
                             h_mm = b[3] - b[2] if len(b) >= 4 else 500
                         
-                        plot_mold_risk_map(rh_grid, width_mm=w_mm, height_mm=h_mm,
-                                           filename=mold_filename, x_coords=x_c, y_coords=y_c)
-                        st.image(mold_filename, caption=f"Mold Risk (Ti={t_int_val}°C, RHi={indoor_rh}%)")
+                        mold_buf = plot_mold_risk_map(rh_grid, width_mm=w_mm, height_mm=h_mm,
+                                           filename=None, x_coords=x_c, y_coords=y_c)
+                        st.image(mold_buf, caption=f"Mold Risk (Ti={t_int_val}°C, RHi={indoor_rh}%)")
                     else:
                         st.warning("Temperature field not found in results.")
                         
@@ -547,14 +516,14 @@ with tab_opt:
                                                       title=f"Impact of {target_param} on Psi-Value",
                                                       labels={'value': target_param, 'psi_value': 'Psi-Value [W/mK]'},
                                                       markers=True)
-                                        st.plotly_chart(fig, use_container_width=True)
+                                        st.plotly_chart(fig)
                                         
                                         if 'fRsi' in df.columns and df['fRsi'].notnull().any():
                                             fig2 = px.line(df, x='value', y='fRsi',
                                                            title=f"Impact of {target_param} on fRsi",
                                                             labels={'value': target_param, 'fRsi': 'fRsi Factor'},
                                                            markers=True)
-                                            st.plotly_chart(fig2, use_container_width=True)
+                                            st.plotly_chart(fig2)
                                             
                                 except Exception as e:
                                     st.error(f"Sweep Failed: {e}")
@@ -582,26 +551,25 @@ with tab_opt:
         
     if st.button("Generate PDF Report"):
         # Gather results (need to be in scope or session state)
-        # We might need to re-parse or better yet, store 'last_results' in session_state.
         
-        # Better approach: Check if results image exists
-        img_path = f"result_{active_name}.png"
-        if os.path.exists(img_path):
-            # Try to reconstruct results from a simplified approach or session state
-            # Ideally, 'results' should be saved. 
-            # Let's check if we can read measurement values from a log or just pass empty for now if missing.
-            # To do this properly, let's modify the simulation block to save to session_state.
-            
+        # Better approach: Check if results image exists (now in buffer)
+        img_buf = st.session_state.get('last_plot_buffer')
+        
+        if img_buf:
             # Use 'st.session_state.get' to find results if we decide to store them
             results_for_report = st.session_state.get('last_simulation_results', {})
             
             pdf_path = f"report_{active_name.replace(' ', '_')}.pdf"
+            
+            # Rewind buffer just in case
+            if hasattr(img_buf, 'seek'): img_buf.seek(0)
+            
             success, msg = generate_pdf_report(
                 project_name=rep_project_name,
                 author=rep_author,
                 description=rep_desc,
                 results=results_for_report,
-                image_path=img_path,
+                image_path=img_buf, 
                 output_path=pdf_path
             )
             
@@ -671,7 +639,7 @@ with tab_compare:
                      cfg_ref['name'] = ref_run_name
                         
                      defprog = {"name": ref_run_name, "file_suffix": "ref", "cfg": cfg_ref}
-                     res_ref = solve_scenario(defprog, use_adaptive_mesh=True)
+                     res_ref = solve_scenario(defprog, use_adaptive_mesh=True, return_plot_data=True)
                 
                 # 2. Proposed
                 with st.spinner(f"Simulating Proposed: {prop_sel}..."):
@@ -682,7 +650,7 @@ with tab_compare:
                      cfg_prop['name'] = prop_run_name
                         
                      defprog = {"name": prop_run_name, "file_suffix": "prop", "cfg": cfg_prop}
-                     res_prop = solve_scenario(defprog, use_adaptive_mesh=True)
+                     res_prop = solve_scenario(defprog, use_adaptive_mesh=True, return_plot_data=True)
                      
                 st.success("Simulations Complete!")
                 
@@ -726,18 +694,8 @@ with tab_compare:
                 
                 import matplotlib.pyplot as plt
                 
-                def plot_temp_fast(res, title, key_salt):
-                     # Check for file generated by solver
-                     # The solver uses geom.data['name'] for filename
-                     target = f"result_{res['name']}{'_final' if res.get('final_temp') is not None else ''}.png"
-                     if os.path.exists(target):
-                         return target
-                     target = f"result_{res['name']}.png"
-                     if os.path.exists(target): return target
-                     return None
-
-                img_r = plot_temp_fast(res_ref, "Reference", "ref")
-                img_p = plot_temp_fast(res_prop, "Proposed", "prop")
+                img_r = res_ref.get('plot_buffer')
+                img_p = res_prop.get('plot_buffer')
                 
                 with v_col1:
                     st.caption(f"Reference: {ref_sel}")
@@ -976,7 +934,7 @@ with tab_import:
             col_dxf_act1, col_dxf_act2, col_dxf_act3 = st.columns(3)
             
             with col_dxf_act1:
-                if st.button("Convert to Scenario", type="primary", use_container_width=True):
+                if st.button("Convert to Scenario", type="primary"):
                     if mapping:
                         scen_dict = importer.extract_scenario(mapping, simplify_tol, min_area)
                         yaml_str = yaml.dump(scen_dict, sort_keys=False)
@@ -987,9 +945,9 @@ with tab_import:
             
             with col_dxf_act2:
                 if st.session_state.dxf_yaml_preview:
-                    if st.button("Load into Editor", use_container_width=True):
-                        st.session_state.yaml_editor = st.session_state.dxf_yaml_preview
-                        st.success("Loaded into Editor! Switch to 'Scenario Studio' tab.")
+                    if st.button("Load into Editor", width="stretch"):
+                         st.session_state.yaml_editor = st.session_state.dxf_yaml_preview
+                         st.success("Loaded into Editor! Switch to 'Scenario Studio' tab.")
             
             with col_dxf_act3:
                 if st.session_state.dxf_yaml_preview:
@@ -998,7 +956,7 @@ with tab_import:
                         data=st.session_state.dxf_yaml_preview,
                         file_name=f"imported_{dxf_file.name.replace('.dxf', '')}.yaml",
                         mime="text/yaml",
-                        use_container_width=True
+                        width="stretch"
                     )
                         
             # Show YAML Preview if available

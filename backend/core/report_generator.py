@@ -138,7 +138,7 @@ HTML_TEMPLATE = """
 <section>
     <h2>Temperature Field</h2>
     <div class="image-container">
-        <img src="file://{{ image_path }}" alt="Temperature Map">
+        <img src="{{ image_src }}" alt="Temperature Map">
     </div>
 </section>
 
@@ -155,6 +155,23 @@ def generate_pdf_report(project_name, author, description, results, image_path, 
     Generates a PDF report from simulation results.
     """
     
+    import base64
+    from io import BytesIO
+
+    img_src = ""
+    if image_path:
+        if isinstance(image_path, str) and os.path.exists(image_path):
+             img_src = f"file://{os.path.abspath(image_path)}"
+        elif hasattr(image_path, 'read') or isinstance(image_path, bytes):
+             # It's a buffer or bytes
+             if hasattr(image_path, 'read'):
+                 if hasattr(image_path, 'seek'): image_path.seek(0)
+                 data = image_path.read()
+             else:
+                 data = image_path
+             b64_data = base64.b64encode(data).decode('utf-8')
+             img_src = f"data:image/png;base64,{b64_data}"
+    
     # 1. Prepare Context
     context = {
         "project_name": project_name,
@@ -162,7 +179,7 @@ def generate_pdf_report(project_name, author, description, results, image_path, 
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "description": description,
         "results": results,
-        "image_path": os.path.abspath(image_path)
+        "image_src": img_src
     }
     
     # 2. Render HTML

@@ -8,6 +8,8 @@ areas at risk of mold growth, compliant with ISO 13788 principles.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from typing import Union, BinaryIO
+from io import BytesIO
 
 def calculate_saturation_pressure(temp_c: np.ndarray) -> np.ndarray:
     """
@@ -64,7 +66,7 @@ def calculate_surface_humidity(temp_surf: np.ndarray,
 def plot_mold_risk_map(rh_grid: np.ndarray,
                        width_mm: float,
                        height_mm: float,
-                       filename: str,
+                       filename: Union[str, BinaryIO, None],
                        x_coords: np.ndarray = None,
                        y_coords: np.ndarray = None):
     """
@@ -79,8 +81,11 @@ def plot_mold_risk_map(rh_grid: np.ndarray,
         rh_grid: 2D array of Relative Humidity [0.0 - 1.xx]
         width_mm: Domain width
         height_mm: Domain height
-        filename: Output path
+        filename: Output path, BytesIO buffer, or None (creates new buffer)
         x_coords, y_coords: Optional adaptive mesh coordinates
+        
+    Returns:
+        The filename (str) or buffer (BytesIO).
     """
     plt.figure(figsize=(10, 8))
     
@@ -142,5 +147,19 @@ def plot_mold_risk_map(rh_grid: np.ndarray,
     plt.gca().set_aspect('equal', adjustable='box')
     
     plt.tight_layout()
-    plt.savefig(filename, dpi=150)
-    plt.close()
+    plt.tight_layout()
+    
+    if filename is None:
+        buf = BytesIO()
+        plt.savefig(buf, dpi=150)
+        plt.close()
+        buf.seek(0)
+        return buf
+    elif isinstance(filename, str):
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        return filename
+    else:
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        return filename

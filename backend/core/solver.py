@@ -15,7 +15,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from typing import Tuple, Dict, Optional
+from io import BytesIO
+from typing import Tuple, Dict, Optional, Union, BinaryIO
 
 from backend.core.config import TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER
 from backend.core.geometry import MaterialID
@@ -385,7 +386,7 @@ def calculate_thermal_results(temp: np.ndarray,
 def plot_temperature_map(temp_grid: np.ndarray,
                          width_mm: float,
                          height_mm: float,
-                         filename: str,
+                         filename: Union[str, BinaryIO, None],
                          title: str,
                          wall_thick_mm: Optional[float] = None,
                          grid_size_mm: Optional[float] = None,
@@ -394,6 +395,10 @@ def plot_temperature_map(temp_grid: np.ndarray,
     """
     Plot temperature distribution with isotherm contour lines.
     Supports both uniform (imshow) and adaptive (pcolormesh) grids.
+    
+    If filename is None, returns a BytesIO buffer containing the PNG.
+    If filename is str, saves to that path and returns filename.
+    If filename is a file-like object, saves to it and returns it.
     """
     plt.figure(figsize=(10, 8))
     
@@ -530,14 +535,27 @@ def plot_temperature_map(temp_grid: np.ndarray,
         plt.xlim(0, width_mm)
         plt.ylim(0, height_mm)
     
-    plt.savefig(filename, dpi=150)
-    plt.close()
+    if filename is None:
+        buf = BytesIO()
+        plt.savefig(buf, dpi=150)
+        plt.close()
+        buf.seek(0)
+        return buf
+    elif isinstance(filename, str):
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        return filename
+    else:
+        # Assume file-like
+        plt.savefig(filename, dpi=150)
+        plt.close()
+        return filename
 
 
 def plot_geometry(grid_map: np.ndarray,
                   width_mm: float,
                   height_mm: float,
-                  filename: str = "geometry_debug.png",
+                  filename: Union[str, BinaryIO, None] = "geometry_debug.png",
                   x_coords: Optional[np.ndarray] = None,
                   y_coords: Optional[np.ndarray] = None,
                   equal_aspect: bool = False,
@@ -651,5 +669,20 @@ def plot_geometry(grid_map: np.ndarray,
     
     # Adjust layout to accommodate external legend
     plt.tight_layout()
-    plt.savefig(filename, dpi=150, bbox_inches='tight')
-    plt.close()
+    # Adjust layout to accommodate external legend
+    plt.tight_layout()
+    
+    if filename is None:
+        buf = BytesIO()
+        plt.savefig(buf, dpi=150, bbox_inches='tight')
+        plt.close()
+        buf.seek(0)
+        return buf
+    elif isinstance(filename, str):
+        plt.savefig(filename, dpi=150, bbox_inches='tight')
+        plt.close()
+        return filename
+    else:
+        plt.savefig(filename, dpi=150, bbox_inches='tight')
+        plt.close()
+        return filename
