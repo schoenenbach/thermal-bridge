@@ -176,15 +176,29 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
         
     if 'convective' in bcs:
         conv = bcs['convective']
-        # Internal (Design)
+        
+        # Generic Parsing for T and R from all sides
+        for side, params in conv.items():
+            if not isinstance(params, dict): continue
+            
+            t_val = float(params.get('T', 20.0))
+            r_val = float(params.get('R', RSI_WALL))
+            
+            # Heuristic: Warm side is Internal (>10C)
+            if t_val > 10.0:
+                t_int = t_val
+                if 'R' in params: rsi_design = r_val
+            else:
+                t_ext = t_val
+                if 'R' in params: rse = r_val
+        
+        # Explicit Overrides (legacy/specific support)
         if 'internal' in conv:
             t_int = float(conv['internal'].get('T', t_int))
             rsi_design = float(conv['internal'].get('R', rsi_design))
-        # External
         if 'external' in conv:
             t_ext = float(conv['external'].get('T', t_ext))
             rse = float(conv['external'].get('R', rse))
-        # Internal (Check/Corner) - Optional override
         if 'internal_check' in conv:
             rsi_check = float(conv['internal_check'].get('R', rsi_check))
     
@@ -334,7 +348,22 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
                 mask[:, -1] = 0
     # ----------------------------------------------------
     
-    temp = np.ones_like(cond) * 10.0
+    # intelligent Initialization
+    # Check if we have opposing boundaries to establish a gradient
+    if pad_bottom and pad_top:
+        # Vertical Gradient
+        t_b = float(conv_bcs.get('bottom', {}).get('T', t_int))
+        t_t = float(conv_bcs.get('top', {}).get('T', t_ext))
+        temp = np.linspace(t_b, t_t, cond.shape[0])[:, None] * np.ones((1, cond.shape[1]))
+    elif pad_left and pad_right:
+        # Horizontal Gradient
+        t_l = float(conv_bcs.get('left', {}).get('T', t_int))
+        t_r = float(conv_bcs.get('right', {}).get('T', t_ext))
+        temp = np.linspace(t_l, t_r, cond.shape[1])[None, :] * np.ones((cond.shape[0], 1))
+    else:
+        # Flat fallback
+        temp = np.ones_like(cond) * (t_int + t_ext) / 2.0
+
     temp[mask_int] = t_int
     temp[mask_ext] = t_ext
     
@@ -346,7 +375,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
         cb1 = lambda s, t, d: progress_callback("Pass 1: Psi-Value", s, t, d)
 
     temp_res = solve(temp, Gh, Gv, mask, values, max_iter=500000, tol=1e-7, 
-                     batch_size=5000, verbose=True, progress_callback=cb1)
+                     batch_size=10000, verbose=True, progress_callback=cb1)
     
     # 6. Calculate Results - Total Flux L2D
     # Flux calculation needs to handle variable dy/dx
@@ -417,7 +446,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
 
     temp_frsi = temp_res.copy()
     temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=500000, 
-                      tol=1e-7, batch_size=5000, verbose=True, progress_callback=cb2)
+                      tol=1e-7, batch_size=10000, verbose=True, progress_callback=cb2)
     
     # Minimum surface temperature
     def get_min_surf(t_field, k_field, rsi_used, material_filter=None):
