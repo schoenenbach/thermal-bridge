@@ -1,0 +1,273 @@
+INFO:     Will watch for changes in these directories: ['/home/thomas/Desktop/Fensterlaibung_rollläden']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [194742] using StatReload
+INFO:     Started server process [194745]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:45100 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45108 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47192 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47208 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47210 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47222 - "WebSocket /api/ws/simulation/8154be41-ea34-40c0-9f27-f3afee18daae" [accepted]
+INFO:     connection open
+
+running ISO Case 1: Half Column...
+  AdaptiveMesh: 200 x 400 cells (200.0 x 400.0 mm)
+  [PASS 1] Solving for Psi-value (Rsi=0.13)...
+[INFO] C++ Accelerated Solver Loaded.
+  Iteration 10000/500000: Diff=9.99e-08
+  Converged in 10000 iterations (diff=9.99e-08)
+  [Pass 2] Skipped (No fRsi requested).
+
+  --- Measurement Results ---
+    ISO Checkpoint: 5.2275 (Expected: 5.2500) -> PASS
+INFO:     127.0.0.1:49838 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 186, in _run_simulation_task
+    results = await loop.run_in_executor(None, solve_wrapper)
+  File "/usr/lib/python3.10/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 180, in solve_wrapper
+    return solve_scenario(
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/simulation_engine.py", line 372, in solve_scenario
+    geom = DeclarativeGeometry(data)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 38, in __init__
+    raise e
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 34, in __init__
+    self.model = Scenario(**self.data)
+  File "/home/thomas/.local/lib/python3.10/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for Scenario
+materials
+  Input should be a valid list [type=list_type, input_value={'concrete': {'conductivi....0, 'color': '#888888'}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/list_type
+canvas.bounds
+  Field required [type=missing, input_value={'width': 500, 'height': 500, 'grid': 10.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+INFO:     127.0.0.1:49838 - "WebSocket /api/ws/simulation/bfb315b9-d9ec-4fee-884c-074e39a77862" [accepted]
+INFO:     connection open
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'reproduce_stall.py'. Reloading...
+INFO:     Shutting down
+INFO:     connection closed
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [194745]
+INFO:     Started server process [195533]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49916 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49916 - "WebSocket /api/ws/simulation/8c2e5bf0-5fb2-4d0f-ba1e-c5125f8cf710" [accepted]
+INFO:     connection open
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'reproduce_stall.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [195533]
+INFO:     Started server process [195671]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57200 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57200 - "WebSocket /api/ws/simulation/33fc2def-58c5-4746-9081-74c8646b7a7f" [accepted]
+INFO:     connection open
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'backend/core/simulation_engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [195671]
+INFO:     Started server process [195867]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38082 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38082 - "WebSocket /api/ws/simulation/8da4b5de-70c6-41e8-93b9-21907d38d5a1" [accepted]
+INFO:     connection open
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'backend/core/simulation_engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [195867]
+INFO:     Started server process [196007]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'backend/app/jobs.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [196007]
+INFO:     Started server process [196024]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49112 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49112 - "WebSocket /api/ws/simulation/8e7e8da7-0767-445d-8e85-0823ef2ac528" [accepted]
+INFO:     connection open
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'backend/app/jobs.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [196024]
+INFO:     Started server process [196173]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:52276 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52276 - "WebSocket /api/ws/simulation/c1425a6f-3e15-4138-989e-9972f512e6ad" [accepted]
+INFO:     connection open
+INFO:     connection closed
+
+running Scenario 8: Wall 360mm (Styrodur, No Rev)...
+  AdaptiveMesh: 269 x 202 cells (660.0 x 500.0 mm)
+[JOBS] Connecting WS for job c1425a6f-3e15-4138-989e-9972f512e6ad
+  [PASS 1] Solving for Psi-value (Rsi=0.13)...
+[INFO] C++ Accelerated Solver Loaded.
+  Iteration 10000/500000: Diff=9.98e-08
+  Converged in 10000 iterations (diff=9.98e-08)
+  [PASS 2] Solving for fRsi/MinT (Rsi=0.25)...
+  Iteration 10000/500000: Diff=9.99e-08
+  Converged in 10000 iterations (diff=9.99e-08)
+
+  --- Measurement Results ---
+    Psi: 0.0110 W/mK
+    fRsi: 0.6294 (MinT: 10.73C)
+    MinT_Wall: 10.73
+    MinT_Frame: 11.20
+    MinT_Glass: 13.92
+[JOBS] Sending completion for c1425a6f-3e15-4138-989e-9972f512e6ad
+INFO:     127.0.0.1:42032 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42036 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42052 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55712 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55728 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55732 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55756 - "WebSocket /api/ws/simulation/a5ba7453-f496-4e9f-9f32-5d1e1c115bad" [accepted]
+INFO:     connection open
+
+running ISO Case 1: Half Column...
+  AdaptiveMesh: 200 x 400 cells (200.0 x 400.0 mm)
+  [PASS 1] Solving for Psi-value (Rsi=0.13)...
+[JOBS] Connecting WS for job a5ba7453-f496-4e9f-9f32-5d1e1c115bad
+  Iteration 10000/500000: Diff=9.99e-08
+  Converged in 10000 iterations (diff=9.99e-08)
+  [Pass 2] Skipped (No fRsi requested).
+
+  --- Measurement Results ---
+    ISO Checkpoint: 5.2275 (Expected: 5.2500) -> PASS
+[JOBS] Sending completion for a5ba7453-f496-4e9f-9f32-5d1e1c115bad
+[JOBS] Failed to send completion for a5ba7453-f496-4e9f-9f32-5d1e1c115bad: Object of type bool_ is not JSON serializable
+INFO:     127.0.0.1:39454 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39458 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39470 - "GET /api/scenarios/scenario_8.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39476 - "GET /api/scenarios/scenario_8.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45974 - "POST /api/simulation/run-async HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:45978 - "POST /api/simulation/run-async HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:45992 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 186, in _run_simulation_task
+    results = await loop.run_in_executor(None, solve_wrapper)
+  File "/usr/lib/python3.10/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 180, in solve_wrapper
+    return solve_scenario(
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/simulation_engine.py", line 372, in solve_scenario
+    geom = DeclarativeGeometry(data)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 38, in __init__
+    raise e
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 34, in __init__
+    self.model = Scenario(**self.data)
+  File "/home/thomas/.local/lib/python3.10/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+INFO:     127.0.0.1:45998 - "WebSocket /api/ws/simulation/52d885d9-cf02-4065-aa93-eda41b884319" [accepted]
+INFO:     connection open
+INFO:     connection closed
+
+running Scenario 8: Wall 360mm (Styrodur, No Rev)...
+[FATAL] Schema Validation Failed for scenario 'Scenario 8: Wall 360mm (Styrodur, No Rev)':
+1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+[JOBS] Connecting WS for job 52d885d9-cf02-4065-aa93-eda41b884319
+INFO:     127.0.0.1:46008 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 186, in _run_simulation_task
+    results = await loop.run_in_executor(None, solve_wrapper)
+  File "/usr/lib/python3.10/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 180, in solve_wrapper
+    return solve_scenario(
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/simulation_engine.py", line 372, in solve_scenario
+    geom = DeclarativeGeometry(data)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 38, in __init__
+    raise e
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 34, in __init__
+    self.model = Scenario(**self.data)
+  File "/home/thomas/.local/lib/python3.10/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+INFO:     127.0.0.1:46024 - "WebSocket /api/ws/simulation/13ca2344-41c1-4d4a-a0d1-fb4f73480041" [accepted]
+INFO:     connection open
+INFO:     connection closed
+
+running Scenario 8: Wall 360mm (Styrodur, No Rev)...
+[FATAL] Schema Validation Failed for scenario 'Scenario 8: Wall 360mm (Styrodur, No Rev)':
+1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+[JOBS] Connecting WS for job 13ca2344-41c1-4d4a-a0d1-fb4f73480041
+INFO:     127.0.0.1:46036 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 186, in _run_simulation_task
+    results = await loop.run_in_executor(None, solve_wrapper)
+  File "/usr/lib/python3.10/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/app/routes/simulation.py", line 180, in solve_wrapper
+    return solve_scenario(
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/simulation_engine.py", line 372, in solve_scenario
+    geom = DeclarativeGeometry(data)
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 38, in __init__
+    raise e
+  File "/home/thomas/Desktop/Fensterlaibung_rollläden/backend/core/declarative_geometry.py", line 34, in __init__
+    self.model = Scenario(**self.data)
+  File "/home/thomas/.local/lib/python3.10/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+INFO:     127.0.0.1:46052 - "WebSocket /api/ws/simulation/be0d956a-b236-434f-93d6-6b25622a92c0" [accepted]
+INFO:     connection open
+INFO:     connection closed
+
+running Scenario 8: Wall 360mm (Styrodur, No Rev)...
+[FATAL] Schema Validation Failed for scenario 'Scenario 8: Wall 360mm (Styrodur, No Rev)':
+1 validation error for Scenario
+canvas.grid
+  Value error, grid must be greater than 0 [type=value_error, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+[JOBS] Connecting WS for job be0d956a-b236-434f-93d6-6b25622a92c0
+INFO:     127.0.0.1:45184 - "GET /api/scenarios/scenario_8.yaml HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     127.0.0.1:41358 - "GET /api/scenarios/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41372 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "GET /api/scenarios/iso_case_1.yaml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41388 - "POST /api/simulation/run-async HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41404 - "WebSocket /api/ws/simulation/26ebb944-e06c-4570-bb83-c04f03eafe74" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [196173]
+INFO:     Stopping reloader process [194742]

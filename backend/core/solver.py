@@ -12,6 +12,8 @@ Consolidates all solver logic:
 import os
 import ctypes
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, Optional
 

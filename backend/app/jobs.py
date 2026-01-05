@@ -43,6 +43,7 @@ class JobManager:
         if job_id not in self.jobs:
             return False
         
+        print(f"[JOBS] Connecting WS for job {job_id}")
         self.websockets[job_id] = websocket
         return True
 
@@ -72,10 +73,12 @@ class JobManager:
         ws = self.websockets.get(job_id)
         if ws:
             try:
+                # print(f"[JOBS] Sending progress for {job_id}: {step}/{total}")
                 await ws.send_json(progress.model_dump())
-            except Exception:
-                 # Connection likely closed
-                 pass
+            except Exception as e:
+                print(f"[JOBS] Failed to send progress for {job_id}: {e}")
+        else:
+            print(f"[JOBS] No WS connected for {job_id} (Progress: {percent:.1f}%)")
 
     async def set_complete(self, job_id: str, result: SimulationResult):
         """Mark job as complete and send result."""
@@ -90,13 +93,16 @@ class JobManager:
         ws = self.websockets.get(job_id)
         if ws:
             try:
+                print(f"[JOBS] Sending completion for {job_id}")
                 await ws.send_json({
                     "status": "complete",
                     "result": result.model_dump()
                 })
                 # We typically don't close here, let client close or send close frame
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[JOBS] Failed to send completion for {job_id}: {e}")
+        else:
+             print(f"[JOBS] No WS connected for {job_id} (Complete)")
 
     async def set_error(self, job_id: str, error: str):
         """Mark job as failed."""

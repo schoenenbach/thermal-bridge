@@ -49,3 +49,10 @@ export const MaterialsService = {
         return response.data;
     }
 };
+
+export const SimulationService = {
+    runAsync: async (payload: any): Promise<{ job_id: string, ws_url: string }> => {
+        const response = await apiClient.post<{ job_id: string, ws_url: string }>('/simulation/run-async', payload);
+        return response.data;
+    }
+};

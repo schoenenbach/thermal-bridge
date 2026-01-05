@@ -12,6 +12,8 @@ import warnings
 warnings.filterwarnings("ignore", message="The value of the smallest subnormal for.* type is zero")
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from backend.core.config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
 from backend.core.geometry import build_material_grid, build_transient_grid, MaterialID
@@ -177,11 +179,11 @@ def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond,
     if 'point_probes' in categories:
         for p in measurements_def.get('point_probes', []):
             t_val = probe_temperature(mesh, temp_field, cond, p['x'], p['y'], y_offset, x_offset)
-            res = {"value": t_val}
+            res = {"value": float(t_val)}
             if 'expected' in p:
-                res["expected"] = p['expected']
-                res["diff"] = abs(t_val - p['expected'])
-                res["passed"] = res["diff"] <= p.get('tolerance', 0.1)
+                res["expected"] = float(p['expected'])
+                res["diff"] = float(abs(t_val - p['expected']))
+                res["passed"] = bool(res["diff"] <= p.get('tolerance', 0.1))
             results[p['name']] = res
 
     # 2. Surface Metrics
@@ -199,7 +201,7 @@ def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond,
             elif mtype == 'max': val = np.max(t_vals)
             else: val = np.mean(t_vals)
             
-            results[s['name']] = {"value": val}
+            results[s['name']] = {"value": float(val)}
 
     # 3. Boundary Flux
     if 'boundary_flux' in categories:
@@ -216,11 +218,11 @@ def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond,
                  flow = g_row * dt
                  flux = np.sum(flow)
             
-            res = {"value": flux}
+            res = {"value": float(flux)}
             if 'expected' in f:
-                res["expected"] = f['expected']
-                res["diff"] = abs(flux - f['expected'])
-                res["passed"] = res["diff"] <= f.get('tolerance', 0.5)
+                res["expected"] = float(f['expected'])
+                res["diff"] = float(abs(flux - f['expected']))
+                res["passed"] = bool(res["diff"] <= f.get('tolerance', 0.5))
             results[f['name']] = res
         
     return results
@@ -907,6 +909,13 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
         "name": scenario_def['name'],
         "measurements": combined_results,
         "temp": temp_for_plot,
+        "psi_value": psi,
+        "frsi_factor": combined_results.get('fRsi', {}).get('value'),
+        "temp_min": combined_results.get('MinT_Wall', {}).get('value'), # Approximate
+        "temp_max": np.max(temp_res),
+        "flux_int": l2d * (t_int - t_ext),
+        # Pass solver iterations if available (we don't track total iterations easily here without callback sum)
+        "iterations": 0, 
         "mesh": {
             "x_coords": mesh.x_coords,
             "y_coords": mesh.y_coords
