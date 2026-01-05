@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../scenario_schema.json
 name: "ISO Case 1: Half Column"
 description: |
   ISO 10211-2007 Annex A Test Case 1: 2D Half-Column

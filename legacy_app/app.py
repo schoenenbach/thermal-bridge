@@ -1000,6 +1000,20 @@ with tab_help:
     st.header("📚 Configuration Reference")
     st.info("The scenario configuration is based on a YAML schema. Below are the available element types and parameters.")
     
+    # --- Schema Download ---
+    from backend.core.scenario_schema import Scenario
+    import json
+    
+    schema_json = json.dumps(Scenario.model_json_schema(), indent=2)
+    st.download_button(
+        label="⬇️ Download JSON Schema",
+        data=schema_json,
+        file_name="scenario_schema.json",
+        mime="application/json",
+        help="Use this schema in VS Code to get auto-completion for your YAML files."
+    )
+    st.markdown("---")
+    
     from backend.core.scenario_schema import (
         Scenario, CanvasConfig, MaterialDef,
         RectParams, WallParams, AirParams, 
