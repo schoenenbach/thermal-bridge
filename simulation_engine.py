@@ -235,6 +235,37 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     values = np.zeros_like(cond)
     values[mask_int] = t_int
     values[mask_ext] = t_ext
+
+    # --- Apply Explicit Boundary Conditions from YAML ---
+    # This allows ISO tests and custom geometries to override defaults
+    if 'dirichlet' in bcs:
+        d_bcs = bcs['dirichlet']
+        if 'top' in d_bcs:
+            mask[-1, :] = 1
+            values[-1, :] = float(d_bcs['top'])
+        if 'bottom' in d_bcs:
+            mask[0, :] = 1
+            values[0, :] = float(d_bcs['bottom'])
+        if 'left' in d_bcs:
+            mask[:, 0] = 1
+            values[:, 0] = float(d_bcs['left'])
+        if 'right' in d_bcs:
+            mask[:, -1] = 1
+            values[:, -1] = float(d_bcs['right'])
+            
+    if 'adiabatic' in bcs:
+        # Adiabatic means flux=0, which is natural BC in FEM/FDM if not in mask.
+        a_bcs = bcs['adiabatic'] # List of sides e.g. ['left', 'top']
+        if isinstance(a_bcs, list):
+            if 'top' in a_bcs:
+                mask[-1, :] = 0
+            if 'bottom' in a_bcs:
+                mask[0, :] = 0
+            if 'left' in a_bcs:
+                mask[:, 0] = 0
+            if 'right' in a_bcs:
+                mask[:, -1] = 0
+    # ----------------------------------------------------
     
     temp = np.ones_like(cond) * 10.0
     temp[mask_int] = t_int

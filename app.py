@@ -116,6 +116,12 @@ elements:
         with open(pth, 'r') as f:
             default_yaml = f.read()
 
+    # Grid Override (Performance)
+    st.sidebar.markdown("---")
+    grid_override = st.sidebar.number_input("Override Grid Size (mm)", 
+                                           min_value=0.0, max_value=50.0, value=0.0, step=0.5,
+                                           help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
+
     # Editor
     st.subheader("Geometry Definition (YAML)")
     yaml_input = st.text_area("Edit Configuration", value=default_yaml, height=400)
@@ -140,6 +146,12 @@ if active_data:
         if st.button("Run Simulation", type="primary"):
             with st.spinner("Simulating..."):
                 try:
+                    # Apply Grid Override
+                    if grid_override > 0:
+                        if 'canvas' not in active_data: active_data['canvas'] = {}
+                        active_data['canvas']['grid'] = grid_override
+                        # Also bounds if needed? No, just grid.
+
                     # Temp file strategy
                     temp_yaml = "temp_active.yaml"
                     with open(temp_yaml, 'w') as f:
