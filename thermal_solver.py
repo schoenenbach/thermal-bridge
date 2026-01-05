@@ -641,8 +641,6 @@ class ThermalSolver:
         plt.figure(figsize=(10, 8))
         plt.imshow(self.temp, cmap='jet', origin='lower', extent=[0, self.width_mm, 0, self.height_mm])
         plt.colorbar(label='Temperature [°C]')
-        plt.imshow(self.temp, cmap='jet', origin='lower', extent=[0, self.width_mm, 0, self.height_mm])
-        plt.colorbar(label='Temperature [°C]')
         plt.title(f'Temperature Distribution (Thick: {self.cfg.wall_thickness_mm}mm, Grid: {self.cfg.grid_size_mm}mm)')
         plt.xlabel('Depth [mm]')
         plt.ylabel('Facade Length [mm]')

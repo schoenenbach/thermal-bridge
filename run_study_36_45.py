@@ -9,15 +9,18 @@ def run_study(geometry_only=False):
     INS_MAX = 200
     INS_MIN = 100
     REVEAL_INS = 30
-    GRID = 2.5 # mm
+    GRID = 5 # mm
     
-    # Define Configurations
+    # Define Configurations (Swiss Spacer Only)
     configs = []
     
     # Scenario 1: No Insulation
     # Case 1.1: 36cm
     configs.append({
-        "name": "36cm_NoIns",
+        "name": "Wall 360mm (Pos 150mm) (No Ins)",
+        "wall_desc": "360mm",
+        "ins_desc": "None",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=360,
             insulation_thick_max_mm=0,
@@ -34,7 +37,10 @@ def run_study(geometry_only=False):
     
     # Case 1.2: 45cm
     configs.append({
-        "name": "45cm_NoIns",
+        "name": "Wall 450mm (Pos 150mm) (No Ins)",
+        "wall_desc": "450mm",
+        "ins_desc": "None",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=450,
             insulation_thick_max_mm=0,
@@ -52,7 +58,10 @@ def run_study(geometry_only=False):
     # Scenario 2: Ext Insulation + Taper (No Reveal Ins)
     # Case 2.1: 36cm
     configs.append({
-        "name": "36cm_ExtIns_NoReveal",
+        "name": "Wall 360mm (Pos 150mm) (No Rev Ins)",
+        "wall_desc": "360mm",
+        "ins_desc": "200->100 mm",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=360,
             insulation_thick_max_mm=INS_MAX,
@@ -69,7 +78,10 @@ def run_study(geometry_only=False):
     
     # Case 2.2: 45cm
     configs.append({
-        "name": "45cm_ExtIns_NoReveal",
+        "name": "Wall 450mm (Pos 150mm) (No Rev Ins)",
+        "wall_desc": "450mm",
+        "ins_desc": "200->100 mm",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=450,
             insulation_thick_max_mm=INS_MAX,
@@ -85,11 +97,12 @@ def run_study(geometry_only=False):
     })
     
     # Scenario 3: Ext Insulation + Taper + Reveal Insulation
-    # Reveal Insulation added.
-    
     # Case 3.1: 36cm
     configs.append({
-        "name": "36cm_Full",
+        "name": "Wall 360mm (Pos 150mm) (Full)",
+        "wall_desc": "360mm",
+        "ins_desc": "200->100 mm",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=360,
             insulation_thick_max_mm=INS_MAX,
@@ -106,7 +119,10 @@ def run_study(geometry_only=False):
     
     # Case 3.2: 45cm
     configs.append({
-        "name": "45cm_Full",
+        "name": "Wall 450mm (Pos 150mm) (Full)",
+        "wall_desc": "450mm",
+        "ins_desc": "200->100 mm",
+        "spacer_desc": "Swiss",
         "cfg": CalculationConfig(
             wall_thickness_mm=450,
             insulation_thick_max_mm=INS_MAX,
@@ -128,33 +144,39 @@ def run_study(geometry_only=False):
     for item in configs:
         name = item['name']
         cfg = item['cfg']
+        # Sanitize filename
+        safe_name = name.replace(" ", "_").replace("(", "").replace(")", "")
+        
         print(f"Processing {name}...")
         
         # Pass 1: Psi
         solver_psi = ThermalSolver(cfg, rsi_value=0.13)
-        # Save Geometry Plot
-        solver_psi.plot_geometry(f"plot_geometry_{name}.png")
-        print(f"  -> Saved plot_geometry_{name}.png")
-        
         if geometry_only:
+            solver_psi.plot_geometry(f"plot_geometry_{safe_name}.png")
+            print(f"  -> Saved plot_geometry_{safe_name}.png")
             continue
             
-        solver_psi.solve(max_iter=60000)
+        solver_psi.solve(max_iter=15000)
         res_psi = solver_psi.calculate_psi()
         
         # Pass 2: fRsi (Rsi=0.25)
         # Note: Usually geometry is identical, just Rsi changes.
         solver_frsi = ThermalSolver(cfg, rsi_value=0.25)
-        solver_frsi.solve(max_iter=60000)
+        solver_frsi.solve(max_iter=15000)
         res_frsi = solver_frsi.calculate_psi()
         
-        # Plot Temp
-        solver_psi.plot_results(f"plot_temp_{name}.png")
+        # Plot Temp (Use Psi run for standard check, or fRsi run? 
+        # Usually Psi run has standard boundaries. Surface temps are best from fRsi run.)
+        solver_frsi.plot_results(f"plot_temp_{safe_name}.png")
         
         results.append({
             "Case": name,
+            "Wall": item['wall_desc'],
+            "Insulation": item['ins_desc'],
+            "Spacer": item['spacer_desc'],
             "Psi": res_psi['Psi'],
             "fRsi": res_frsi['fRsi'],
+            "MinT": res_frsi['MinT'],
             "MinT_Wall": res_frsi['MinT_Wall'],
             "MinT_Frame": res_frsi['MinT_Frame'],
             "MinT_Glass": res_frsi['MinT_Glass']
@@ -165,11 +187,12 @@ def run_study(geometry_only=False):
     if not geometry_only:
         # Save Results
         with open("results_36_45.md", "w") as f:
-            f.write("# Thermal Bridge Study (36cm vs 45cm)\n\n")
-            f.write("| Case | Psi (W/mK) | fRsi | MinT Wall | MinT Frame | MinT Glass |\n")
-            f.write("|---|---|---|---|---|---|\n")
+            f.write("# Thermal Bridge Calculation Results\n\n")
+            f.write("| Case | Wall | Insulation | Spacer | Psi-Value | fRsi | Min Temp | Min Temp Details |\n")
+            f.write("|---|---|---|---|---|---|---|---|\n")
             for r in results:
-                f.write(f"| {r['Case']} | **{r['Psi']:.3f}** | {r['fRsi']:.3f} | {r['MinT_Wall']:.1f}°C | {r['MinT_Frame']:.1f}°C | {r['MinT_Glass']:.1f}°C |\n")
+                details = f"Wall: {r['MinT_Wall']:.1f}°C, Frame: {r['MinT_Frame']:.1f}°C, Glass: {r['MinT_Glass']:.1f}°C"
+                f.write(f"| {r['Case']} | {r['Wall']} | {r['Insulation']} | {r['Spacer']} | **{r['Psi']:.3f} W/mK** | {r['fRsi']:.3f} | {r['MinT']:.1f}°C | {details} |\n")
         
         print("Done. Results saved to results_36_45.md")
     else:
