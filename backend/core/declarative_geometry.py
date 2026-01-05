@@ -114,16 +114,21 @@ class DeclarativeGeometry(SketchGeometry):
         registry = MaterialRegistry.get()
         
         # Reserved IDs for core materials (Must match geometry.MaterialID)
+        # Reserved IDs for core materials (Must match geometry.MaterialID)
         RESERVED_IDS = {
-            "AIR_EXT": 0,
-            "AIR_INT": 1,
-            "WALL": 2,
-            "INSULATION": 3,
-            "FRAME": 4,
-            "GLASS": 5,
-            "STYRODUR": 6,
-            "REVEAL_INS": 7,
-            "ALUMINUM": 8  # Common but not strictly reserved by solver logic, but good for consistency
+            "AIR_EXT": MaterialID.AIR_EXT,
+            "AIR_INT": MaterialID.AIR_INT,
+            "WALL": MaterialID.WALL,
+            "INSULATION": MaterialID.INSULATION,
+            "REVEAL_INS": MaterialID.REVEAL_INS,
+            "FRAME": MaterialID.FRAME,
+            "GLASS": MaterialID.GLASS,
+            "SPACER": MaterialID.SPACER,
+            "CAVITY": MaterialID.CAVITY,
+            "STYRODUR": MaterialID.STYRODUR,
+            "CONCRETE": MaterialID.CONCRETE,
+            "WOOD": MaterialID.WOOD,
+            "ALUMINUM": MaterialID.ALUMINUM
         }
         
         for mat in self.model.materials:

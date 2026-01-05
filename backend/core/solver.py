@@ -541,7 +541,9 @@ def plot_geometry(grid_map: np.ndarray,
                   x_coords: Optional[np.ndarray] = None,
                   y_coords: Optional[np.ndarray] = None,
                   equal_aspect: bool = False,
-                  highlight_bbox: Optional[Tuple[float, float, float, float]] = None):
+                  highlight_bbox: Optional[Tuple[float, float, float, float]] = None,
+                  material_names: Optional[Dict[int, str]] = None,
+                  material_colors: Optional[Dict[int, str]] = None):
     """
     Plot material ID map for geometry verification.
     
@@ -553,6 +555,9 @@ def plot_geometry(grid_map: np.ndarray,
         x_coords: X face coordinates (for adaptive mesh)
         y_coords: Y face coordinates (for adaptive mesh)
         equal_aspect: If True, use equal aspect ratio (shows true proportions)
+        highlight_bbox: Optional bounding box to highlight (x, y, w, h)
+        material_names: Optional mapping of material ID to name for legend
+        material_colors: Optional mapping of material ID to hex color string
     """
     # Adjust figure size based on aspect ratio
     aspect = width_mm / height_mm
@@ -567,17 +572,33 @@ def plot_geometry(grid_map: np.ndarray,
     # Derive color range from actual material IDs
     unique_mats = np.unique(grid_map)
     n_materials = len(unique_mats)
-    cmap = plt.get_cmap('tab10', max(n_materials, 10))
+    
+    # Construct a custom colormap that matches the unique materials in order
+    from matplotlib.colors import ListedColormap
+    
+    # Default fallback palette
+    fallback_cmap = plt.get_cmap('tab20' if n_materials > 10 else 'tab10', max(n_materials, 10))
+    
+    color_list = []
+    for i, m_id in enumerate(unique_mats):
+        if material_colors and m_id in material_colors:
+            color_list.append(material_colors[m_id])
+        else:
+            # Fallback to standard palette
+            color_list.append(fallback_cmap(i))
+            
+    cmap = ListedColormap(color_list)
     
     # Create normalized version for proper coloring
-    # Map unique materials to sequential indices for better color distinction
+    # Map unique materials to sequential indices 0..N-1
     mat_to_idx = {m: i for i, m in enumerate(unique_mats)}
     grid_normalized = np.vectorize(lambda x: mat_to_idx[x])(grid_map)
     
     if x_coords is not None and y_coords is not None:
         X, Y = np.meshgrid(x_coords, y_coords)
+        # vmin/vmax range matches 0..N-1 indices
         im = plt.pcolormesh(X, Y, grid_normalized, cmap=cmap, shading='flat', 
-                           vmin=0, vmax=max(n_materials-1, 1))
+                           vmin=0, vmax=n_materials-1)
         
         # Set limits based on coords
         plt.xlim(x_coords[0], x_coords[-1])
@@ -585,16 +606,30 @@ def plot_geometry(grid_map: np.ndarray,
     else:
         im = plt.imshow(grid_normalized, cmap=cmap, origin='lower',
                         extent=[0, width_mm, 0, height_mm], 
-                        interpolation='nearest', vmin=0, vmax=max(n_materials-1, 1))
+                        interpolation='nearest', vmin=0, vmax=n_materials-1)
         # Default limits
         plt.xlim(0, width_mm)
         plt.ylim(0, height_mm)
     
-    # Create colorbar with actual material IDs as labels
-    cbar = plt.colorbar(im, label='Material ID')
-    if n_materials <= 10:
-        cbar.set_ticks(range(n_materials))
-        cbar.set_ticklabels([str(m) for m in unique_mats])
+    # Create patches for legend instead of colorbar for clear categorical labeling
+    from matplotlib.patches import Patch
+    
+    legend_handles = []
+    
+    # Helper to clean up labels
+    def get_label(m_id):
+        if material_names and m_id in material_names:
+            return material_names[m_id]
+        return str(m_id)
+
+    # For each material index (0..N-1), use the explicit color from our list
+    for i, m_id in enumerate(unique_mats):
+        color = color_list[i]
+        label = get_label(int(m_id))
+        legend_handles.append(Patch(color=color, label=label))
+    
+    # Place legend outside: upper left anchored to the right of the plot
+    plt.legend(handles=legend_handles, bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0., title="Materials")
     
     if equal_aspect:
         plt.gca().set_aspect('equal', adjustable='box')
@@ -602,8 +637,6 @@ def plot_geometry(grid_map: np.ndarray,
     plt.title(f'Geometry: {filename}')
     plt.xlabel('Depth [mm]')
     plt.ylabel('Facade Length [mm]')
-    
-
     
     # Draw highlight box if specified
     if highlight_bbox is not None:
@@ -615,6 +648,8 @@ def plot_geometry(grid_map: np.ndarray,
         ax.add_patch(rect)
     
     plt.grid(True, color='white', alpha=0.3)
+    
+    # Adjust layout to accommodate external legend
     plt.tight_layout()
-    plt.savefig(filename, dpi=150)
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
     plt.close()

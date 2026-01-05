@@ -5,25 +5,25 @@ description: "Reference Scenario: 360mm Wall, No Insulation"
 materials:
   - id: WALL
     lambda: 0.8
-    color: "#AAAAAA"
+    color: "#D3D3D3"
   - id: CONCRETE
     lambda: 2.0
-    color: "#999999"
+    color: "#708090"
   - id: INSULATION
     lambda: 0.035
-    color: "#FFCC00"
+    color: "#F0E68C"
   - id: REVEAL_INS
     lambda: 0.035
-    color: "#FFD700"
+    color: "#FFA500"
   - id: FRAME
     lambda: 0.13
-    color: "#444444"
+    color: "#555555"
   - id: GLASS
     lambda: 0.0325
-    color: "#88CCFF"
+    color: "#87CEEB"
   - id: ALUMINUM
     lambda: 160.0
-    color: "#CCCCCC"
+    color: "#B0C4DE"
   - id: CAVITY
     lambda: 0.25
     color: "#EEFFFF"

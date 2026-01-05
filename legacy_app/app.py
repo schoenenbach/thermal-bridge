@@ -181,7 +181,8 @@ with tab_studio:
                 from backend.core.geometry_builder import get_element_bbox
                 from backend.core.mesh import AdaptiveMesh
                 from backend.core.solver import plot_geometry
-                from backend.core.geometry import build_material_grid
+                from backend.core.geometry import build_material_grid, MaterialID
+                from library.material_registry import MaterialRegistry
                 
                 geom = DeclarativeGeometry(active_data)
                 mesh = AdaptiveMesh(geom)
@@ -193,6 +194,49 @@ with tab_studio:
                 if selected_el_idx >= 0:
                     highlight = get_element_bbox(active_data, selected_el_idx)
                 
+                # Prepare Material Legend Map
+                registry_map = {p.solver_id: p.name for p in MaterialRegistry.get().solver_id_map.values()}
+                registry_colors = {p.solver_id: p.color for p in MaterialRegistry.get().solver_id_map.values()}
+                
+                defaults = {
+                     MaterialID.AIR_EXT: "Air Ext",
+                     MaterialID.AIR_INT: "Air Int",
+                     MaterialID.WALL: "Wall",
+                     MaterialID.INSULATION: "Insulation",
+                     MaterialID.REVEAL_INS: "Reveal Ins",
+                     MaterialID.FRAME: "Frame",
+                     MaterialID.GLASS: "Glass",
+                     MaterialID.SPACER: "Spacer",
+                     MaterialID.CAVITY: "Cavity",
+                     MaterialID.STYRODUR: "Styrodur",
+                     MaterialID.CONCRETE: "Concrete",
+                     MaterialID.WOOD: "Wood",
+                     MaterialID.ALUMINUM: "Aluminum"
+                }
+                
+                # Default colors (High Contrast Palette)
+                defaults_colors = {
+                     MaterialID.AIR_EXT: "#E0F7FA",  # Light Cyan
+                     MaterialID.AIR_INT: "#FFFFFF",  # White
+                     MaterialID.WALL: "#D3D3D3",     # LightGray (vs Concrete)
+                     MaterialID.INSULATION: "#F0E68C", # Khaki (Light Yellow)
+                     MaterialID.REVEAL_INS: "#FFA500", # Orange (Distinct from Ins)
+                     MaterialID.FRAME: "#555555",    # DimGray
+                     MaterialID.GLASS: "#87CEEB",    # SkyBlue
+                     MaterialID.SPACER: "#000000",   # Black
+                     MaterialID.CAVITY: "#F0FFFF",   # Azure
+                     MaterialID.STYRODUR: "#BA55D3", # MediumOrchid
+                     MaterialID.CONCRETE: "#708090", # SlateGray (Distinct from Wall)
+                     MaterialID.WOOD: "#8B4513",     # SaddleBrown
+                     MaterialID.ALUMINUM: "#B0C4DE"  # LightSteelBlue (Distinct from Grey)
+                }
+                
+                final_names = defaults.copy()
+                final_names.update(registry_map)
+                
+                final_colors = defaults_colors.copy()
+                final_colors.update(registry_colors)
+
                 # Generate preview with unique filename to bust cache
                 preview_file = "studio_preview.png"
                 plot_geometry(grid_map, 
@@ -201,7 +245,9 @@ with tab_studio:
                               filename=preview_file,
                               x_coords=mesh.x_coords,
                               y_coords=mesh.y_coords,
-                              highlight_bbox=highlight)
+                              highlight_bbox=highlight,
+                              material_names=final_names,
+                              material_colors=final_colors)
                 
                 # Display with unique key to force refresh
                 st.image(preview_file, use_container_width=True)
