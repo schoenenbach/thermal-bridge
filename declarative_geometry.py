@@ -126,8 +126,9 @@ class DeclarativeGeometry(SketchGeometry):
         }
         
         if isinstance(mat_val, str):
-            if mat_val in MAT_MAP:
-                return MAT_MAP[mat_val]
+            mat_upper = mat_val.upper()
+            if mat_upper in MAT_MAP:
+                return MAT_MAP[mat_upper]
             else:
                 print(f"[WARNING] Unknown material name '{mat_val}', defaulting to WALL")
                 return (MaterialID.WALL, MAT_WALL)
