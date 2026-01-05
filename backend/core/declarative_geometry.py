@@ -298,6 +298,61 @@ class DeclarativeGeometry(SketchGeometry):
             # We pass off_x/off_y to shift the result
             self._instantiate_element(resolved_sub, offset_x=off_x, offset_y=off_y)
 
+    def get_refinement_zones(self):
+        """
+        Return refinement zones parsed from YAML configuration,
+        plus auto-generated zones at material boundaries.
+        """
+        from backend.core.geometry import RefinementZone
+        zones = []
+        
+        # 1. Parse explicit zones from YAML (high priority)
+        for z in self.model.refinement_zones:
+            zones.append(RefinementZone(
+                x_min=z.x_min,
+                x_max=z.x_max,
+                y_min=z.y_min,
+                y_max=z.y_max,
+                target_dx=z.target_dx,
+                target_dy=z.target_dy if z.target_dy is not None else z.target_dx,
+                priority=z.priority
+            ))
+        
+        # 2. Auto-generate zones at material boundaries (lower priority)
+        config = self.get_canvas_config()
+        default_dx = config.default_dx_mm
+        
+        # Heuristics for auto-refinement:
+        # - Halo width: 2x default cell size around each element
+        # - Fine resolution: 1/4 of default (e.g., 2.5mm -> 0.625mm)
+        # - Priority: -1 (lower than any explicit zone with priority >= 0)
+        halo_width = default_dx * 2
+        fine_dx = max(0.25, default_dx / 4)  # Minimum 0.25mm to avoid excessive cells
+        
+        for region in self.get_regions():
+            x_min, x_max, y_min, y_max = region.bounds
+            
+            # Skip very small regions or canvas-sized regions
+            region_width = x_max - x_min
+            region_height = y_max - y_min
+            
+            if region_width < 1.0 or region_height < 1.0:
+                continue
+            if region_width >= config.width_mm * 0.9 and region_height >= config.height_mm * 0.9:
+                continue
+                
+            zones.append(RefinementZone(
+                x_min=max(config.x_min_mm, x_min - halo_width),
+                x_max=min(config.x_max_mm, x_max + halo_width),
+                y_min=max(config.y_min_mm, y_min - halo_width),
+                y_max=min(config.y_max_mm, y_max + halo_width),
+                target_dx=fine_dx,
+                target_dy=fine_dx,
+                priority=-1  # Lower than explicit zones
+            ))
+        
+        return zones
+
     def get_boundary_conditions(self) -> dict:
         # Convert Pydantic BC model to dict format expected by Solver
         return self.model.boundary_conditions.model_dump()

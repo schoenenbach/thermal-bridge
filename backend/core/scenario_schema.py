@@ -313,6 +313,19 @@ class TransientConfig(BaseModel):
     save_interval_steps: int = Field(1, description="Save result every N steps")
 
 
+# --- Refinement Zones ---
+
+class RefinementZoneDef(BaseModel):
+    """Refinement zone for finer mesh in specific regions."""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    target_dx: float
+    target_dy: Optional[float] = None  # defaults to target_dx if not specified
+    priority: int = 0
+
+
 # --- Main Scenario ---
 
 class Scenario(BaseModel):
@@ -358,3 +371,6 @@ class Scenario(BaseModel):
     
     # Transient simulation settings
     transient: TransientConfig = Field(default_factory=TransientConfig)
+    
+    # Mesh refinement zones for finer resolution in specific areas
+    refinement_zones: List[RefinementZoneDef] = Field(default_factory=list)
