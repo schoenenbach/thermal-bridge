@@ -31,12 +31,26 @@ This project is a thermal bridge simulation tool designed to calculate Psi-value
 
 ### Running Simulations
 ```bash
-# Run all window reveal scenarios (output: result_scenario_*.png)
-python3 simulation_engine.py
+# Run specific scenarios by index (1-based from --list)
+python3 simulation_engine.py --scenarios 1,5,7
+
+# Run with uniform mesh (default is adaptive)
+python3 simulation_engine.py --scenarios 1 --use-uniform-mesh
+
+# List all available scenarios
+python3 simulation_engine.py --list
+
+# Run all window reveal scenarios (standard behavior)
+python3 simulation_engine.py --run-all
 
 # Run ISO 10211 validation tests
 python3 run_iso_tests.py all
 ```
+
+### Plotting Features
+- **Isotherms:** Default step is 2.0°C. 
+- **Critical Isotherm:** The 12.6°C line (limit for $f_{Rsi} \ge 0.70$) is formatted as a **dashed line**.
+- **Adaptive Labels:** Captions are placed only at the **bottom** and **left** boundaries to prevent overlapping with cluttered geometry or other axis labels.
 
 ### Extending the Project
 - **New Element Library:** Use `elements.py` to create geometries by composing simple building blocks.

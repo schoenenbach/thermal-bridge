@@ -316,27 +316,93 @@ def plot_temperature_map(temp_grid: np.ndarray,
     max_t = np.max(temp_grid)
     step = 2.0
     
+    def add_boundary_labels(cs):
+        for i, level in enumerate(cs.levels):
+            # In newer matplotlib, collections might be different, but this is traditional
+            paths = cs.collections[i].get_paths()
+            for path in paths:
+                v = path.vertices
+                if len(v) < 2: continue
+                # Find all boundary intersections for this path
+                boundary_pts = []
+                for pt in [v[0], v[-1]]:
+                    x, y = pt
+                    on_bottom = abs(y - yc[0]) < 0.5
+                    on_left = abs(x - xc[0]) < 0.5
+                    on_right = abs(x - xc[-1]) < 0.5
+                    on_top = abs(y - yc[-1]) < 0.5
+                    
+                    if on_bottom: boundary_pts.append((x, y, 'bottom'))
+                    if on_left: boundary_pts.append((x, y, 'left'))
+                    if on_right: boundary_pts.append((x, y, 'right'))
+                    if on_top: boundary_pts.append((x, y, 'top'))
+                
+                if not boundary_pts:
+                    continue
+                
+                # Heuristic for "most space": 
+                # Prioritize Left and Bottom as they usually converge less in this geometry.
+                # If both ends hit boundaries, prefer the one on Left or Bottom.
+                best_pt = None
+                for pt in boundary_pts:
+                    if pt[2] in ['left', 'bottom']:
+                        best_pt = pt
+                        break
+                if not best_pt:
+                    best_pt = boundary_pts[0]
+                
+                x, y, side = best_pt
+                
+                # Position label INSIDE the plot to avoid axis conflict
+                # Use a small offset proportional to domain size
+                off_x = width_mm * 0.015
+                off_y = height_mm * 0.015
+                
+                dx, dy = 0, 0
+                ha, va = 'center', 'center'
+                
+                if side == 'bottom':
+                    dy, va = off_y, 'bottom'
+                elif side == 'left':
+                    dx, ha = off_x, 'left'
+                elif side == 'right':
+                    dx, ha = -off_x, 'right'
+                elif side == 'top':
+                    dy, va = -off_y, 'top'
+                
+                plt.annotate(f"{level:.1f}°C", (x, y), 
+                             xytext=(dx, dy), textcoords='offset points',
+                             fontsize=7, color='black', fontweight='normal',
+                             ha=ha, va=va, alpha=0.9, clip_on=True,
+                             bbox=dict(boxstyle='round,pad=0.1', fc='white', ec='none', alpha=0.6))
+
     if max_t > min_t:
+        # Regular levels (excluding 12.6)
         levels = np.arange(np.ceil(min_t), np.floor(max_t) + 1, step)
-        if min_t < 12.6 < max_t:
-            levels = np.sort(np.append(levels, 12.6))
+        levels = levels[np.abs(levels - 12.6) > 0.05]
         
-        if len(levels) > 0:
+        if len(levels) > 0 or (min_t < 12.6 < max_t):
+            # Setup coordinates for contour
             if x_coords is not None and y_coords is not None:
-                # Contour needs centers for accurate lines, or it can handle X, Y faces?
-                # Contour X, Y must match Z shape usually.
-                # If Z is (ny, nx), X, Y should be centers (ny, nx) or dimensions.
                 xc = (x_coords[:-1] + x_coords[1:]) / 2.0
                 yc = (y_coords[:-1] + y_coords[1:]) / 2.0
                 X_cen, Y_cen = np.meshgrid(xc, yc)
-                CS = plt.contour(X_cen, Y_cen, temp_grid, levels=levels, 
-                                 colors='black', linewidths=0.5, alpha=0.7)
             else:
-                CS = plt.contour(temp_grid, levels=levels, origin='lower',
-                                 extent=[0, width_mm, 0, height_mm],
-                                 colors='black', linewidths=0.5, alpha=0.7)
+                xc = np.linspace(0, width_mm, temp_grid.shape[1])
+                yc = np.linspace(0, height_mm, temp_grid.shape[0])
+                X_cen, Y_cen = np.meshgrid(xc, yc)
+
+            # 1. Plot regular isotherms
+            if len(levels) > 0:
+                CS = plt.contour(X_cen, Y_cen, temp_grid, levels=levels, 
+                                 colors='black', linewidths=0.5, alpha=0.6, linestyles='solid')
+                add_boundary_labels(CS)
             
-            plt.clabel(CS, inline=True, fontsize=8, fmt='%1.1f')
+            # 2. Plot critical 12.6 isotherm
+            if min_t < 12.6 < max_t:
+                CS126 = plt.contour(X_cen, Y_cen, temp_grid, levels=[12.6], 
+                                    colors='black', linewidths=0.8, alpha=0.8, linestyles='dashed')
+                add_boundary_labels(CS126)
     
     # Title
     full_title = title

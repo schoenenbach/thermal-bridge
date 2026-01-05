@@ -278,9 +278,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     temp[mask_int] = TEMP_INT
     temp[mask_ext] = TEMP_EXT
     
-    # Pre-check convergence using tolerance from config if available, or default
+    # Pass 1: Solve for Psi (Standard Rsi = 0.13)
+    print(f"  [PASS 1] Solving for Psi-value (Rsi={RSI_WALL})...")
     temp_res = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, 
-                     batch_size=5000, verbose=False)
+                     batch_size=5000, verbose=True)
     
     # 6. Calculate Results - Total Flux L2D
     # Flux calculation needs to handle variable dy/dx
@@ -328,9 +329,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     apply_boundary_conductances(Gh_frsi, Gv_frsi, RSI_CORNER, mask_int)
     apply_boundary_conductances(Gh_frsi, Gv_frsi, RSE, mask_ext)
     
+    print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={RSI_CORNER})...")
     temp_frsi = temp_res.copy()
     temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
-                      tol=1e-7, batch_size=5000, verbose=False)
+                      tol=1e-7, batch_size=5000, verbose=True)
     
     # Minimum surface temperature
     def get_min_surf(t_field, k_field, rsi_used, material_filter=None):
@@ -418,19 +420,37 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     }
 
 
-def run_all(use_adaptive_mesh=True):
-    """Run all scenarios and print summary."""
-    # Ensure solver is loaded
+def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
+    """Run specific scenarios or all if none specified."""
     get_solver_lib()
-    
     scenarios = get_scenarios()
-    results = []
     
-    for sc in scenarios:
+    if scenario_indices:
+        # Filter scenarios by 1-based index
+        selected = []
+        for idx in scenario_indices:
+            try:
+                i = int(idx) - 1
+                if 0 <= i < len(scenarios):
+                    selected.append(scenarios[i])
+                else:
+                    print(f"[WARNING] Scenario index {idx} out of range (1-{len(scenarios)})")
+            except ValueError:
+                print(f"[WARNING] Invalid scenario index: {idx}")
+        
+        if not selected:
+            print("[ERROR] No valid scenarios selected.")
+            return
+        to_run = selected
+    else:
+        to_run = scenarios
+    
+    results = []
+    for sc in to_run:
         res = solve_scenario(sc, use_adaptive_mesh=use_adaptive_mesh)
         results.append(res)
         
-    print("\n--- Final Summary ---")
+    print("\n--- Summary ---")
     print(f"{'Scenario':<40} | {'Psi (W/mK)':<10} | {'fRsi':<10} | {'MinT (C)':<10} | {'Wall T':<10} | {'Frame T':<10} | {'Glass T':<10}")
     print("-" * 115)
     for r in results:
@@ -477,16 +497,30 @@ def generate_geometries():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Thermal Bridge Simulation Engine")
     parser.add_argument("--geometries-only", action="store_true", help="Generate geometry plots only, skip simulation")
-    parser.add_argument("--run-all", action="store_true", help="Run all scenarios (Default)")
+    parser.add_argument("--run-all", action="store_true", help="Run all scenarios")
+    parser.add_argument("--scenarios", type=str, help="Comma-separated list of scenario indices to run (e.g. 1,3,5)")
     parser.add_argument("--use-uniform-mesh", action="store_true", help="Use Uniform Mesh instead of Adaptive Mesh")
+    parser.add_argument("--list", action="store_true", help="List available scenarios")
     
     args = parser.parse_args()
     
+    if args.list:
+        scenarios = get_scenarios()
+        print("\nAvailable Scenarios:")
+        for i, sc in enumerate(scenarios, 1):
+            print(f"  {i}: {sc['name']}")
+        exit(0)
+
     if args.geometries_only:
         generate_geometries()
     else:
-        # Default behavior matches run_all if no args, but here we pass the flag
-        # We want default to be Adaptive now (use_adaptive_mesh=True if flag not present)
-        # arg.use_uniform_mesh is False by default.
-        run_all(use_adaptive_mesh=not args.use_uniform_mesh)
+        indices = None
+        if args.scenarios:
+            indices = args.scenarios.split(",")
+        
+        # If neither run-all nor scenarios specified, and not geometries-only, 
+        # normally we might want to default to something or show help.
+        # But let's follow the user's intent: run specific or all.
+        
+        run_scenarios(scenario_indices=indices, use_adaptive_mesh=not args.use_uniform_mesh)
 
