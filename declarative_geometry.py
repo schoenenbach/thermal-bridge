@@ -15,6 +15,7 @@ from config import (
     TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER
 )
 import elements
+from scenario_schema import validate_scenario
 
 class DeclarativeGeometry(SketchGeometry):
     """
@@ -84,7 +85,16 @@ class DeclarativeGeometry(SketchGeometry):
         self.data = replace_val(self.data)
         
     def _validate_schema(self):
-        # Basic checks
+        """Validate scenario data against schema."""
+        errors = validate_scenario(self.data)
+        
+        if errors:
+            scenario_name = self.data.get('name', 'Unknown')
+            print(f"[WARNING] Schema validation issues in '{scenario_name}':")
+            for err in errors:
+                print(f"  - {err}")
+        
+        # Legacy check for 'shapes' key (not used in current scenarios)
         if 'elements' not in self.data and 'shapes' not in self.data:
             print("[INFO] No 'elements' or 'shapes' found in YAML.")
             

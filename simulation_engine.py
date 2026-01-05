@@ -6,6 +6,11 @@ Provides scenario definitions and solving workflow for window reveal geometries.
 
 import argparse
 import os
+import warnings
+
+# Suppress annoying numpy/matplotlib warnings about subnormal floats
+warnings.filterwarnings("ignore", message="The value of the smallest subnormal for.* type is zero")
+
 import numpy as np
 import matplotlib.pyplot as plt
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
@@ -477,7 +482,6 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     # --- Apply Explicit Boundary Conditions from YAML ---
     # This allows ISO tests and custom geometries to override defaults
     if 'dirichlet' in bcs:
-        print(f"[DEBUG] Applying Dirichlet BCs: {bcs['dirichlet']}")
         d_bcs = bcs['dirichlet']
         if 'top' in d_bcs:
             mask[-1, :] = 1
@@ -491,14 +495,11 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
         if 'right' in d_bcs:
             mask[:, -1] = 1
             values[:, -1] = float(d_bcs['right'])
-            
-    print(f"[DEBUG] Mask non-zero count: {np.count_nonzero(mask)}")
-    print(f"[DEBUG] Values unique: {np.unique(values[mask==1])}")
+
 
     if 'adiabatic' in bcs:
         # Adiabatic means flux=0, which is natural BC in FEM/FDM if not in mask.
         a_bcs = bcs['adiabatic'] # List of sides e.g. ['left', 'top']
-        print(f"[DEBUG] Explicit Adiabatic: {a_bcs}")
         if isinstance(a_bcs, list):
             if 'top' in a_bcs:
                 mask[-1, :] = 0
@@ -720,12 +721,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
                          x_coords=mesh.x_coords,
                          y_coords=mesh.y_coords)
     
-    # Return flat dict for summary
-    return_res = {"name": scenario_def['name']}
-    for name, res in combined_results.items():
-        return_res[name] = res["value"]
-    
-    return return_res
+    return {
+        "name": scenario_def['name'],
+        "measurements": combined_results
+    }
 
 
 def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
@@ -754,8 +753,9 @@ def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
     # Identify unique measurement names across all results to build table header
     all_keys = set()
     for r in results:
-        all_keys.update(r.keys())
-    all_keys.discard('name')
+        if 'measurements' in r:
+            all_keys.update(r['measurements'].keys())
+            
     sorted_keys = sorted(list(all_keys))
     
     header = f"{'Scenario':<40}"
@@ -765,11 +765,15 @@ def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
     
     for r in results:
         line = f"{r['name']:<40}"
+        measurements = r.get('measurements', {})
         for k in sorted_keys:
-            val = r.get(k)
-            if val is None: line += f" | {'N/A':<10}"
-            elif isinstance(val, float): line += f" | {val:<10.3f}"
-            else: line += f" | {str(val):<10}"
+            if k in measurements:
+                val = measurements[k].get('value')
+                if val is None: line += f" | {'N/A':<10}"
+                elif isinstance(val, (int, float)): line += f" | {val:<10.3f}"
+                else: line += f" | {str(val):<10}"
+            else:
+                line += f" | {'-':<10}"
         print(line)
 
 

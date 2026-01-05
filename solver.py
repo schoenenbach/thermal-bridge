@@ -329,9 +329,9 @@ def plot_temperature_map(temp_grid: np.ndarray,
     def add_boundary_labels(cs):
         for i, level in enumerate(cs.levels):
             # In newer matplotlib, collections might be different, but this is traditional
-            paths = cs.collections[i].get_paths()
-            for path in paths:
-                v = path.vertices
+            # Use allsegs to get vertices directly (works in older and newer MPL)
+            segments = cs.allsegs[i] 
+            for v in segments:
                 if len(v) < 2: continue
                 # Find all boundary intersections for this path
                 boundary_pts = []

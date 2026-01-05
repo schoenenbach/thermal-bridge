@@ -1,0 +1,108 @@
+# Reusable Component Templates
+# Define complex element groups that can be instantiated with parameters
+# Use: type: component, template: isg_shutter_assembly, params: {x_base: 260.0, y_base: 303.0}
+
+# --- ISG + Shutter Rail Assembly ---
+# The complete shutter guide rail assembly with ISG profile and shutter rail
+isg_shutter_assembly:
+  description: "ISG guide rail + shutter rail assembly"
+  params:
+    x_base: required  # Left edge of ISG aluminum
+    y_base: required  # Bottom edge of assembly
+  
+  dimensions:
+    isg_width: 22.0
+    isg_height: 53.0
+    wall_thickness: 2.0  # Aluminum wall thickness
+    seal_width: 1.0
+    shutter_width: 22.0
+    
+  elements:
+    # ISG Outer Aluminum
+    - type: rect
+      name: "ISG_Alu"
+      material: ALUMINUM
+      params:
+        x: "$x_base"
+        y: "$y_base"
+        width: 22.0
+        height: 53.0
+        
+    # ISG Inner Cavity
+    - type: rect
+      name: "ISG_Air"
+      material: CAVITY
+      params:
+        x: "$x_base + 2"
+        y: "$y_base + 2"
+        width: 18.0
+        height: 49.0
+        
+    # Seal between ISG and Shutter
+    - type: rect
+      name: "ISG_Seal"
+      material: AIR_EXT
+      lambda: 0.25
+      params:
+        x: "$x_base + 22"
+        y: "$y_base"
+        width: 1.0
+        height: 53.0
+        
+    # Shutter Rail Outer Aluminum
+    - type: rect
+      name: "Shutter_Alu"
+      material: ALUMINUM
+      params:
+        x: "$x_base + 23"
+        y: "$y_base"
+        width: 22.0
+        height: 53.0
+        
+    # Shutter Rail Inner Cavity
+    - type: rect
+      name: "Shutter_Air"
+      material: CAVITY
+      params:
+        x: "$x_base + 25"
+        y: "$y_base + 2"
+        width: 18.0
+        height: 49.0
+
+# --- Mounting Screw ---
+# Steel mounting screw for ISG rail
+mounting_screw:
+  description: "Steel mounting screw for ISG rail attachment"
+  params:
+    x: required
+    y: required
+    length: 50.0  # Default 50mm, use 100mm with insulation
+    diameter: 8.0
+    
+  elements:
+    - type: rect
+      name: "MountingScrew"
+      material: FRAME  # Uses FRAME for steel
+      lambda: 50.0     # Steel conductivity
+      params:
+        x: "$x"
+        y: "$y"
+        width: "$length"
+        height: "$diameter"
+
+# --- Interior Air Polygon Points ---
+# Standard point names for the interior air polygon
+# These are derived from wall/window positions but documented here for reference
+air_polygon_points:
+  description: "Standard interior air polygon point sequence"
+  point_order:
+    - AirInt_BL         # [0, y_bottom]
+    - Wall_BL           # [x_wall_int, y_bottom]
+    - Wall_TL           # [x_wall_int, y_reveal]
+    - Frame_BL          # [x_f_start, y_reveal]
+    - Frame_Int_Step    # [x_f_start, y_sash_start]
+    - Sash_BL           # [x_sash_start, y_sash_start]
+    - Sash_TL           # [x_sash_start, y_sash_end]
+    - Sash_Glass_Step   # [x_glass_start, y_sash_end]
+    - Glass_TL          # [x_glass_start, y_top]
+    - AirInt_TopLeft    # [0, y_top]

@@ -1,6 +1,8 @@
 name: "Scenario 8: Wall 360mm (Styrodur, No Rev)"
 description: "Reference Scenario: 360mm Wall, Styrodur Insulation, No Reveal Insulation"
 
+# References: library/defaults.yaml (wall_360mm)
+
 variables:
   # Geometry Config
   wall_thick: 360.0

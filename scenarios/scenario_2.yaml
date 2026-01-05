@@ -1,13 +1,11 @@
 name: "Scenario 2: Wall 450mm (No Ins)"
 description: "Reference Scenario: 450mm Wall, No Insulation"
 
+# References: library/defaults.yaml (window_standard, wall_450mm)
+
 variables:
   # Geometry Config
   wall_thick: 450.0
-  ins_thick_max: 0.0
-  ins_thick_min: 0.0
-  reveal_ins_mm: 0.0
-  taper_len: 0.0
   win_pos: 150.0
   rebate_overlap: 50.0
   
@@ -18,16 +16,16 @@ variables:
   # Canvas
   grid_size: 2.5
   
-  # Derived
+  # Derived (from wall_450mm preset)
   x_wall_int: 50.0
-  x_wall_ext: 500.0 # 50+450
+  x_wall_ext: 500.0  # 50+450
   x_win_outer: 350.0 # 500-150
   
   y_bottom: 0.0
   y_reveal: 250.0
   y_top: 500.0
   
-  # Window details
+  # Window details (from window_standard preset)
   f_depth: 70.0
   f_width: 70.0
   sash_overlap: 10.0
@@ -37,16 +35,15 @@ variables:
   glass_thick: 24.0
   
   # Calculated window helpers
-  x_f_start: 280.0 # 350-70
+  x_f_start: 280.0  # 350-70
   
   y_sash_start: 310.0
   y_sash_end: 380.0
-  x_sash_start: 250.0 # 350-30-70
+  x_sash_start: 250.0  # 350-30-70
   x_glass_start: 273.0 # (250+320)/2 - 12
   
-  # Reveal Shift (0mm)
-  reveal_shift: 0.0
-  y_reveal_shifted: 250.0 # No shift
+  # Reveal (no shift for no-insulation case)
+  y_reveal_shifted: 250.0
 
 canvas:
   bounds: [0, 600, 0, 500] 

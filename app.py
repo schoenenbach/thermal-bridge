@@ -186,17 +186,45 @@ if active_data:
                     
                     prog_bar.progress(1.0)
                     status_text.success("Simulation Complete")
-                    st.metric("Psi-Value", f"{results.get('Psi', 0.0):.4f} W/mK", help="Available if 'Psi' is defined in measurements")
-                    if 'fRsi' in results:
-                        st.metric("fRsi Factor", f"{results['fRsi']:.4f}")
-                    else:
-                        st.info("fRsi not calculated")
-                        
-                    if 'MinT' in results:
-                        st.metric("Min Temp", f"{results['MinT']:.2f} °C")
-                    else:
-                        st.info("Min Temp not available")
+                    prog_bar.progress(1.0)
+                    status_text.success("Simulation Complete")
                     
+                    measurements = results.get('measurements', {})
+                    if measurements:
+                        st.subheader("Measurements")
+                        # Dynamic grid layout
+                        cols = st.columns(3)
+                        for i, (name, res) in enumerate(measurements.items()):
+                            val = res.get('value')
+                            if val is None: continue
+                            
+                            with cols[i % 3]:
+                                label = name
+                                value_str = f"{val:.4f}"
+                                delta = None
+                                help_txt = None
+                                
+                                # Handle special formatting for known keys
+                                if name == "Psi":
+                                    label = "Ψ-Value [W/mK]"
+                                elif name == "fRsi":
+                                    label = "fRsi Factor"
+                                elif "MinT" in name:
+                                    value_str += " °C"
+                                
+                                # Handle validation data
+                                if 'expected' in res:
+                                    expected = res['expected']
+                                    diff = res.get('diff', abs(val - expected))
+                                    passed = res.get('passed', diff < 0.1) # Fallback tolerance
+                                    
+                                    icon = "✅" if passed else "❌"
+                                    label = f"{icon} {label}"
+                                    delta = f"Err: {diff:.4f}"
+                                    help_txt = f"Expected: {expected:.4f}"
+                                
+                                st.metric(label, value_str, delta=delta, delta_color="inverse", help=help_txt)
+                                
                     # Cleanup
                     if os.path.exists(temp_yaml): os.remove(temp_yaml)
                     
