@@ -11,7 +11,7 @@ from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, 
 from geometry import build_material_grid, MaterialID
 from geometries.window_reveal import WindowRevealGeometry
 from mesh import UniformMesh
-from solver import get_solver_lib, solve, calculate_conductances_uniform
+from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map
 
 # --- Scenarios ---
 def get_scenarios():
@@ -195,12 +195,14 @@ def solve_scenario(scenario_def):
     print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")
     
     # Plot
-    plt.figure(figsize=(10, 10))
-    plt.imshow(temp_res, cmap='jet', origin='lower')
-    plt.title(f"{scenario_def['name']}\nPsi={psi:.3f}, fRsi={frsi:.3f}, MinT={min_temp:.1f}C")
-    plt.colorbar(label='Temp [C]')
-    plt.savefig(f"result_{suffix}.png")
-    plt.close()
+    plot_temperature_map(
+        temp_grid=temp_res,
+        width_mm=mesh.width_mm,
+        height_mm=mesh.height_mm,
+        filename=f"result_{suffix}.png",
+        title=f"{scenario_def['name']}\nPsi={psi:.3f}, fRsi={frsi:.3f}, MinT={min_temp:.1f}C",
+        grid_size_mm=mesh.grid_size_mm
+    )
     
     return {
         "name": scenario_def['name'],
