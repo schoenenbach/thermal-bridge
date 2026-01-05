@@ -454,7 +454,7 @@ def generate_geometries():
                 data = yaml.safe_load(f)
             geom = DeclarativeGeometry(data)
         else:
-            geom = WindowRevealGeometry(cfg)
+            raise ValueError(f"Unsupported config type: {type(cfg)}. Expected YAML file path.")
             
         mesh = AdaptiveMesh(geom)
         mesh.generate()

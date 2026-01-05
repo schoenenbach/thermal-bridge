@@ -6,7 +6,6 @@ Uses absolute coordinates (mm).
 """
 
 from geometry import SketchGeometry, MaterialID
-from geometry import SketchGeometry, MaterialID
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_STYRODUR, 
     MAT_FRAME_EQ, MAT_GLASS_UG11, MAT_REVEAL_INSULATION
