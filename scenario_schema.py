@@ -182,7 +182,8 @@ class ScenarioSchema:
 # --- Validation Helpers ---
 VALID_ELEMENT_TYPES = {
     'rect', 'polygon', 'wall', 'window_detail', 
-    'insulation_tapered', 'insulation'
+    'insulation_tapered', 'insulation',
+    'roller_shutter', 'window_sill', 'venetian_blind', 'roof_junction'
 }
 
 VALID_MATERIALS = {

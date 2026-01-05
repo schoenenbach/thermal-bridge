@@ -1,214 +1,341 @@
 """
 Element Library for Window Reveal Geometries
 
-Provides factory functions to add common building elements to a SketchGeometry.
+Provides factory functions and classes to add common building elements to a SketchGeometry.
 Uses absolute coordinates (mm).
 """
 
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional
 from geometry import SketchGeometry, MaterialID
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_STYRODUR, 
-    MAT_FRAME_EQ, MAT_GLASS_UG11, MAT_REVEAL_INSULATION
+    MAT_FRAME_EQ, MAT_GLASS_UG11, MAT_REVEAL_INSULATION,
+    MAT_ALUMINUM, MAT_AIR_EXT, MAT_AIR_INT
 )
 
-def add_rect(sketch: SketchGeometry, 
-             name_prefix: str, 
-             x: float, y: float, 
-             width: float, height: float, 
-             material_id: int, 
-             lambda_val: float):
-    """
-    Add a generic rectangular element.
-    """
-    p1 = f"{name_prefix}_BL"
-    p2 = f"{name_prefix}_BR"
-    p3 = f"{name_prefix}_TR"
-    p4 = f"{name_prefix}_TL"
-    
-    sketch.add_point(p1, x, y)
-    sketch.add_point(p2, x + width, y)
-    sketch.add_point(p3, x + width, y + height)
-    sketch.add_point(p4, x, y + height)
-    
-    sketch.add_shape([p1, p2, p3, p4], material_id, lambda_val, name_prefix)
+# Base Class
+class Element(ABC):
+    def __init__(self, sketch: SketchGeometry, **params):
+        self.sketch = sketch
+        self.params = params
+        self.name = params.get('name', f"{self.__class__.__name__}")
+        self.material_id = params.get('material_id', MaterialID.WALL)
+        self.lambda_val = float(params.get('lambda_val', 0.5))
 
-def add_wall(sketch: SketchGeometry, 
-             x: float, y: float, 
-             width: float, height: float, 
-             lambda_val: float = MAT_WALL):
-    """
-    Add a masonry wall block.
-    """
-    add_rect(sketch, "Wall", x, y, width, height, MaterialID.WALL, lambda_val)
+    @abstractmethod
+    def build(self):
+        """Construct the element geometry on the sketch."""
+        pass
 
-def add_insulation(sketch: SketchGeometry, 
-                   x: float, y: float, 
-                   width: float, height: float, 
-                   lambda_val: float = MAT_INSULATION,
-                   name="Insulation",
-                   material_id: int = MaterialID.INSULATION):
-    """
-    Add a rectangular insulation block.
-    """
-    add_rect(sketch, name, x, y, width, height, material_id, lambda_val)
+    def _get_param(self, key: str, default: Any = None) -> Any:
+        return self.params.get(key, default)
 
-def add_insulation_tapered(sketch: SketchGeometry, 
-                           x_base: float,     # Inner face of insulation (against wall)
-                           y_bottom: float,   # Bottom of insulation
-                           y_top: float,      # Top of insulation (at reveal)
-                           thick_main: float, # Max thickness
-                           thick_taper: float,# Min thickness at top
-                           taper_start_y: float, # Y where taper begins
-                           lambda_val: float = MAT_INSULATION,
-                           name="InsulationTapered",
-                           material_id: int = MaterialID.INSULATION):
-    """
-    Add tapered insulation (wedge shape).
-    
-    Orientation: Vertical wall, insulation on *right* of x_base? 
-    No, usually external insulation is on the outside.
-    Assuming x_base is the interface between Wall and Insulation.
-    Direction: Insulation extends from x_base to x_base + thickness.
-    
-    Shape:
-    1. Rectangular part from y_bottom to taper_start_y
-    2. Wedge part from taper_start_y to y_top
-    """
-    
-    # Points
-    # Bottom (Rect)
-    sketch.add_point(f"{name}_BL", x_base, y_bottom)
-    sketch.add_point(f"{name}_BR", x_base + thick_main, y_bottom)
-    
-    # Taper Start (Rect top/Wedge bottom)
-    sketch.add_point(f"{name}_MidL", x_base, taper_start_y)
-    sketch.add_point(f"{name}_MidR", x_base + thick_main, taper_start_y)
-    
-    # Top (Wedge top)
-    sketch.add_point(f"{name}_TL", x_base, y_top) # Assuming flush with wall at top?
-    sketch.add_point(f"{name}_TR", x_base + thick_taper, y_top)
-    
-    # Shape
-    # BL -> BR -> MidR -> TR -> TL -> MidL -> BL
-    # Or split into 2 shapes? One shape is fine.
-    
-    pts = [
-        f"{name}_BL",
-        f"{name}_BR",
-        f"{name}_MidR", 
-        f"{name}_TR", 
-        f"{name}_TL", 
-        f"{name}_MidL"
-    ]
-    
-    sketch.add_shape(pts, material_id, lambda_val, name)
 
-def add_guard_rail(sketch: SketchGeometry,
-                   x: float, y: float, 
-                   width: float, height: float,
-                   lambda_val: float = 50.0): # 50 = Steel (approx guide)
-    """
-    Add rolling shutter guard rail.
-    """
-    add_rect(sketch, "GuardRail", x, y, width, height, MaterialID.FRAME, lambda_val) # Use Frame ID for convenience/color
+class RectElement(Element):
+    def __init__(self, sketch: SketchGeometry, **params):
+        super().__init__(sketch, **params)
+        self.x = float(self._get_param('x', 0.0))
+        self.y = float(self._get_param('y', 0.0))
+        self.width = float(self._get_param('width', 0.0))
+        self.height = float(self._get_param('height', 0.0))
+        
+    def build(self):
+        p1 = f"{self.name}_BL"
+        p2 = f"{self.name}_BR"
+        p3 = f"{self.name}_TR"
+        p4 = f"{self.name}_TL"
+        
+        self.sketch.add_point(p1, self.x, self.y)
+        self.sketch.add_point(p2, self.x + self.width, self.y)
+        self.sketch.add_point(p3, self.x + self.width, self.y + self.height)
+        self.sketch.add_point(p4, self.x, self.y + self.height)
+        
+        self.sketch.add_shape([p1, p2, p3, p4], self.material_id, self.lambda_val, self.name)
 
-def add_rebate_corner(sketch: SketchGeometry,
-                      x_corner: float, # The logical corner of the opening
-                      y_corner: float, # The logical corner of the opening (reveal height)
-                      rebate_depth: float, # How deep into the wall (horizontal overlap?)
-                      rebate_height: float, # How high up the reveal (vertical overlap)
-                      lambda_val=MAT_WALL):
-    """
-    Add a masonry rebate (nose) that extends into the opening.
-    Usually modeled as a rectangle added on top of the wall corner.
-    """
-    if rebate_height <= 0 or rebate_depth <= 0:
-        return
 
-    # In WindowRevealGeometry, rebate sits on top of wall:
-    # y_rebate_end = y_reveal + rebate
-    # x extends from x_win_outer to x_wall_ext (width = rebate_depth?)
-    # Wait, rebate_depth in this fn means width.
-    # We assume caller provides correct width.
-    
-    add_rect(sketch, "Rebate", x_corner, y_corner, rebate_depth, rebate_height, MaterialID.WALL, lambda_val)
+class Wall(RectElement):
+    def __init__(self, sketch: SketchGeometry, **params):
+        params.setdefault('material_id', MaterialID.WALL)
+        params.setdefault('lambda_val', MAT_WALL)
+        super().__init__(sketch, **params)
 
-def add_window_detail(sketch: SketchGeometry,
-                      x_frame_start: float, # Left edge of fixed frame
-                      y_frame_start: float, # Bottom of fixed frame (sill/reveal)
-                      frame_depth: float,
-                      frame_width: float,
-                      sash_depth: float,
-                      sash_width: float,
-                      sash_overlap: float,
-                      sash_recess: float, # Distance from frame outer edge to sash outer edge
-                      glass_thickness: float,
-                      y_top: float, # Top of glass/domain
-                      mat_frame_lambda=MAT_FRAME_EQ,
-                      mat_glass_lambda=MAT_GLASS_UG11,
-                      name="Window"):
-    """
-    Add detailed window assembly: Fixed Frame, Sash, Glass.
-    Matches logic from WindowRevealGeometry.
-    """
-    # Coordinates Calculation
-    x_f_end = x_frame_start + frame_depth
-    y_f_end = y_frame_start + frame_width
-    
-    # Sash
-    # x_sash_end = x_f_end - sash_recess
-    # x_sash_start = x_sash_end - sash_depth
-    x_sash_end = x_f_end - sash_recess
-    x_sash_start = x_sash_end - sash_depth
-    
-    y_sash_start = y_f_end - sash_overlap
-    y_sash_end = y_sash_start + sash_width
-    
-    # Glass
-    glass_mid_x = (x_sash_start + x_sash_end) / 2
-    x_glass_start = glass_mid_x - glass_thickness / 2
-    x_glass_end = glass_mid_x + glass_thickness / 2
-    y_glass_start = y_sash_start + 10 # Glass sits 10mm into sash?
-    
-    # 1. Fixed Frame
-    add_rect(sketch, f"{name}_Fixed", x_frame_start, y_frame_start, 
-             frame_depth, frame_width, MaterialID.FRAME, mat_frame_lambda)
+
+class Insulation(RectElement):
+    def __init__(self, sketch: SketchGeometry, **params):
+        params.setdefault('material_id', MaterialID.INSULATION)
+        params.setdefault('lambda_val', MAT_INSULATION)
+        super().__init__(sketch, **params)
+
+
+class InsulationTapered(Element):
+    def build(self):
+        x_base = float(self._get_param('x_base', 0.0))
+        y_bottom = float(self._get_param('y_bottom', 0.0))
+        y_top = float(self._get_param('y_top', 0.0))
+        thick_main = float(self._get_param('thick_main', 0.0))
+        thick_taper = float(self._get_param('thick_taper', 0.0))
+        taper_start_y = float(self._get_param('taper_start_y', 0.0))
+        
+        name = self.name
+        
+        # Points
+        self.sketch.add_point(f"{name}_BL", x_base, y_bottom)
+        self.sketch.add_point(f"{name}_BR", x_base + thick_main, y_bottom)
+        
+        self.sketch.add_point(f"{name}_MidL", x_base, taper_start_y)
+        self.sketch.add_point(f"{name}_MidR", x_base + thick_main, taper_start_y)
+        
+        self.sketch.add_point(f"{name}_TR", x_base + thick_taper, y_top)
+        self.sketch.add_point(f"{name}_TL", x_base, y_top)
+        
+        pts = [
+            f"{name}_BL", f"{name}_BR",
+            f"{name}_MidR", f"{name}_TR", 
+            f"{name}_TL", f"{name}_MidL"
+        ]
+        
+        self.sketch.add_shape(pts, self.material_id, self.lambda_val, name)
+
+
+class WindowDetail(Element):
+    def build(self):
+        x_fs = float(self._get_param('x_frame_start', 0))
+        y_fs = float(self._get_param('y_frame_start', 0))
+        fd = float(self._get_param('frame_depth', 0))
+        fw = float(self._get_param('frame_width', 0))
+        sd = float(self._get_param('sash_depth', 0))
+        sw = float(self._get_param('sash_width', 0))
+        sov = float(self._get_param('sash_overlap', 0))
+        srec = float(self._get_param('sash_recess', 0))
+        gt = float(self._get_param('glass_thickness', 0))
+        y_top = float(self._get_param('y_top', 0))
+        
+        mat_frame = self._get_param('mat_frame_lambda', MAT_FRAME_EQ)
+        mat_glass = self._get_param('mat_glass_lambda', MAT_GLASS_UG11)
+        name = self.name
+
+        # Coordinates
+        x_f_end = x_fs + fd
+        y_f_end = y_fs + fw
+        
+        x_sash_end = x_f_end - srec
+        x_sash_start = x_sash_end - sd
+        
+        y_sash_start = y_f_end - sov
+        y_glass_start = y_sash_start + 10
+        
+        glass_mid_x = (x_sash_start + x_sash_end) / 2
+        x_glass_start = glass_mid_x - gt / 2
+        
+        # 1. Fixed Frame
+        self._add_rect(f"{name}_Fixed", x_fs, y_fs, fd, fw, MaterialID.FRAME, mat_frame)
              
-    # 2. Sash
-    add_rect(sketch, f"{name}_Sash", x_sash_start, y_sash_start,
-             sash_depth, sash_width, MaterialID.FRAME, mat_frame_lambda)
+        # 2. Sash
+        self._add_rect(f"{name}_Sash", x_sash_start, y_sash_start, sd, sw, MaterialID.FRAME, mat_frame)
              
-    # 3. Glass
-    glass_height = y_top - y_glass_start
-    add_rect(sketch, f"{name}_Glass", x_glass_start, y_glass_start,
-             glass_thickness, glass_height, MaterialID.GLASS, mat_glass_lambda)
+        # 3. Glass
+        glass_height = y_top - y_glass_start
+        self._add_rect(f"{name}_Glass", x_glass_start, y_glass_start, gt, glass_height, MaterialID.GLASS, mat_glass)
 
-    # Note: Does not create Air polygons. Callers responsibility.
-
-def add_box_frame(sketch: SketchGeometry, x, y, w, h, mat_id=MaterialID.FRAME, lam=0.13, name="Frame"):
-    add_rect(sketch, name, x, y, w, h, mat_id, lam)
+    def _add_rect(self, sub_name, x, y, w, h, mid, lam):
+        RectElement(self.sketch, name=sub_name, x=x, y=y, width=w, height=h, material_id=mid, lambda_val=lam).build()
 
 
+class CustomElement(Element):
+    """Bridge for generic construction if needed."""
+    def build(self):
+        pass
+
+
+# --- New Advanced Macros ---
+
+class RollerShutterBox(RectElement):
+    """
+    Parametric Roller Shutter Box with insulation.
+    Simplified representation: Box frame + Insulation wedge + Air cavity.
+    """
+    def __init__(self, sketch: SketchGeometry, **params):
+        params.setdefault('material_id', MaterialID.CONCRETE) # or whatever the box is made of
+        params.setdefault('lambda_val', 2.0) # Concrete-ish
+        super().__init__(sketch, **params)
+        
+    def build(self):
+        # Determine specific geometry from params
+        # For now, just a placeholder box, but we can make it more detailed later
+        # Example: 
+        # - Box Shell
+        # - Internal Insulation
+        # - External Inspection Lid
+        
+        # Draw the main box (shell)
+        super().build() 
+        
+        # If we want detailed internals, we would add them here as sub-shapes
+        # For example, adding an insulation layer inside
+        ins_thick = float(self._get_param('insulation_thickness', 0.0))
+        if ins_thick > 0:
+            RectElement(self.sketch, 
+                name=f"{self.name}_Insulation",
+                x=self.x + 10, # arbitrary offset for now
+                y=self.y + 10,
+                width=self.width - 20,
+                height=ins_thick,
+                material_id=MaterialID.INSULATION,
+                lambda_val=MAT_INSULATION
+            ).build()
+
+
+class WindowSill(Element):
+    """
+    External Aluminum Sill and Internal Stone/Wood Sill.
+    """
+    def build(self):
+        x = float(self._get_param('x', 0))
+        y = float(self._get_param('y', 0))
+        width = float(self._get_param('width', 0)) # Total width available
+        
+        # Internal params
+        depth_int = float(self._get_param('depth_int', 200))
+        thick_int = float(self._get_param('thick_int', 20))
+        mat_int = self._get_param('material_int', 'stone') # stone or wood
+        
+        # External params
+        depth_ext = float(self._get_param('depth_ext', 150))
+        thick_ext = float(self._get_param('thick_ext', 2)) # Aluminum sheet
+        
+        lambda_int = 2.3 if mat_int == 'stone' else 0.13
+        lambda_ext = MAT_ALUMINUM
+        
+        # Internal Sill
+        RectElement(self.sketch, 
+            name=f"{self.name}_Int",
+            x=x - depth_int, 
+            y=y, 
+            width=depth_int, 
+            height=thick_int, 
+            material_id=MaterialID.CONCRETE, # Placeholder ID
+            lambda_val=lambda_int
+        ).build()
+        
+        # External Sill (sloped?) -> Simplified as rect for now
+        RectElement(self.sketch, 
+            name=f"{self.name}_Ext",
+            x=x, # Starts at window face?
+            y=y, # Starts at sill level
+            width=depth_ext, 
+            height=thick_ext, 
+            material_id=MaterialID.ALUMINUM,
+            lambda_val=lambda_ext
+        ).build()
+
+
+class VenetianBlindBox(RectElement):
+    """
+    Recessed box for Venetian Blinds (Raffstore).
+    Usually taller and narrower than roller shutter boxes, open at bottom.
+    """
+    def build(self):
+        # Base box
+        super().build()
+        
+        # Add side insulation if requested
+        ins_thick = float(self._get_param('insulation_thickness', 0.0))
+        if ins_thick > 0:
+            RectElement(self.sketch, 
+                name=f"{self.name}_Insulation_Back",
+                x=self.x, 
+                y=self.y,
+                width=self.width,
+                height=ins_thick, # Insulation at top? Or back? assuming back means top or inner side
+                material_id=MaterialID.INSULATION,
+                lambda_val=MAT_INSULATION
+            ).build()
+
+class RoofJunction(Element):
+    """
+    Eaves detail: Wall meets Roof.
+    Simplified: Wall continues up, Roof rafter angles down.
+    """
+    def build(self):
+        x_wall = float(self._get_param('x_wall', 0))
+        y_wall_top = float(self._get_param('y_wall_top', 3000))
+        wall_width = float(self._get_param('wall_width', 360))
+        
+        # Add Wall segment
+        RectElement(self.sketch,
+            name=f"{self.name}_Wall",
+            x=x_wall,
+            y=y_wall_top - 500, # arbitrary start
+            width=wall_width,
+            height=500,
+            material_id=MaterialID.WALL, 
+            lambda_val=MAT_WALL
+        ).build()
+        
+        # Add Rafter (wood)
+        # Simplified as a generic block for now, angling requires Polygon
+        # TODO: Implement angled rafter using PolygonShape when we have generic polygon support in Element
+        pass
+
+class Factory:
+    @staticmethod
+    def create(type_name: str, sketch: SketchGeometry, **params) -> Element:
+        map_ = {
+            'rect': RectElement,
+            'wall': Wall,
+            'insulation': Insulation,
+            'insulation_tapered': InsulationTapered,
+            'window_detail': WindowDetail,
+            'roller_shutter': RollerShutterBox,
+            'window_sill': WindowSill,
+            'venetian_blind': VenetianBlindBox,
+            'roof_junction': RoofJunction,
+        }
+        
+        cls = map_.get(type_name.lower())
+        if cls:
+            return cls(sketch, **params)
+        else:
+            # Fallback or error
+            print(f"[WARNING] Unknown element type '{type_name}', using generic RectElement.")
+            return RectElement(sketch, **params)
+
+
+# --- Backward Compatibility Wrappers ---
+
+def add_rect(sketch: SketchGeometry, name_prefix: str, x: float, y: float, width: float, height: float, material_id: int, lambda_val: float):
+    RectElement(sketch, name=name_prefix, x=x, y=y, width=width, height=height, material_id=material_id, lambda_val=lambda_val).build()
+
+def add_wall(sketch: SketchGeometry, x: float, y: float, width: float, height: float, lambda_val: float = MAT_WALL):
+    Wall(sketch, x=x, y=y, width=width, height=height, lambda_val=lambda_val).build()
+
+def add_insulation(sketch: SketchGeometry, x: float, y: float, width: float, height: float, lambda_val: float = MAT_INSULATION, name="Insulation", material_id: int = MaterialID.INSULATION):
+    Insulation(sketch, x=x, y=y, width=width, height=height, lambda_val=lambda_val, name=name, material_id=material_id).build()
+
+def add_insulation_tapered(sketch: SketchGeometry, x_base: float, y_bottom: float, y_top: float, thick_main: float, thick_taper: float, taper_start_y: float, lambda_val: float = MAT_INSULATION, name="InsulationTapered", material_id: int = MaterialID.INSULATION):
+    InsulationTapered(sketch, x_base=x_base, y_bottom=y_bottom, y_top=y_top, thick_main=thick_main, thick_taper=thick_taper, taper_start_y=taper_start_y, lambda_val=lambda_val, name=name, material_id=material_id).build()
+
+def add_window_detail(sketch, x_frame_start, y_frame_start, frame_depth, frame_width, sash_depth, sash_width, sash_overlap, sash_recess, glass_thickness, y_top, mat_frame_lambda=MAT_FRAME_EQ, mat_glass_lambda=MAT_GLASS_UG11, name="Window"):
+    WindowDetail(sketch, x_frame_start=x_frame_start, y_frame_start=y_frame_start, frame_depth=frame_depth, frame_width=frame_width, sash_depth=sash_depth, sash_width=sash_width, sash_overlap=sash_overlap, sash_recess=sash_recess, glass_thickness=glass_thickness, y_top=y_top, mat_frame_lambda=mat_frame_lambda, mat_glass_lambda=mat_glass_lambda, name=name).build()
+
+def add_guard_rail(sketch, x, y, width, height, lambda_val=50.0):
+    RectElement(sketch, name="GuardRail", x=x, y=y, width=width, height=height, material_id=MaterialID.FRAME, lambda_val=lambda_val).build()
+
+def add_rebate_corner(sketch, x_corner, y_corner, rebate_depth, rebate_height, lambda_val=MAT_WALL):
+    if rebate_height <= 0 or rebate_depth <= 0: return
+    RectElement(sketch, name="Rebate", x=x_corner, y=y_corner, width=rebate_depth, height=rebate_height, material_id=MaterialID.WALL, lambda_val=lambda_val).build()
+
+def add_box_frame(sketch, x, y, w, h, mat_id=MaterialID.FRAME, lam=0.13, name="Frame"):
+    RectElement(sketch, name=name, x=x, y=y, width=w, height=h, material_id=mat_id, lambda_val=lam).build()
+
+def add_air_cutout(sketch, x, y, width, height, name="AirCutout"):
+    RectElement(sketch, name=name, x=x, y=y, width=width, height=height, material_id=MaterialID.AIR_EXT, lambda_val=0.025).build()
+
+# For legacy class support ??
 class ElementBasedGeometry(SketchGeometry):
-    """
-    Geometry defined by a sequence of element factory functions.
-    """
     def __init__(self, build_steps, canvas_bounds):
         super().__init__()
-        
-        # Execute build steps
         for step in build_steps:
-            # step is a callable that takes (sketch)
             step(self)
-            
         self.set_canvas(*canvas_bounds)
-
-
-def add_air_cutout(sketch: SketchGeometry, x, y, width, height, name="AirCutout"):
-    """
-    Cut out a rectangular region by overwriting with External Air.
-    Place this AFTER adding solid elements to effectively 'remove' material.
-    """
-    # Using 0.025 for air lambda to be safe, though usually handled by BCs
-    add_rect(sketch, name, x, y, width, height, MaterialID.AIR_EXT, 0.025)
-

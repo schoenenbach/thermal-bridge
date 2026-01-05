@@ -54,6 +54,8 @@ MAT_SPACER_ALUMINUM = registry.get_lambda("aluminum_generic", 10.0)
 MAT_ALUMINUM = registry.get_lambda("aluminum_generic", 160.0)
 MAT_CAVITY_ISO = registry.get_lambda("air_cavity_unventilated", 0.25)
 MAT_EPDM = 0.25
+MAT_AIR_EXT = 0.025
+MAT_AIR_INT = 0.025
 
 class SpacerType:
     NONE = 0

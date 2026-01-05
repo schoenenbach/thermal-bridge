@@ -162,7 +162,7 @@ class DeclarativeGeometry(SketchGeometry):
         # Let's assume a unified list under 'elements'
         el_list = self.data.get('elements', [])
         
-        for el in el_list:
+        for i, el in enumerate(el_list):
             el_type = el.get('type', 'rect')
             
             # --- Common Params ---
@@ -172,16 +172,22 @@ class DeclarativeGeometry(SketchGeometry):
             if 'lambda' in el:
                 mat_lambda = float(el['lambda'])
             
-            name = el.get('name', f"{el_type}_{el_list.index(el)}")
-            p = el.get('params', {})
+            name = el.get('name', f"{el_type}_{i}")
+            p = el.get('params', {}).copy()
             # Merge top-level keys into params for convenience if not in params dict
             for k,v in el.items():
                 if k not in ['type', 'params', 'material', 'lambda', 'name', 'points']:
                     p[k] = v
 
+            # Add resolved common props to params
+            p['name'] = name
+            p['material_id'] = mat_id
+            p['lambda_val'] = mat_lambda
+
             # --- Type Handlers ---
             
             if el_type == 'polygon':
+                # Polygon is special, handled natively in SketchGeometry usually, but let's see
                 # Reference existing points by name
                 pt_names = el.get('points', [])
                 if pt_names:
@@ -189,53 +195,13 @@ class DeclarativeGeometry(SketchGeometry):
                 else:
                     print(f"[ERROR] Polygon {name} has no points defined.")
             
-            elif el_type == 'rect':
-                x = float(p.get('x', 0))
-                y = float(p.get('y', 0))
-                w = float(p.get('width', 0))
-                h = float(p.get('height', 0))
-                elements.add_rect(self, name, x, y, w, h, mat_id, mat_lambda)
-                
-            elif el_type == 'wall':
-                elements.add_wall(self, p.get('x'), p.get('y'), p.get('width'), p.get('height'), mat_lambda)
-                
-            elif el_type == 'insulation':
-                elements.add_insulation(self, p.get('x'), p.get('y'), p.get('width'), p.get('height'), mat_lambda, name, mat_id)
-                
-            elif el_type == 'insulation_tapered':
-                elements.add_insulation_tapered(
-                    self, 
-                    x_base=p.get('x_base'), 
-                    y_bottom=p.get('y_bottom'), 
-                    y_top=p.get('y_top'),
-                    thick_main=p.get('thick_main'),
-                    thick_taper=p.get('thick_taper'),
-                    taper_start_y=p.get('taper_start_y'),
-                    lambda_val=mat_lambda,
-                    name=name,
-                    material_id=mat_id
-                )
-             
-            # ... Add other macros as needed (rebate, window definition, etc.)
-            
-            elif el_type == 'window_detail':
-                # Complex macro
-                elements.add_window_detail(
-                    self,
-                    x_frame_start=p.get('x_frame_start'),
-                    y_frame_start=p.get('y_frame_start'),
-                    frame_depth=p.get('frame_depth'),
-                    frame_width=p.get('frame_width'),
-                    sash_depth=p.get('sash_depth'),
-                    sash_width=p.get('sash_width'),
-                    sash_overlap=p.get('sash_overlap'),
-                    sash_recess=p.get('sash_recess'),
-                    glass_thickness=p.get('glass_thickness'),
-                    y_top=p.get('y_top'),
-                    mat_frame_lambda=MAT_FRAME_EQ,
-                    mat_glass_lambda=MAT_GLASS_UG11,
-                    name=name
-                )
+            else:
+                # Use Factory for everything else
+                # Note: Factory expects sketch as first arg
+                try:
+                    elements.Factory.create(el_type, self, **p).build()
+                except Exception as e:
+                    print(f"[ERROR] Failed to build element '{name}' of type '{el_type}': {e}")
             
     def get_refinement_zones(self) -> List[RefinementZone]:
         zones_data = self.data.get('refinement_zones', [])

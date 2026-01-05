@@ -1,0 +1,52 @@
+name: Demo New Elements
+description: Comparison of new architectural macros.
+
+variables:
+   wall_width: 360
+   sim_width: 1000
+   sim_height: 1000
+
+canvas:
+  bounds: [-100, "${sim_width}", -100, "${sim_height}"]
+  grid: 10
+
+elements:
+  # 1. Main Wall
+  - type: wall
+    x: 0
+    y: 0
+    width: ${wall_width}
+    height: ${sim_height}
+
+  # 2. Window Sill
+  - type: window_sill
+    name: MySill
+    x: ${wall_width} # Outer edge of wall? (No, usually 0 is int, wall_width is ext?)
+    # Let's assume standard coords: x=0 (interior), x=360 (exterior)
+    # Sill at x=360?
+    # Actually let's assume geometry: x=0 is interior finish.
+    x: ${wall_width}
+    y: 400
+    width: ${wall_width}
+    depth_ext: 160
+    depth_int: 200
+
+  # 3. Venetian Blind Box (Top)
+  - type: venetian_blind
+    x: ${wall_width}
+    y: 1500 # Top of window
+    width: 160
+    height: 300
+    insulation_thickness: 40
+
+  # 4. Roof Junction (Top of wall)
+  - type: roof_junction
+    x_wall: 0
+    y_wall_top: ${sim_height}
+    wall_width: ${wall_width}
+
+boundary_conditions:
+  T_int: 20.0
+  T_ext: -5.0
+  Rsi_wall: 0.13
+  Rse: 0.04

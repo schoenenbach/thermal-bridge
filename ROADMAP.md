@@ -15,7 +15,7 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
     *   Update `declarative_geometry.py` to lookup materials by string ID (e.g., "concrete_reinforced") instead of enum.
 *   **UI:** Add a "Material Browser" in Streamlit to view and edit properties.
 
-## 2. Expanded Component Library
+## 2. Expanded Component Library [DONE]
 
 **Objective:** Enhance the `elements.py` library with high-level architectural macros to speed up geometry creation.
 
