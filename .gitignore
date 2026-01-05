@@ -5,3 +5,6 @@ __pycache__/
 *.so
 results/
 result_*.png
+
+Testing_Plan/
+*.pdf

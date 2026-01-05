@@ -1,15 +1,15 @@
 name: "ISO Case 2: Multi-Material Bridge"
 description: |
   ISO 10211-2007 Annex A Test Case 2: Multi-Material Bridge
-  
+
   Thermal bridge with aluminum stud through insulation layer.
   Dimensions: 500mm width, 47.5mm height.
-  
+
   Boundary conditions:
   - Bottom: Convective T=20.0°C, Rsi=0.11 m²K/W
   - Top: Convective T=0.0°C, Rse=0.06 m²K/W
   - Sides: Adiabatic
-  
+
   Validation:
   - Point temperatures A-I (see measurements)
   - Heat flux through interior surface should be 9.5 W/m ± 0.5W/m
@@ -45,20 +45,20 @@ materials:
 variables:
   # Canvas dimensions
   grid_size: 0.25
-  
+
   # Layer heights
   concrete_top: 41.5
-  
+
   # Wall thicknesses (Total 500mm)
   # Insulation: 15mm
   # Concrete: 485mm
   # Using absolute coordinates as per ISO spec is easier here
-  
+
   # Material Properties (Standard)
   lam_conc: 1.15
   lam_wood: 0.12
-  lam_reinf: 2.3  
-  
+  lam_reinf: 2.3
+
   concrete_height: 6.0
   wood_top: 36.5
   wood_height: 5.0
@@ -67,11 +67,11 @@ variables:
   alu_leg_bottom: 1.5
   alu_leg_height: 33.5
   alu_plate_height: 1.5
-  
+
   # Widths
   wood_width: 15.0
   alu_leg_width: 1.5
-  
+
 # Mesh Optimization (Graded Mesh)
 refinement_zones:
   # 1. Aluminum Main Leg (Vertical) + Insulation Wedge
@@ -84,7 +84,6 @@ refinement_zones:
     target_dy: 0.25
     priority: 10
     grading: 1.1 # 10% expansion per step away from critical
-
 
 canvas:
   bounds: [0, 500, 0, 47.5]
@@ -101,26 +100,23 @@ boundary_conditions:
 
 measurements:
   point_probes:
-    - { name: A, x:   0.0, y: 47.5, expected: 7.1,  tolerance: 0.1 }
-    - { name: B, x: 500.0, y: 47.5, expected: 0.8,  tolerance: 0.1 }
-    - { name: C, x:   0.0, y: 41.5, expected: 7.9,  tolerance: 0.1 }
-    - { name: D, x:  15.0, y: 41.5, expected: 6.3,  tolerance: 0.1 }
-    - { name: E, x: 500.0, y: 41.5, expected: 0.8,  tolerance: 0.1 }
-    - { name: F, x:   0.0, y: 36.5, expected: 16.4, tolerance: 0.1 }
-    - { name: G, x:  15.0, y: 36.5, expected: 16.3, tolerance: 0.1 }
-    - { name: H, x:   0.0, y:  0.0, expected: 16.8, tolerance: 0.1 }
-    - { name: I, x: 500.0, y:  0.0, expected: 18.3, tolerance: 0.1 }
-  
-  boundary_flux:
-    - { name: "Interior Heat Flux", boundary: bottom, expected: 9.5, tolerance: 0.5 }
+    - { name: A, x: 0.0, y: 47.5, expected: 7.1, tolerance: 0.1 }
+    - { name: B, x: 500.0, y: 47.5, expected: 0.8, tolerance: 0.1 }
+    - { name: C, x: 0.0, y: 41.5, expected: 7.9, tolerance: 0.1 }
+    - { name: D, x: 15.0, y: 41.5, expected: 6.3, tolerance: 0.1 }
+    - { name: E, x: 500.0, y: 41.5, expected: 0.8, tolerance: 0.1 }
+    - { name: F, x: 0.0, y: 36.5, expected: 16.4, tolerance: 0.1 }
+    - { name: G, x: 15.0, y: 36.5, expected: 16.3, tolerance: 0.1 }
+    - { name: H, x: 0.0, y: 0.0, expected: 16.8, tolerance: 0.1 }
+    - { name: I, x: 500.0, y: 0.0, expected: 18.3, tolerance: 0.1 }
 
-refinement_zones:
-  - x_min: 0.0
-    x_max: 20.0
-    y_min: 0.0
-    y_max: 47.5
-    target_dx: 0.25
-    priority: 1
+  boundary_flux:
+    - {
+        name: "Interior Heat Flux",
+        boundary: bottom,
+        expected: 9.5,
+        tolerance: 0.5,
+      }
 
 elements:
   # 1. Base Insulation
@@ -128,57 +124,57 @@ elements:
     name: "InsulationBase"
     material: INSULATION
     params:
-       x: 0.0
-       y: 0.0
-       width: 500.0
-       height: 47.5
+      x: 0.0
+      y: 0.0
+      width: 500.0
+      height: 47.5
 
   # 2. Concrete Top Layer
   - type: rect
     name: "ConcreteLayer"
     material: CONCRETE
     params:
-       x: 0.0
-       y: ${concrete_top}
-       width: 500.0
-       height: ${concrete_height}
+      x: 0.0
+      y: ${concrete_top}
+      width: 500.0
+      height: ${concrete_height}
 
   # 3. Wood Block
   - type: rect
     name: "WoodBlock"
     material: WOOD
     params:
-       x: 0.0
-       y: ${wood_top}
-       width: ${wood_width}
-       height: ${wood_height}
+      x: 0.0
+      y: ${wood_top}
+      width: ${wood_width}
+      height: ${wood_height}
 
   # 4. Aluminum Head
   - type: rect
     name: "AluminumHead"
     material: ALUMINUM
     params:
-       x: 0.0
-       y: ${alu_head_top}
-       width: ${wood_width}
-       height: ${alu_head_height}
+      x: 0.0
+      y: ${alu_head_top}
+      width: ${wood_width}
+      height: ${alu_head_height}
 
   # 5. Aluminum Leg
   - type: rect
     name: "AluminumLeg"
     material: ALUMINUM
     params:
-       x: 0.0
-       y: ${alu_leg_bottom}
-       width: ${alu_leg_width}
-       height: ${alu_leg_height}
+      x: 0.0
+      y: ${alu_leg_bottom}
+      width: ${alu_leg_width}
+      height: ${alu_leg_height}
 
   # 6. Aluminum Plate
   - type: rect
     name: "AluminumPlate"
     material: ALUMINUM
     params:
-       x: 0.0
-       y: 0.0
-       width: 500.0
-       height: ${alu_plate_height}
+      x: 0.0
+      y: 0.0
+      width: 500.0
+      height: ${alu_plate_height}

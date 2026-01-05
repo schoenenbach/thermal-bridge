@@ -1,6 +1,6 @@
 {
     "yaml.schemas": {
-        "./scenario.schema.json": "scenarios/*.yaml"
+        "./scenario_schema.json": "scenarios/*.yaml"
     },
     "yaml.validate": true,
     "yaml.format.enable": true
