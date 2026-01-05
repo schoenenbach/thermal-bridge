@@ -129,3 +129,57 @@ This document outlines the strategic roadmap for the Thermal Bridge Simulation p
 *   **Cloud Architecture:**
     *   Decouple Frontend (Streamlit) from Backend (Solver).
     *   Use a Task Queue (Celery/Redis) for long-running simulations so the web server doesn't time out during transient or parametric sweeps.
+
+## 11. Schema Architecture & IDE Integration [DONE]
+
+**Objective:** Establish a stable, strongly-typed data structure for scenarios that enables IDE validation, strict runtime checking, and future frontend migration.
+
+**Completed Tasks:**
+- [x] Add `schema_version` field to `Scenario` model (defaults to "1.0")
+- [x] Define typed param schemas for all element types: `RectParams`, `WallParams`, `AirParams`, `InsulationTaperedParams`, `WindowDetailParams`, `WindowSillParams`, `VenetianBlindParams`, `RoofJunctionParams`
+- [x] Create `schema_export.py` to generate JSON Schema from Pydantic
+- [x] Configure VS Code YAML extension (`.vscode/settings.json`)
+- [x] Create `validate_scenarios.py` helper for scenario analysis
+- [x] Add 17 unit tests in `test_schema_validation.py`
+
+**Files Added:**
+- `scenario.schema.json` - JSON Schema for IDE autocomplete
+- `schema_export.py` - Schema export utility
+- `validate_scenarios.py` - Scenario analysis tool
+- `.vscode/settings.json` - VS Code YAML extension config
+
+**IDE Setup:** Install Red Hat YAML extension: `ext install redhat.vscode-yaml`
+
+---
+
+## 12. UI Validation Layer [TODO]
+
+**Objective:** Provide real-time schema validation feedback in the Streamlit editor.
+
+**Proposed Tasks:**
+- [ ] Wrap YAML parsing with Pydantic validation in `app.py`
+- [ ] Display validation errors inline with line numbers
+- [ ] Color-code YAML text area based on validity
+- [ ] Show element-specific hints (e.g., "rect requires x, y, width, height")
+
+**Effort Estimate:** 4-6 hours
+
+---
+
+## 13. Frontend Migration (React/Angular) [FUTURE]
+
+**Objective:** Migrate from Streamlit to a modern SPA framework for better UX.
+
+**Prerequisites:**
+- Schema Architecture (Done - Item 11)
+- REST API design based on Pydantic models
+
+**Proposed Tasks:**
+- [ ] Design REST API contract (`/api/scenarios/validate`, `/api/simulate`, etc.)
+- [ ] Generate OpenAPI spec from Pydantic + FastAPI
+- [ ] Implement WebSocket for simulation progress updates
+- [ ] Use JSON Schema for dynamic form generation
+- [ ] Evaluate React vs. Angular based on team expertise
+
+**Note:** This is a significant undertaking requiring architectural changes. Consider as a separate project phase.
+
