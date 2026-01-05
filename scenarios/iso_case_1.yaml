@@ -14,6 +14,14 @@ description: |
   Validation:
   - Temperature at (150, 300)mm should be 5.25 °C ± 0.1K.
 
+# Explicit Material Definitions
+materials:
+  - id: ISO_MEDIUM
+    lambda: 0.1
+    color: "#AAAAAA"
+    description: "Homogeneous medium with lambda=0.1"
+    solver_id: 100
+
 canvas:
   bounds: [0, 200, 0, 400]
   grid: 1.0
@@ -24,7 +32,6 @@ boundary_conditions:
     right: 0.0
     bottom: 0.0
   adiabatic: [left]
-  surface_resistance: {}
 
 measurements:
   point_probes:
@@ -37,8 +44,7 @@ measurements:
 elements:
   - type: rect
     name: "SolidColumn"
-    material: 100
-    lambda: 0.1
+    material: ISO_MEDIUM
     params:
        x: 0.0
        y: 0.0

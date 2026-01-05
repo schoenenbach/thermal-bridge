@@ -1,8 +1,40 @@
 name: "Scenario 1: Wall 360mm (No Ins)"
 description: "Reference Scenario: 360mm Wall, No Insulation"
 
-# References: library/defaults.yaml (window_standard, wall_360mm)
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+  - id: CONCRETE
+    lambda: 2.0
+    color: "#999999"
+  - id: INSULATION
+    lambda: 0.035
+    color: "#FFCC00"
+  - id: REVEAL_INS
+    lambda: 0.035
+    color: "#FFD700"
+  - id: FRAME
+    lambda: 0.13
+    color: "#444444"
+  - id: GLASS
+    lambda: 0.0325
+    color: "#88CCFF"
+  - id: ALUMINUM
+    lambda: 160.0
+    color: "#CCCCCC"
+  - id: CAVITY
+    lambda: 0.25
+    color: "#EEFFFF"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
 
+# Parametric Variables
 variables:
   # Geometry Config
   wall_thick: 360.0
@@ -33,7 +65,6 @@ variables:
   sash_width: 70.0
   sash_recess: 30.0
   glass_thick: 24.0
-  
   # Calculated window helpers
   x_f_start: 190.0  # 260-70
   
@@ -49,16 +80,23 @@ canvas:
   bounds: [0, 500, 0, 500] 
   grid: ${grid_size}
 
+boundary_conditions:
+  convective:
+    # Defaults
+    internal: {T: 20.0, R: 0.13}
+    external: {T: -5.0, R: 0.04}
+    # Checks
+    internal_check: {R: 0.25}
+
 measurements:
   surface_metrics:
-    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
+    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE] }
     - { name: "MinT_Frame", type: min, boundary: internal, materials: [FRAME] }
     - { name: "MinT_Glass", type: min, boundary: internal, materials: [GLASS] }
   
   derived:
     - { name: "Psi", formula: psi_value }
     - { name: "fRsi", formula: frsi }
-
 
 points:
   AirInt_BL: [0.0, "${y_bottom}"]
@@ -90,6 +128,7 @@ elements:
 
   # Wall (Interior Part)
   - type: wall
+    material: WALL
     params:
       x: ${x_wall_int}
       y: ${y_bottom}
@@ -98,6 +137,7 @@ elements:
 
   # Wall (Exterior/Reveal Part)
   - type: wall
+    material: WALL
     params:
       x: ${x_win_outer}
       y: ${y_bottom}
@@ -127,6 +167,8 @@ elements:
       sash_recess: ${sash_recess}
       glass_thickness: ${glass_thick}
       y_top: ${y_top}
+      mat_frame_lambda: 0.13
+      mat_glass_lambda: 0.0325
       
   # Shutter Rails
   # Outer Alu

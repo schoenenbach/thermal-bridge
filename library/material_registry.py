@@ -53,6 +53,13 @@ class MaterialRegistry:
         if not mat_id:
             return
             
+        # Determine solver ID (Auto or Explicit)
+        use_auto_id = "id_numeric" not in data
+        solver_id = self.next_solver_id
+        
+        if not use_auto_id:
+            solver_id = int(data["id_numeric"])
+            
         prop = MaterialProp(
             id=mat_id,
             name=data.get('name', 'Unknown'),
@@ -62,12 +69,14 @@ class MaterialRegistry:
             heat_capacity=float(data.get('heat_capacity', 1000.0)),
             color=data.get('color', '#808080'),
             source=data.get('source', ''),
-            solver_id=self.next_solver_id
+            solver_id=solver_id
         )
         
         self.materials[mat_id] = prop
-        self.solver_id_map[self.next_solver_id] = prop
-        self.next_solver_id += 1
+        self.solver_id_map[solver_id] = prop
+        
+        if use_auto_id:
+            self.next_solver_id += 1
 
     def get_by_id(self, mat_id: str) -> Optional[MaterialProp]:
         return self.materials.get(mat_id)
