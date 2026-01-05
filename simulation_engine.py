@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
 from geometry import build_material_grid, MaterialID
-from geometries.window_reveal import WindowRevealGeometry
 from mesh import UniformMesh, AdaptiveMesh
 from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map, plot_geometry
 from declarative_geometry import DeclarativeGeometry
@@ -66,7 +65,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     cfg = scenario_def['cfg']
     suffix = scenario_def['file_suffix']
     
-    # 1. Geometry & Mesh
+    # Load Geometry
     if isinstance(cfg, str) and cfg.endswith('.yaml'):
          # Load Declarative
          with open(cfg, 'r') as f:
@@ -79,10 +78,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
          cfg_grid_size = grid_sz
          wall_thick_mm = geom.data.get('variables', {}).get('wall_thick', 360)
     else:
-        # Standard configs
-        geom = WindowRevealGeometry(cfg)
-        cfg_grid_size = cfg.grid_size_mm
-        wall_thick_mm = cfg.wall_thickness_mm
+        raise ValueError(f"Unsupported config type: {type(cfg)}. Expected YAML file path.")
     
     if use_adaptive_mesh:
         from mesh import AdaptiveMesh
@@ -266,15 +262,18 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True):
     l_win = 0.25
     
     # Handle YAML config abstraction
-    if isinstance(geom, DeclarativeGeometry):
+    if hasattr(geom, 'data'):
         vars = geom.data.get('variables', {})
         f_width = float(vars.get('frame_width', 70))
         wall_th = float(vars.get('wall_thick', 360))
         ins_th = float(vars.get('ins_thick_max', 0))
     else:
-        f_width = cfg.frame_width_mm
-        wall_th = cfg.wall_thickness_mm
-        ins_th = cfg.insulation_thick_max_mm
+        # Fallback if DeclarativeGeometry interface changes or if we have another type
+        # For now, just error or assume defaults?
+        # Let's keep it safe.
+        f_width = 70.0
+        wall_th = 360.0
+        ins_th = 0.0
         
     l_frame = f_width / 1000.0
     l_glass = l_win - l_frame
