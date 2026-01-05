@@ -191,7 +191,12 @@ class WindowRevealGeometry(SketchGeometry):
             
             # 2. Tapered Part
             # Check for Styrodur Variant
-            mat_taper = MAT_STYRODUR if config.use_styrodur_variant else MAT_INSULATION
+            if config.use_styrodur_variant:
+                mat_taper = MAT_STYRODUR
+                id_taper = MaterialID.STYRODUR
+            else:
+                mat_taper = MAT_INSULATION
+                id_taper = MaterialID.INSULATION
             
             add_insulation_tapered(self,
                                    x_base=x_ins_start,
@@ -201,7 +206,8 @@ class WindowRevealGeometry(SketchGeometry):
                                    thick_taper=thick_top,
                                    taper_start_y=y_taper_start, # Redundant here but API takes it
                                    lambda_val=mat_taper,
-                                   name="Insulation Taper")
+                                   name="Insulation Taper",
+                                   material_id=id_taper)
         else:
             # Uniform Block
             add_insulation(self, x_ins_start, self.y_bottom, ins_max, y_ins_top - self.y_bottom,
@@ -209,10 +215,13 @@ class WindowRevealGeometry(SketchGeometry):
 
     def _build_reveal_insulation(self, config, rebate_h):
         rev_ins = config.reveal_insulation_mm
-        rev_mat = MAT_STYRODUR if config.use_styrodur_variant else MAT_REVEAL_INSULATION
-        
         if config.use_styrodur_variant:
+            rev_mat = MAT_STYRODUR
+            rev_id = MaterialID.STYRODUR
             rev_ins = min(rev_ins, 30.0)
+        else:
+            rev_mat = MAT_REVEAL_INSULATION
+            rev_id = MaterialID.REVEAL_INS
             
         y_masonry_top = self.y_reveal - self.reveal_shift_y + float(rebate_h)
         x_start = self.x_win_outer
@@ -237,12 +246,12 @@ class WindowRevealGeometry(SketchGeometry):
             self.add_point("RevIns_TL", x_start, y_masonry_top + rev_ins)
             
             self.add_shape(["RevIns_BL", "RevIns_BR", "RevIns_TR", "RevIns_TL"], 
-                           MaterialID.REVEAL_INS, rev_mat, "Reveal Insulation Tapered")
+                           rev_id, rev_mat, "Reveal Insulation Tapered")
         else:
             # Simple rectangular reveal insulation
             width = (self.x_wall_ext + thick_min) - x_start
             add_rect(self, "Reveal Insulation", x_start, y_masonry_top, width, rev_ins,
-                     MaterialID.REVEAL_INS, rev_mat)
+                     rev_id, rev_mat)
 
     def _build_shutter_rails(self):
         """

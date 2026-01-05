@@ -46,11 +46,12 @@ def add_insulation(sketch: SketchGeometry,
                    x: float, y: float, 
                    width: float, height: float, 
                    lambda_val: float = MAT_INSULATION,
-                   name="Insulation"):
+                   name="Insulation",
+                   material_id: int = MaterialID.INSULATION):
     """
     Add a rectangular insulation block.
     """
-    add_rect(sketch, name, x, y, width, height, MaterialID.INSULATION, lambda_val)
+    add_rect(sketch, name, x, y, width, height, material_id, lambda_val)
 
 def add_insulation_tapered(sketch: SketchGeometry, 
                            x_base: float,     # Inner face of insulation (against wall)
@@ -60,7 +61,8 @@ def add_insulation_tapered(sketch: SketchGeometry,
                            thick_taper: float,# Min thickness at top
                            taper_start_y: float, # Y where taper begins
                            lambda_val: float = MAT_INSULATION,
-                           name="InsulationTapered"):
+                           name="InsulationTapered",
+                           material_id: int = MaterialID.INSULATION):
     """
     Add tapered insulation (wedge shape).
     
@@ -100,7 +102,7 @@ def add_insulation_tapered(sketch: SketchGeometry,
         f"{name}_MidL"
     ]
     
-    sketch.add_shape(pts, MaterialID.INSULATION, lambda_val, name)
+    sketch.add_shape(pts, material_id, lambda_val, name)
 
 def add_guard_rail(sketch: SketchGeometry,
                    x: float, y: float, 

@@ -66,6 +66,7 @@ class MaterialID:
     GLASS = 6
     SPACER = 7
     CAVITY = 8       # Unventilated cavity (e.g. inside rails), participating in conduction.
+    STYRODUR = 9     # XPS / High-performance insulation (WLS 025/028)
     
     # ISO Test Materials (keep excessive IDs)
     CONCRETE = 10
