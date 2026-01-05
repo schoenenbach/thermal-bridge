@@ -49,6 +49,17 @@ canvas:
   bounds: [0, 660, 0, 500] 
   grid: ${grid_size}
 
+measurements:
+  surface_metrics:
+    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
+    - { name: "MinT_Frame", type: min, boundary: internal, materials: [FRAME] }
+    - { name: "MinT_Glass", type: min, boundary: internal, materials: [GLASS] }
+  
+  derived:
+    - { name: "Psi", formula: psi_value }
+    - { name: "fRsi", formula: frsi }
+
+
 points:
   AirInt_BL: [0.0, "${y_bottom}"]
   Wall_BL: ["${x_wall_int}", "${y_bottom}"]

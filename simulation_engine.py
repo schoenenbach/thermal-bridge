@@ -58,7 +58,164 @@ def get_scenarios():
         
     return configs
 
+# --- Measurement Helpers ---
+
+def probe_temperature(mesh, temp_field, cond, x, y, y_offset=0, x_offset=0):
+    """
+    Probe temperature at (x, y) according to ISO 10211 rules.
+    y_offset and x_offset handle padding if the temp_field is larger than the mesh.
+    """
+    eps = 1e-5
+    
+    col_candidates = []
+    for i in range(mesh.nx):
+        if mesh.x_coords[i] <= x + eps and mesh.x_coords[i+1] >= x - eps:
+            col_candidates.append(i)
+            
+    row_candidates = []
+    for j in range(mesh.ny):
+        if mesh.y_coords[j] <= y + eps and mesh.y_coords[j+1] >= y - eps:
+            row_candidates.append(j)
+            
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    found_cells = 0
+    
+    for i in col_candidates:
+        for j in row_candidates:
+            # cell center
+            xc = (mesh.x_coords[i] + mesh.x_coords[i+1]) / 2.0
+            yc = (mesh.y_coords[j] + mesh.y_coords[j+1]) / 2.0
+            
+            s = np.sqrt((x - xc)**2 + (y - yc)**2)
+            if s < 1e-9:
+                return temp_field[j + y_offset, i + x_offset]
+            
+            lam = cond[j + y_offset, i + x_offset]
+            t_cell = temp_field[j + y_offset, i + x_offset]
+            
+            w = lam / s
+            weighted_sum += w * t_cell
+            weight_sum += w
+            found_cells += 1
+            
+    if found_cells == 0:
+        return 0.0
+        
+    return weighted_sum / weight_sum
+
+def evaluate_measurements(measurements_def, geom, mesh, temp_field, cond, 
+                        t_int, t_ext, rsi_used, grid_map, mask_int,
+                        y_offset=0, x_offset=0, Gh=None, Gv=None, categories=None):
+    """
+    Evaluate measurements defined in YAML.
+    categories: list of 'point_probes', 'surface_metrics', 'boundary_flux'. None=All.
+    """
+    results = {}
+    if categories is None:
+        categories = ['point_probes', 'surface_metrics', 'boundary_flux']
+    
+    # helper for surface metrics
+    def get_surf_metric(t_f, k_f, rsi, boundary_type, material_filter=None):
+        # We need a mask that matches the current field shape
+        m_int = mask_int
+        
+        padded = np.pad(m_int, 1)
+        # boundary nodes are solid nodes adjacent to internal air
+        boundary = (padded[:-2, 1:-1] | padded[2:, 1:-1] | 
+                    padded[1:-1, :-2] | padded[1:-1, 2:]) & (~m_int)
+        
+        # filter by exterior air if needed? usually we want internal surface
+        # for window reveal, we filter out external air nodes from boundary
+        boundary = boundary & (grid_map != MaterialID.AIR_EXT)
+        
+        y, x = np.where(boundary)
+        if len(y) == 0: return None
+        
+        if material_filter is not None:
+             mats = grid_map[y, x]
+             # Handle material names from YAML (converted to IDs)
+             mat_ids = []
+             for m in material_filter:
+                 if isinstance(m, str):
+                     if hasattr(MaterialID, m):
+                         mat_ids.append(getattr(MaterialID, m))
+                     else:
+                         print(f"[WARNING] Unknown material in measurements: {m}")
+                 else:
+                     mat_ids.append(m)
+             
+             keep = np.isin(mats, mat_ids)
+             y, x = y[keep], x[keep]
+             if len(y) == 0: return None
+
+        k_solid = k_f[y, x]
+        t_node = t_f[y, x]
+        
+        # dx_local_m. Note: x matches the field shape including x_offset
+        # mesh.dx_array is original. so use x - x_offset
+        dx_local_m = mesh.dx_array[x - x_offset] / 1000.0
+        
+        r1 = dx_local_m / (2 * k_solid)
+        r2 = rsi
+        t_si = (t_int * r1 + t_node * r2) / (r1 + r2)
+        
+        return t_si # return full array for min/max/avg
+
+    # 1. Point Probes
+    if 'point_probes' in categories:
+        for p in measurements_def.get('point_probes', []):
+            t_val = probe_temperature(mesh, temp_field, cond, p['x'], p['y'], y_offset, x_offset)
+            res = {"value": t_val}
+            if 'expected' in p:
+                res["expected"] = p['expected']
+                res["diff"] = abs(t_val - p['expected'])
+                res["passed"] = res["diff"] <= p.get('tolerance', 0.1)
+            results[p['name']] = res
+
+    # 2. Surface Metrics
+    if 'surface_metrics' in categories:
+        for s in measurements_def.get('surface_metrics', []):
+            mats = s.get('materials')
+            t_vals = get_surf_metric(temp_field, cond, rsi_used, s.get('boundary', 'internal'), material_filter=mats)
+            
+            if t_vals is None or len(t_vals) == 0:
+                results[s['name']] = {"value": None}
+                continue
+                
+            mtype = s.get('type', 'min')
+            if mtype == 'min': val = np.min(t_vals)
+            elif mtype == 'max': val = np.max(t_vals)
+            else: val = np.mean(t_vals)
+            
+            results[s['name']] = {"value": val}
+
+    # 3. Boundary Flux
+    if 'boundary_flux' in categories:
+        for f in measurements_def.get('boundary_flux', []):
+            # Calculate flux at specified boundary
+            # If Gv/Gh passed, we can calculate precisely
+            flux = 0.0
+            boundary = f.get('boundary')
+            if boundary == 'bottom' and y_offset > 0 and Gv is not None:
+                 # Flux = sum(G * (T_air - T_surf))
+                 # Link 0 connects row 0 (Air) and row 1 (Surface)
+                 g_row = Gv[0, :]
+                 dt = temp_field[0, :] - temp_field[1, :]
+                 flow = g_row * dt
+                 flux = np.sum(flow)
+            
+            res = {"value": flux}
+            if 'expected' in f:
+                res["expected"] = f['expected']
+                res["diff"] = abs(flux - f['expected'])
+                res["passed"] = res["diff"] <= f.get('tolerance', 0.5)
+            results[f['name']] = res
+        
+    return results
+
 # --- Solver Core ---
+
 def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None):
     """Solve a thermal bridge scenario and return results."""
     print(f"\nrunning {scenario_def['name']}...")
@@ -426,128 +583,140 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     ref_flow = u_wall_1d * l_wall + u_frame * l_frame + u_glass * l_glass
     psi = l2d - ref_flow
     
-    # fRsi Pass (Rsi=0.25)
-    # Recalculate K_eff for interior with new Rsi
-    k_eff_int_rsi25 = (dx_grid / 1000.0) / (2 * rsi_check)
-    cond_frsi = cond.copy()
-    cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
-    
-    Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, dx_array, dy_array)
-    
-    # Apply corrections for fRsi pass
-    apply_boundary_conductances(Gh_frsi, Gv_frsi, rsi_check, mask_int)
-    apply_boundary_conductances(Gh_frsi, Gv_frsi, rse, mask_ext)
-    
-    print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={rsi_check})...")
-    
-    cb2 = None
-    if progress_callback:
-        cb2 = lambda s, t, d: progress_callback("Pass 2: fRsi/MinT", s, t, d)
+    # --- Measurements ---
+    measurements_def = geom.data.get('measurements', {})
 
-    temp_frsi = temp_res.copy()
-    temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=500000, 
-                      tol=1e-7, batch_size=10000, verbose=True, progress_callback=cb2)
+    # Pass 2 (fRsi) - Optional
+    derived = measurements_def.get('derived', [])
+    needs_frsi = any(d.get('formula') == 'frsi' or d.get('name') == 'fRsi' for d in derived)
     
-    # Minimum surface temperature
-    def get_min_surf(t_field, k_field, rsi_used, material_filter=None):
-        padded = np.pad(mask_int, 1)
+    p2_results = {}
+    temp_frsi = temp_res # fallback
+    
+    if needs_frsi:
+        # fRsi Pass (Rsi=0.25)
+        k_eff_int_rsi25 = (dx_grid / 1000.0) / (2 * rsi_check)
+        cond_frsi = cond.copy()
+        cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
         
-        boundary = (padded[:-2, 1:-1] | padded[2:, 1:-1] | 
-                    padded[1:-1, :-2] | padded[1:-1, 2:]) & (~mask_int) & (grid_map != MaterialID.AIR_EXT)
+        Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, dx_array, dy_array)
         
-        y, x = np.where(boundary)
-        if len(y) == 0: 
-            return TEMP_INT
-            
-        # Filter by material if requested
-        if material_filter is not None:
-            # grid_map[y, x] gives materials of the boundary solid nodes
-            mats = grid_map[y, x]
-            
-            if isinstance(material_filter, (list, tuple)):
-                # Vectorizedisin verification
-                keep = np.isin(mats, material_filter)
-            else:
-                keep = (mats == material_filter)
-                
-            y = y[keep]
-            x = x[keep]
-            if len(y) == 0:
-                return None # No surface nodes for this material
+        # Corrections
+        apply_boundary_conductances(Gh_frsi, Gv_frsi, rsi_check, mask_int)
+        apply_boundary_conductances(Gh_frsi, Gv_frsi, rse, mask_ext)
         
-        k_solid = k_field[y, x]
-        t_node = t_field[y, x]
+        print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={rsi_check})...")
         
-        # Use local cell width for surface resistance calc
-        # mesh.dx_array is in mm, convert to meters
-        dx_local_m = mesh.dx_array[x] / 1000.0
-        
-        r1 = dx_local_m / (2*k_solid)
-        r2 = rsi_used
-        t_si = (t_int * r1 + t_node * r2) / (r1 + r2)
-        return np.min(t_si)
+        cb2 = None
+        if progress_callback:
+            cb2 = lambda s, t, d: progress_callback("Pass 2: fRsi/MinT", s, t, d)
 
-    min_temp = get_min_surf(temp_frsi, cond_frsi, rsi_check)
-    
-    # Calculate specific minimum temperatures
-    # Wall Materials: Wall, Insulation, Reveal Ins, Concrete, Wood
-    # Note: Wall might be bare (2) or insulated (3, 4)
-    wall_mats = [MaterialID.WALL, MaterialID.INSULATION, MaterialID.REVEAL_INS, MaterialID.CONCRETE, MaterialID.WOOD]
-    min_temp_wall = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=wall_mats)
-    
-    # MaterialID.FRAME = 5
-    # MaterialID.GLASS = 6
-    min_temp_frame = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=5)
-    min_temp_glass = get_min_surf(temp_frsi, cond_frsi, rsi_check, material_filter=6) 
-    
-    frsi = (min_temp - t_ext) / (t_int - t_ext)
-    
-    print(f"  Psi: {psi:.4f} W/mK")
-    print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")
-    if min_temp_wall is not None:
-        print(f"    Wall MinT: {min_temp_wall:.2f}C")
-    if min_temp_frame is not None:
-        print(f"    Frame MinT: {min_temp_frame:.2f}C")
-    if min_temp_glass is not None:
-        print(f"    Glass MinT: {min_temp_glass:.2f}C")
+        temp_frsi = temp_res.copy()
+        temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=500000, 
+                          tol=1e-7, batch_size=10000, verbose=True, progress_callback=cb2)
         
+        p2_results = evaluate_measurements(measurements_def, geom, mesh, temp_frsi, cond_frsi,
+                                         t_int, t_ext, rsi_check, grid_map, mask_int,
+                                         y_off, x_off, categories=['surface_metrics'])
+    else:
+        print("  [Pass 2] Skipped (No fRsi requested).")
     
-    # Plot - exclude padding rows if auto-padding was used
+    # Pass 1 measurements (for Psi)
+    
+    # Pass 1 measurements (for Psi)
+    # Validation checkpoints and Flux should be checked against Design conditions
+    p1_results = evaluate_measurements(measurements_def, geom, mesh, temp_res, cond_pass1,
+                                     t_int, t_ext, rsi_design, grid_map, mask_int,
+                                     y_off, x_off, Gh=Gh, Gv=Gv,
+                                     categories=['point_probes', 'boundary_flux'])
+    
+    # manual flux calculation for Psi fallback
+    dt_h = temp_res[:, :-1] - temp_res[:, 1:]
+    flow_h = Gh[:, :-1] * dt_h
+    m_curr = mask_int[:, :-1]
+    m_next = mask_int[:, 1:]
+    flux = np.sum(flow_h[m_curr & (~m_next)]) + np.sum(flow_h[(~m_curr) & m_next])
+    
+    dt_v = temp_res[:-1, :] - temp_res[1:, :]
+    flow_v = Gv[:-1, :] * dt_v
+    m_curr_v = mask_int[:-1, :]
+    m_next_v = mask_int[1:, :]
+    flux += np.sum(flow_v[m_curr_v & (~m_next_v)]) + np.sum(flow_v[(~m_curr_v) & m_next_v])
+    
+    l2d = flux / (t_int - t_ext)
+    
+    # Reference Flow for Psi
+    l_wall = 0.25
+    l_win = 0.25
+    vars = geom.data.get('variables', {})
+    f_width = float(vars.get('frame_width', 70))
+    wall_th = float(vars.get('wall_thick', 360))
+    ins_th = float(vars.get('ins_thick_max', 0))
+    
+    l_frame = f_width / 1000.0
+    l_glass = l_win - l_frame
+    r_wall_1d = RSI_WALL + (wall_th/1000.0)/MAT_WALL + RSE
+    if ins_th > 0: r_wall_1d += (ins_th/1000.0)/MAT_INSULATION
+    u_wall_1d = 1.0 / r_wall_1d
+    u_frame, u_glass = 1.3, 1.1
+    ref_flow = u_wall_1d * l_wall + u_frame * l_frame + u_glass * l_glass
+    psi = l2d - ref_flow
+
+
+    
+    # Print results
+    print("\n  --- Measurement Results ---")
+    combined_results = {**p1_results, **p2_results}
+    
+    # Handle explicit derived formulas
+    for d in measurements_def.get('derived', []):
+        if d['formula'] == 'psi_value':
+            combined_results[d['name']] = {"value": psi}
+            print(f"    {d['name']}: {psi:.4f} W/mK")
+        elif d['formula'] == 'frsi':
+            min_t = TEMP_INT
+            found_min = False
+            for name, res in combined_results.items():
+                if res.get('value') is not None and any(x in name for x in ["MinT", "Checkpoint"]):
+                    min_t = min(min_t, res['value'])
+                    found_min = True
+            
+            frsi_val = (min_t - t_ext) / (t_int - t_ext)
+            combined_results[d['name']] = {"value": frsi_val, "min_t": min_t}
+            print(f"    {d['name']}: {frsi_val:.4f} (MinT: {min_t:.2f}C)")
+
+    # Print Point Probes and Fluxes
+    for name, res in combined_results.items():
+        if "expected" in res:
+            status = "PASS" if res.get("passed") else "FAIL"
+            print(f"    {name}: {res['value']:.4f} (Expected: {res['expected']:.4f}) -> {status}")
+        elif "value" in res and res["value"] is not None and name not in ["Psi", "fRsi"]:
+             print(f"    {name}: {res['value']:.2f}")
+
+    # Plotting
     if has_padding:
-        # Extract interior region only (exclude air layer padding)
-        ny_p, nx_p = temp_frsi.shape
-        y_start = 1 if pad_bottom else 0
-        y_end = ny_p - 1 if pad_top else ny_p
-        x_start = 1 if pad_left else 0
-        x_end = nx_p - 1 if pad_right else nx_p
-        temp_for_plot = temp_frsi[y_start:y_end, x_start:x_end]
-        # Use original mesh coordinates (before padding)
-        x_coords_plot = mesh.x_coords
-        y_coords_plot = mesh.y_coords
+        y_end = temp_frsi.shape[0] - (1 if pad_top else 0)
+        x_end = temp_frsi.shape[1] - (1 if pad_right else 0)
+        temp_for_plot = temp_frsi[y_off:y_end, x_off:x_end]
     else:
         temp_for_plot = temp_frsi
-        x_coords_plot = mesh.x_coords
-        y_coords_plot = mesh.y_coords
 
     plot_temperature_map(temp_for_plot, 
                          geom.get_canvas_config().width_mm, 
                          geom.get_canvas_config().height_mm,
                          f"result_{scenario_def['name']}.png", 
                          title=scenario_def['name'],
-                         wall_thick_mm=wall_thick_mm,
+                         wall_thick_mm=wall_th,
                          grid_size_mm=getattr(mesh, 'grid_size_mm', None),
-                         x_coords=x_coords_plot,
-                         y_coords=y_coords_plot)
+                         x_coords=mesh.x_coords,
+                         y_coords=mesh.y_coords)
     
-    return {
-        "name": scenario_def['name'],
-        "Psi": psi,
-        "fRsi": frsi,
-        "MinT": min_temp,
-        "MinT_Wall": min_temp_wall,
-        "MinT_Frame": min_temp_frame,
-        "MinT_Glass": min_temp_glass
-    }
+    # Return flat dict for summary
+    return_res = {"name": scenario_def['name']}
+    for name, res in combined_results.items():
+        return_res[name] = res["value"]
+    
+    return return_res
 
 
 def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
@@ -556,22 +725,14 @@ def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
     scenarios = get_scenarios()
     
     if scenario_indices:
-        # Filter scenarios by 1-based index
         selected = []
         for idx in scenario_indices:
             try:
                 i = int(idx) - 1
                 if 0 <= i < len(scenarios):
                     selected.append(scenarios[i])
-                else:
-                    print(f"[WARNING] Scenario index {idx} out of range (1-{len(scenarios)})")
-            except ValueError:
-                print(f"[WARNING] Invalid scenario index: {idx}")
-        
-        if not selected:
-            print("[ERROR] No valid scenarios selected.")
-            return
-        to_run = selected
+            except ValueError: pass
+        to_run = selected or scenarios
     else:
         to_run = scenarios
     
@@ -581,13 +742,27 @@ def run_scenarios(scenario_indices=None, use_adaptive_mesh=True):
         results.append(res)
         
     print("\n--- Summary ---")
-    print(f"{'Scenario':<40} | {'Psi (W/mK)':<10} | {'fRsi':<10} | {'MinT (C)':<10} | {'Wall T':<10} | {'Frame T':<10} | {'Glass T':<10}")
-    print("-" * 115)
+    # Identify unique measurement names across all results to build table header
+    all_keys = set()
     for r in results:
-        wall_t = f"{r['MinT_Wall']:.2f}" if r.get('MinT_Wall') is not None else "N/A"
-        frame_t = f"{r['MinT_Frame']:.2f}" if r.get('MinT_Frame') is not None else "N/A"
-        glass_t = f"{r['MinT_Glass']:.2f}" if r.get('MinT_Glass') is not None else "N/A"
-        print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f} | {wall_t:<10} | {frame_t:<10} | {glass_t:<10}")
+        all_keys.update(r.keys())
+    all_keys.discard('name')
+    sorted_keys = sorted(list(all_keys))
+    
+    header = f"{'Scenario':<40}"
+    for k in sorted_keys: header += f" | {k:<10}"
+    print(header)
+    print("-" * len(header))
+    
+    for r in results:
+        line = f"{r['name']:<40}"
+        for k in sorted_keys:
+            val = r.get(k)
+            if val is None: line += f" | {'N/A':<10}"
+            elif isinstance(val, float): line += f" | {val:<10.3f}"
+            else: line += f" | {str(val):<10}"
+        print(line)
+
 
 
 def generate_geometries(scenarios=None):

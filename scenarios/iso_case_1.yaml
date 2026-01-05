@@ -1,5 +1,18 @@
 name: "ISO Case 1: Half Column"
-description: "ISO 10211 Test Case 1"
+description: |
+  ISO 10211-2007 Annex A Test Case 1: 2D Half-Column
+  
+  Steady-state heat conduction in a 200mm x 400mm homogeneous medium.
+  Thermal conductivity lambda = 0.1 W/(m*K).
+  
+  Boundary conditions:
+  - Top: T = 20.0 °C
+  - Right: T = 0.0 °C
+  - Bottom: T = 0.0 °C
+  - Left: Adiabatic (Natural symmetry)
+  
+  Validation:
+  - Temperature at (150, 300)mm should be 5.25 °C ± 0.1K.
 
 canvas:
   bounds: [0, 200, 0, 400]
@@ -11,9 +24,15 @@ boundary_conditions:
     right: 0.0
     bottom: 0.0
   adiabatic: [left]
-  # surface_resistance empty implies defaults (none if not specified?)
-  # logic in solver depends on keys. empty dict is fine.
   surface_resistance: {}
+
+measurements:
+  point_probes:
+    - name: "ISO Checkpoint"
+      x: 150.0
+      y: 300.0
+      expected: 5.25
+      tolerance: 0.1
 
 elements:
   - type: rect
@@ -25,3 +44,4 @@ elements:
        y: 0.0
        width: 200.0
        height: 400.0
+

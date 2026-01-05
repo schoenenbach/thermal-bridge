@@ -1,5 +1,18 @@
 name: "ISO Case 2: Multi-Material Bridge"
-description: "ISO 10211 Test Case 2"
+description: |
+  ISO 10211-2007 Annex A Test Case 2: Multi-Material Bridge
+  
+  Thermal bridge with aluminum stud through insulation layer.
+  Dimensions: 500mm width, 47.5mm height.
+  
+  Boundary conditions:
+  - Bottom: Convective T=20.0°C, Rsi=0.11 m²K/W
+  - Top: Convective T=0.0°C, Rse=0.06 m²K/W
+  - Sides: Adiabatic
+  
+  Validation:
+  - Point temperatures A-I (see measurements)
+  - Heat flux through interior surface should be 9.5 W/m ± 0.5W/m
 
 canvas:
   bounds: [0, 500, 0, 47.5]
@@ -13,6 +26,22 @@ boundary_conditions:
   surface_resistance:
     204: 0.11 # MAT_AIR_INT
     205: 0.06 # MAT_AIR_EXT
+
+measurements:
+  point_probes:
+    - { name: A, x:   0.0, y: 47.5, expected: 7.1,  tolerance: 0.1 }
+    - { name: B, x: 500.0, y: 47.5, expected: 0.8,  tolerance: 0.1 }
+    - { name: C, x:   0.0, y: 41.5, expected: 7.9,  tolerance: 0.1 }
+    - { name: D, x:  15.0, y: 41.5, expected: 6.3,  tolerance: 0.1 }
+    - { name: E, x: 500.0, y: 41.5, expected: 0.8,  tolerance: 0.1 }
+    - { name: F, x:   0.0, y: 36.5, expected: 16.4, tolerance: 0.1 }
+    - { name: G, x:  15.0, y: 36.5, expected: 16.3, tolerance: 0.1 }
+    - { name: H, x:   0.0, y:  0.0, expected: 16.8, tolerance: 0.1 }
+    - { name: I, x: 500.0, y:  0.0, expected: 18.3, tolerance: 0.1 }
+  
+  boundary_flux:
+    - { name: "Interior Heat Flux", boundary: bottom, expected: 9.5, tolerance: 0.5 }
+
 
 refinement_zones:
   - x_min: 0.0

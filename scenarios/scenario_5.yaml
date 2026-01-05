@@ -66,6 +66,17 @@ canvas:
   bounds: [0, 660, 0, 500] # x_max = 410 + 200 + 50 buffer = 660
   grid: ${grid_size}
 
+measurements:
+  surface_metrics:
+    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
+    - { name: "MinT_Frame", type: min, boundary: internal, materials: [FRAME] }
+    - { name: "MinT_Glass", type: min, boundary: internal, materials: [GLASS] }
+  
+  derived:
+    - { name: "Psi", formula: psi_value }
+    - { name: "fRsi", formula: frsi }
+
+
 # --- Points for Complex Polygons ---
 points:
   # Interior Air Polygon Points
