@@ -141,6 +141,79 @@ def run_case_1(use_adaptive=False):
     return status == "PASS"
 
 
+
+def probe_temperature(mesh, temp_padded, cond, x, y):
+    """
+    Probe temperature at (x, y) according to ISO 10211 rules.
+    
+    - If point is within a cell, return cell temperature.
+    - If point is on a boundary between cells, return weighted average:
+      T = (sum(lambda_i * T_i / s_i)) / (sum(lambda_i / s_i))
+      where s_i is distance from cell center to point.
+      
+    Args:
+        mesh: The mesh object (uniform or adaptive)
+        temp_padded: Temperature array (NY+2, NX) including air layers
+        cond: Conductivity array (NY, NX)
+        x: x coordinate in mm
+        y: y coordinate in mm
+        
+    Returns:
+        float: Calculated temperature
+    """
+    # Find potential neighbor cells
+    # We use searchsorted to find where x/y falls in terms of faces
+    
+    eps = 1e-5
+    
+    # Candidates are any cell i where x_coords[i] <= x <= x_coords[i+1]
+    # This automatically covers boundaries (equality).
+    
+    col_candidates = []
+    for i in range(mesh.nx):
+        if mesh.x_coords[i] <= x + eps and mesh.x_coords[i+1] >= x - eps:
+            col_candidates.append(i)
+            
+    row_candidates = []
+    for j in range(mesh.ny):
+        if mesh.y_coords[j] <= y + eps and mesh.y_coords[j+1] >= y - eps:
+            row_candidates.append(j)
+            
+    # Collect contributing cells
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    
+    found_cells = 0
+    
+    for i in col_candidates:
+        for j in row_candidates:
+            # Get cell center
+            xc = (mesh.x_coords[i] + mesh.x_coords[i+1]) / 2.0
+            yc = (mesh.y_coords[j] + mesh.y_coords[j+1]) / 2.0
+            
+            # Distance s_i
+            s = np.sqrt((x - xc)**2 + (y - yc)**2)
+            
+            if s < 1e-9:
+                return temp_padded[j+1, i] # Direct hit on center (unlikely)
+            
+            lam = cond[j, i]
+            # Use temp from padded array (j maps to j+1)
+            t_cell = temp_padded[j+1, i]
+            
+            w = lam / s
+            
+            weighted_sum += w * t_cell
+            weight_sum += w
+            found_cells += 1
+            
+    if found_cells == 0:
+        print(f"WARNING: No cells found for probe at ({x}, {y})")
+        return 0.0
+        
+    return weighted_sum / weight_sum
+
+
 def run_case_2(use_adaptive=False):
     """Run ISO 10211 Test Case 2 using new geometry structure."""
     print("\n" + "="*60)
@@ -240,8 +313,47 @@ def run_case_2(use_adaptive=False):
     print(f"  Target:     9.5000 W/m")
     print(f"  Deviation:  {abs(flux_in - 9.5):.4f} W ({abs(flux_in - 9.5)/9.5*100:.2f}%)")
     
-    status = "PASS" if abs(flux_in - 9.5) < 0.5 else "FAIL"
-    print(f"Result: {status}")
+    flux_passed = abs(flux_in - 9.5) < 0.5
+    if not flux_passed:
+         print(f"  -> FLUX FAIL (Diff: {abs(flux_in - 9.5):.4f})")
+    
+    # Checkpoints A-I
+    # Coordinates in mm
+    checkpoints = [
+        ('A', 0.0,   47.5, 7.1),
+        ('B', 500.0, 47.5, 0.8),
+        ('C', 0.0,   41.5, 7.9),
+        ('D', 15.0,  41.5, 6.3),
+        ('E', 500.0, 41.5, 0.8),
+        ('F', 0.0,   36.5, 16.4),
+        ('G', 15.0,  36.5, 16.3),
+        ('H', 0.0,   0.0,  16.8),
+        ('I', 500.0, 0.0,  18.3),
+    ]
+    
+    print("\nCheckpoint Temperatures:")
+    print(f"  {'Point':<5} {'Coords (mm)':<15} {'Calc':<10} {'Ref':<10} {'Diff':<10} {'Status'}")
+    print("-" * 75)
+    
+    points_passed = True
+    max_diff = 0.0
+    
+    for name, x, y, ref in checkpoints:
+        t_val = probe_temperature(mesh, temp, cond, x, y)
+        diff = abs(t_val - ref)
+        max_diff = max(max_diff, diff)
+        
+        status = "OK" if diff <= 0.1 else "FAIL" 
+        if status == "FAIL":
+            points_passed = False
+            
+        print(f"  {name:<5} ({x:>5.1f}, {y:>4.1f})   {t_val:>7.2f} °C  {ref:>7.2f} °C  {diff:>7.2f} K  {status}")
+        
+    print("-" * 75)
+    print(f"Max Deviation: {max_diff:.4f} K")
+    
+    overall_status = "PASS" if (flux_passed and points_passed) else "FAIL"
+    print(f"Result: {overall_status}")
     
     # Save plot
     grid_sz = mesh.grid_size_mm if not use_adaptive else None
@@ -250,14 +362,14 @@ def run_case_2(use_adaptive=False):
         width_mm=mesh.width_mm,
         height_mm=mesh.height_mm,
         filename='test_case_2_result.png',
-        title=f'ISO 10211 Case 2 ({type(mesh).__name__})\nFlux={flux_in:.3f} W/m',
+        title=f'ISO 10211 Case 2 ({type(mesh).__name__})\nFlux={flux_in:.3f} W/m, MaxDiff={max_diff:.2f}K',
         grid_size_mm=grid_sz,
         x_coords=mesh.x_coords if use_adaptive else None,
         y_coords=mesh.y_coords if use_adaptive else None
     )
     print("Saved plot to 'test_case_2_result.png'")
     
-    return status == "PASS"
+    return overall_status == "PASS"
 
 
 if __name__ == "__main__":
