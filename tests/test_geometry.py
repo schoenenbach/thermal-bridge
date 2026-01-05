@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from geometry import (
+from backend.core.geometry import (
     CanvasConfig, 
     RectangularRegion, 
     PolygonShape, 
@@ -43,7 +43,7 @@ def test_polygon_shape_contains():
     assert mask[1] == False
 
 def test_build_material_grid():
-    """Test material grid generation from geometry."""
+    """Test material grid generation from backend.core.geometry."""
     # Mock geometry builder
     class MockBuilder:
         def __init__(self):

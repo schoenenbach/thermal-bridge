@@ -377,7 +377,7 @@ def build_material_grid(geometry: GeometryBuilder,
                         xc: np.ndarray, 
                         yc: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Build material ID and conductivity grids from geometry definition.
+    Build material ID and conductivity grids from backend.core.geometry definition.
     """
     ny, nx = len(yc), len(xc)
     X, Y = np.meshgrid(xc, yc)

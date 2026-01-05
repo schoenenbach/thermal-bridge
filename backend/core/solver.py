@@ -15,11 +15,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, Optional
 
-from config import TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER
-from geometry import MaterialID
+from backend.core.config import TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER
+from backend.core.geometry import MaterialID
 
 # --- C++ Library Loading ---
-SO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "thermal_solver_core.so"))
+SO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "solver", "thermal_solver_core.so"))
 _lib = None
 
 

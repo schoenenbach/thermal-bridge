@@ -1,9 +1,9 @@
 import pytest
 import numpy as np
 import math
-from geometry import build_material_grid
-from mesh import AdaptiveMesh
-from solver import (
+from backend.core.geometry import build_material_grid
+from backend.core.mesh import AdaptiveMesh
+from backend.core.solver import (
     solve,
     calculate_conductances, 
     calculate_conductances_uniform,
@@ -34,7 +34,7 @@ def test_iso_case_1_checkpoint(iso_case_1_geometry, solver_lib):
     mesh = AdaptiveMesh(iso_case_1_geometry)
     mesh.generate()
     
-    # Calculate grid map and conductivity from geometry
+    # Calculate grid map and conductivity from backend.core.geometry
     grid_map, cond = build_material_grid(iso_case_1_geometry, mesh.xc, mesh.yc)
     Gh, Gv = calculate_conductances(cond, mesh.dx_array, mesh.dy_array)
     

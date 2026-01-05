@@ -6,8 +6,8 @@ import glob
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from simulation_engine import solve_scenario
-from geometry import MaterialID
+from backend.core.simulation_engine import solve_scenario
+from backend.core.geometry import MaterialID
 
 def test_transient_dispatch():
     """

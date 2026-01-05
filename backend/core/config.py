@@ -8,7 +8,8 @@ from library.material_registry import MaterialRegistry
 # Initialize Registry
 # Assuming the script runs from root or we find the library relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.join(BASE_DIR, "library", "materials")
+# Navigate up from backend/core -> backend -> root
+LIB_DIR = os.path.join(BASE_DIR, "..", "..", "library", "materials")
 registry = MaterialRegistry.get()
 registry.initialize(LIB_DIR)
 

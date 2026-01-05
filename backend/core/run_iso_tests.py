@@ -14,10 +14,10 @@ import sys
 import numpy as np
 
 # Local imports
-from geometry import build_material_grid
-from mesh import UniformMesh, AdaptiveMesh
-from declarative_geometry import DeclarativeGeometry
-from solver import (
+from backend.core.geometry import build_material_grid
+from backend.core.mesh import UniformMesh, AdaptiveMesh
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.solver import (
     get_solver_lib,
     solve,
     plot_temperature_map,
@@ -39,7 +39,7 @@ def calculate_conductances(cond, dx_in, dy_in):
         dy_array = np.array(dy_in, dtype=float)
     
     # Use the robust general calculator
-    from solver import calculate_conductances as calc_general
+    from backend.core.solver import calculate_conductances as calc_general
     return calc_general(cond, dx_array, dy_array)
 
 
@@ -59,7 +59,7 @@ def run_case_1(use_adaptive=False):
         data = yaml.safe_load(f)
     geometry = DeclarativeGeometry(data)
     
-    # Extract grid size from geometry
+    # Extract grid size from backend.core.geometry
     grid_mm = geometry.get_canvas_config().default_dx_mm
     
     if use_adaptive:
@@ -248,7 +248,7 @@ def run_case_2(use_adaptive=False):
     except Exception as e:
         print(f"[WARNING] Could not parse RSI/RSE from YAML, using defaults: {e}")
         
-    # Extract grid size from geometry
+    # Extract grid size from backend.core.geometry
     grid_mm = geometry.get_canvas_config().default_dx_mm
     
     if use_adaptive:

@@ -4,7 +4,8 @@ Converts Streamlit Canvas JSON to Declarative Scenario Dictionary.
 """
 
 from typing import Dict, Any, List, Tuple, Optional
-from geometry import MaterialID
+from backend.core.geometry import MaterialID
+from backend.core import elements as el_lib
 
 
 def get_element_bbox(scenario_data: Dict[str, Any], element_index: int) -> Optional[Tuple[float, float, float, float]]:
@@ -227,7 +228,6 @@ def scenario_to_canvas(scenario_data: Dict[str, Any],
     """
     Generate Canvas JSON from Declarative Scenario.
     """
-    import elements as el_lib
     
     # 1. Determine Scale
     bounds = scenario_data.get('canvas', {}).get('bounds', [0, 1000, 0, 1000])

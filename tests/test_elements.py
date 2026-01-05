@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
-from elements import (
+from backend.core.elements import (
     Factory, RectElement, Wall, Insulation, InsulationTapered,
     WindowDetail, RollerShutterBox, WindowSill, VenetianBlindBox, RoofJunction
 )
-from geometry import SketchGeometry, MaterialID
+from backend.core.geometry import SketchGeometry, MaterialID
 
 @pytest.fixture
 def mock_sketch():

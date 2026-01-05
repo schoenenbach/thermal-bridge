@@ -9,7 +9,7 @@ import time
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 
-from api.models import (
+from backend.app.models import (
     SimulationRequest,
     SimulationResult,
     SimulationMetrics,
@@ -28,7 +28,7 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 @router.post("/run", response_model=SimulationResult)
 async def run_simulation(request: SimulationRequest):
     """Run a thermal bridge simulation."""
-    from simulation_engine import solve_scenario
+    from backend.core.simulation_engine import solve_scenario
     
     start_time = time.time()
     
@@ -84,7 +84,7 @@ async def run_simulation(request: SimulationRequest):
 @router.post("/optimize", response_model=OptimizationResult)
 async def run_optimization(request: OptimizationRequest):
     """Run parameter sweep optimization."""
-    from batch_simulator import BatchSimulator
+    from backend.core.batch_simulator import BatchSimulator
     
     try:
         simulator = BatchSimulator(request.scenario)
@@ -142,15 +142,15 @@ async def get_result(result_id: str):
 
 # --- Async / WebSocket Support ---
 
-from api.models import JobCreatedResponse
-from api.jobs import job_manager
+from backend.app.models import JobCreatedResponse
+from backend.app.jobs import job_manager
 import asyncio
 
 async def _run_simulation_task(job_id: str, request: SimulationRequest):
     """
     Background task to run simulation (in thread pool) and push updates.
     """
-    from simulation_engine import solve_scenario
+    from backend.core.simulation_engine import solve_scenario
     
     loop = asyncio.get_running_loop()
     

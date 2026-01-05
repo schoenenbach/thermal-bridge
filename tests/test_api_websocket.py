@@ -4,7 +4,7 @@ WebSocket API Tests.
 
 import pytest
 from fastapi.testclient import TestClient
-from api.main import app
+from backend.app.main import app
 import time
 
 client = TestClient(app)

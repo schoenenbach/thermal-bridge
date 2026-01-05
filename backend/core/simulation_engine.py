@@ -13,11 +13,11 @@ warnings.filterwarnings("ignore", message="The value of the smallest subnormal f
 
 import numpy as np
 import matplotlib.pyplot as plt
-from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
-from geometry import build_material_grid, build_transient_grid, MaterialID
-from mesh import UniformMesh, AdaptiveMesh
-from solver import get_solver_lib, solve, solve_transient, calculate_conductances_uniform, plot_temperature_map, plot_geometry
-from declarative_geometry import DeclarativeGeometry
+from backend.core.config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
+from backend.core.geometry import build_material_grid, build_transient_grid, MaterialID
+from backend.core.mesh import UniformMesh, AdaptiveMesh
+from backend.core.solver import get_solver_lib, solve, solve_transient, calculate_conductances_uniform, plot_temperature_map, plot_geometry
+from backend.core.declarative_geometry import DeclarativeGeometry
 import yaml
 
 # --- Scenarios ---
@@ -376,10 +376,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     wall_thick_mm = geom.data.get('variables', {}).get('wall_thick', 360)
     
     if use_adaptive_mesh:
-        from mesh import AdaptiveMesh
+        from backend.core.mesh import AdaptiveMesh
         mesh = AdaptiveMesh(geom)
     else:
-        from mesh import UniformMesh
+        from backend.core.mesh import UniformMesh
         # UniformMesh needs explicit grid size if not default
         mesh = UniformMesh(geom, grid_size_mm=cfg_grid_size)
 
@@ -518,7 +518,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None)
     cond_pass1[mask_ext] = k_eff_ext[mask_ext]
     
 
-    from solver import calculate_conductances
+    from backend.core.solver import calculate_conductances
     
     # For padded scenarios (ISO Case 2 style), use original cond values instead of k_eff
     # since we explicitly override boundary conductances. The k_eff approach is for

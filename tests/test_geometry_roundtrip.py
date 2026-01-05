@@ -1,7 +1,7 @@
 
 import pytest
-from geometry_builder import scenario_to_canvas, generate_scenario
-from config import MAT_WALL
+from backend.core.geometry_builder import scenario_to_canvas, generate_scenario
+from backend.core.config import MAT_WALL
 
 
 def test_roundtrip_polygon_corruption():

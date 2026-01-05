@@ -1,7 +1,7 @@
 import pytest
 import os
 from library.material_registry import MaterialRegistry
-from config import MAT_WALL
+from backend.core.config import MAT_WALL
 
 @pytest.fixture
 def clean_registry():

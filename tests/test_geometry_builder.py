@@ -1,6 +1,6 @@
 
 import pytest
-from geometry_builder import scenario_to_canvas, MockSketchRobust
+from backend.core.geometry_builder import scenario_to_canvas, MockSketchRobust
 
 def test_mock_sketch_robust():
     sketch = MockSketchRobust(scale_mm_per_px=10.0, canvas_height_px=400)

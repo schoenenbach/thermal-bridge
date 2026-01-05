@@ -7,7 +7,7 @@ Provides endpoints for material library access.
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from api.models import MaterialInfo
+from backend.app.models import MaterialInfo
 from library.material_registry import MaterialRegistry
 
 router = APIRouter()

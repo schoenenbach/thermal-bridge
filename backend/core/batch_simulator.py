@@ -3,7 +3,7 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Tuple
-from simulation_engine import solve_scenario
+from backend.core.simulation_engine import solve_scenario
 
 def get_nested_value(data: Dict[str, Any], path: str, sep: str = '.') -> Any:
     """Get value from nested dictionary using dot notation path."""

@@ -8,7 +8,7 @@ Provides endpoints for scenario validation, simulation, and data retrieval.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import scenarios, simulation, materials, websocket, schema
+from backend.app.routes import scenarios, simulation, materials, websocket, schema
 
 app = FastAPI(
     title="Thermal Bridge Simulator API",

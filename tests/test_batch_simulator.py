@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
-from batch_simulator import BatchSimulator, get_nested_value, set_nested_value, flatten_dict
+from backend.core.batch_simulator import BatchSimulator, get_nested_value, set_nested_value, flatten_dict
 
 class TestDictHelpers:
     def test_get_nested_value(self):
@@ -34,8 +34,8 @@ class TestBatchSimulator:
             'other': 5
         }
 
-    @patch('batch_simulator.solve_scenario')
-    @patch('batch_simulator.multiprocessing.Pool')
+    @patch('backend.core.batch_simulator.solve_scenario')
+    @patch('backend.core.batch_simulator.multiprocessing.Pool')
     def test_run_sweep(self, mock_pool, mock_solve, sample_config):
         # Mock pool
         pool_instance = MagicMock()

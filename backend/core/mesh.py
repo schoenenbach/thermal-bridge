@@ -10,15 +10,15 @@ import numpy as np
 from typing import List, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from geometry import GeometryBuilder
+    from backend.core.geometry import GeometryBuilder
 
 
 class AdaptiveMesh:
     """
-    Generates non-uniform rectilinear mesh from geometry hints.
+    Generates non-uniform rectilinear mesh from backend.core.geometry hints.
     
     The mesh is constructed by:
-    1. Collecting critical X/Y points from geometry (material boundaries)
+    1. Collecting critical X/Y points from backend.core.geometry (material boundaries)
     2. Filling intervals between critical points with appropriate resolution
     3. Applying refinement zones for higher density in detail areas
     

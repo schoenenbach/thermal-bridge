@@ -10,15 +10,15 @@ import sys
 # Ensure current directory is in path so we can import modules
 sys.path.append(os.getcwd())
 
-from declarative_geometry import DeclarativeGeometry
-from dxf_importer import DXFImporter
-from simulation_engine import solve_scenario
-from solver import get_solver_lib
-from solver import get_solver_lib
-from geometry_builder import generate_scenario, COLOR_MAP, scenario_to_canvas
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.dxf_importer import DXFImporter
+from backend.core.simulation_engine import solve_scenario
+from backend.core.solver import get_solver_lib
+from backend.core.solver import get_solver_lib
+from backend.core.geometry_builder import generate_scenario, COLOR_MAP, scenario_to_canvas
 
 from streamlit_drawable_canvas import st_canvas
-from mold_analysis import calculate_surface_humidity, plot_mold_risk_map
+from backend.core.mold_analysis import calculate_surface_humidity, plot_mold_risk_map
 
 # ... (Previous imports)
 
@@ -34,15 +34,18 @@ from mold_analysis import calculate_surface_humidity, plot_mold_risk_map
 
 
 # --- Auto-Build for Cloud Deployment ---
+# --- Auto-Build for Cloud Deployment ---
 import subprocess
-if not os.path.exists("thermal_solver_core.so"):
-    st.warning("Compiling Solver (First Run)...")
+solver_path = os.path.join("backend", "solver", "thermal_solver_core.so")
+if not os.path.exists(solver_path):
+    st.warning(f"Compiling Solver to {solver_path}...")
     try:
-        subprocess.check_call(["python3", "build_solver.py"])
+        subprocess.check_call(["python3", "backend/solver/build_solver.py"])
         st.success("Solver compiled!")
     except Exception as e:
         st.error(f"Compilation failed: {e}")
         st.stop()
+# ---------------------------------------
 # ---------------------------------------
 
 st.set_page_config(page_title="Thermal Bridge Simulator", layout="wide")
@@ -117,7 +120,7 @@ with tab_studio:
         yaml_input = st.text_area("Edit Configuration", height=450, key="yaml_editor", label_visibility="collapsed")
         
         # Validation Status
-        from ui_validation import validate_scenario_yaml, get_element_hints
+        from backend.core.ui_validation import validate_scenario_yaml, get_element_hints
         validation_res = validate_scenario_yaml(yaml_input)
         
         # Dynamic CSS for validation feedback
@@ -175,10 +178,10 @@ with tab_studio:
         # Generate preview if we have valid data
         if active_data and 'canvas' in active_data and 'elements' in active_data:
             try:
-                from geometry_builder import get_element_bbox
-                from mesh import AdaptiveMesh
-                from solver import plot_geometry
-                from geometry import build_material_grid
+                from backend.core.geometry_builder import get_element_bbox
+                from backend.core.mesh import AdaptiveMesh
+                from backend.core.solver import plot_geometry
+                from backend.core.geometry import build_material_grid
                 
                 geom = DeclarativeGeometry(active_data)
                 mesh = AdaptiveMesh(geom)
@@ -452,7 +455,7 @@ with tab_studio:
                 st.code(traceback.format_exc())
 
 import plotly.express as px
-from batch_simulator import BatchSimulator
+from backend.core.batch_simulator import BatchSimulator
 
 
 
@@ -521,7 +524,7 @@ with tab_opt:
     st.markdown("---")
     st.subheader("Export Report")
     
-    from report_generator import generate_pdf_report
+    from backend.core.report_generator import generate_pdf_report
     
     col_rep1, col_rep2 = st.columns(2)
     with col_rep1:

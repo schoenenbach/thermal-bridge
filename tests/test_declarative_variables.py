@@ -1,5 +1,5 @@
 import pytest
-from declarative_geometry import DeclarativeGeometry
+from backend.core.declarative_geometry import DeclarativeGeometry
 
 def test_variable_substitution_simple():
     yaml_content = {

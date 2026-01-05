@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from mold_analysis import calculate_saturation_pressure, calculate_surface_humidity
+from backend.core.mold_analysis import calculate_saturation_pressure, calculate_surface_humidity
 
 def test_saturation_pressure():
     # Test values based on standard tables or online calculators

@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 # Re-export core schemas
-from scenario_schema import (
+from backend.core.scenario_schema import (
     Scenario,
     MaterialDef,
     CanvasConfig,

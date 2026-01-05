@@ -11,7 +11,7 @@ This generates scenario.schema.json which can be used by:
 """
 
 import json
-from scenario_schema import Scenario
+from backend.core.scenario_schema import Scenario
 
 
 def export_schema(output_path: str = "scenario.schema.json"):

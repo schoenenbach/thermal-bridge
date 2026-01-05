@@ -10,7 +10,7 @@ from typing import Dict, Optional, Any, List
 import asyncio
 from fastapi import WebSocket
 
-from api.models import ProgressMessage, SimulationResult
+from backend.app.models import ProgressMessage, SimulationResult
 
 class JobManager:
     """

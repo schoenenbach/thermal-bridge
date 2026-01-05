@@ -13,8 +13,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code and build
+# Copy source code and build
 COPY . .
-RUN python3 build_solver.py
+RUN python3 backend/solver/build_solver.py
 
 # Stage 2: Runtime
 FROM python:3.10-slim
@@ -31,9 +32,11 @@ COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy compiled extension and app code
-COPY --from=builder /app/thermal_solver_core.so .
+# Create directory for solver lib
+RUN mkdir -p backend/solver
+COPY --from=builder /app/backend/solver/thermal_solver_core.so backend/solver/
 COPY . .
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "legacy_app/app.py", "--server.address=0.0.0.0"]

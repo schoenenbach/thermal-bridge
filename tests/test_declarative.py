@@ -1,6 +1,6 @@
 import pytest
-from declarative_geometry import DeclarativeGeometry
-from geometry import RectangularRegion, PolygonShape, MaterialID
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.geometry import RectangularRegion, PolygonShape, MaterialID
 
 def test_declarative_variable_resolution():
     """Test variable substitution in YAML."""

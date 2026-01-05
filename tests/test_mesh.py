@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from mesh import UniformMesh, AdaptiveMesh
-from geometry import CanvasConfig, RefinementZone
+from backend.core.mesh import UniformMesh, AdaptiveMesh
+from backend.core.geometry import CanvasConfig, RefinementZone
 
 class MockGeometry:
     def __init__(self):

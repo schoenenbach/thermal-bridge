@@ -1,6 +1,6 @@
 
 import pytest
-from scenario_schema import CanvasConfig
+from backend.core.scenario_schema import CanvasConfig
 
 class TestCanvasConfigVariables:
     def test_canvas_grid_references(self):

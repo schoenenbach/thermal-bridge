@@ -3,7 +3,7 @@
 Tests for UI Validation Module
 """
 import pytest
-from ui_validation import validate_scenario_yaml, get_element_hints, ValidationResult
+from backend.core.ui_validation import validate_scenario_yaml, get_element_hints, ValidationResult
 
 class TestValidateScenarioYaml:
     """Tests for validate_scenario_yaml function."""

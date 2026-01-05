@@ -1,7 +1,7 @@
 
 import numpy as np
 import yaml
-from simulation_engine import solve_scenario
+from backend.core.simulation_engine import solve_scenario
 import os
 
 def test_comparison_logic():

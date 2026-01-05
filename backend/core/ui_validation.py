@@ -10,7 +10,7 @@ import yaml
 from pydantic import ValidationError
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
-from scenario_schema import Scenario, RectParams, WallParams, AirParams
+from backend.core.scenario_schema import Scenario, RectParams, WallParams, AirParams
 
 @dataclass
 class ValidationErrorInfo:

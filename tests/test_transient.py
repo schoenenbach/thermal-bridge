@@ -2,9 +2,9 @@
 import pytest
 import numpy as np
 import os
-from geometry import SketchGeometry, build_material_grid, build_transient_grid, MaterialID
-from mesh import UniformMesh
-from solver import solve_transient, get_solver_lib
+from backend.core.geometry import SketchGeometry, build_material_grid, build_transient_grid, MaterialID
+from backend.core.mesh import UniformMesh
+from backend.core.solver import solve_transient, get_solver_lib
 
 def test_transient_solver_1d_diffusion():
     """

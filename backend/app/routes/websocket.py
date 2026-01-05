@@ -3,7 +3,7 @@ WebSocket Routes.
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from api.jobs import job_manager
+from backend.app.jobs import job_manager
 
 router = APIRouter()
 

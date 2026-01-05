@@ -5,9 +5,9 @@ Parses YAML scenario files to construct a SketchGeometry.
 
 import yaml
 from typing import Dict, Any, List, Union
-from geometry import SketchGeometry, MaterialID, RefinementZone
-import elements
-from scenario_schema import Scenario, MaterialDef
+from backend.core.geometry import SketchGeometry, MaterialID, RefinementZone
+from backend.core import elements
+from backend.core.scenario_schema import Scenario, MaterialDef
 from library.material_registry import MaterialRegistry
 import re
 
@@ -174,7 +174,7 @@ class DeclarativeGeometry(SketchGeometry):
             
         # 3. Fallback (Global Defaults / Legacy Map)
         # We keep the legacy map for backward compatibility with 'WALL' etc not defined in YAML
-        from config import (
+        from backend.core.config import (
             MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
             MAT_STYRODUR, MAT_ALUMINUM, MAT_CAVITY_ISO
         )

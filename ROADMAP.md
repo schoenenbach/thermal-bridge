@@ -208,7 +208,7 @@ uvicorn api.main:app --reload
 
 ### Phase 2: Frontend Framework [FUTURE]
 - [x] Implement WebSocket for simulation progress updates
-- [ ] Use JSON Schema for dynamic form generation
+- [x] Use JSON Schema for dynamic form generation
 - [ ] Evaluate React vs. Angular as alternative frontend frameworks
 
 **Key Features to Implement (not feasible in Streamlit):**

@@ -7,10 +7,10 @@ import numpy as np
 # Add project root to path so we can import modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from geometry import CanvasConfig, Point
-from declarative_geometry import DeclarativeGeometry
-from mesh import UniformMesh, AdaptiveMesh
-from solver import get_solver_lib
+from backend.core.geometry import CanvasConfig, Point
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.mesh import UniformMesh, AdaptiveMesh
+from backend.core.solver import get_solver_lib
 
 def pytest_addoption(parser):
     parser.addoption(

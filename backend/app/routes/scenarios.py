@@ -10,19 +10,19 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 import yaml
 
-from api.models import (
+from backend.app.models import (
     ScenarioValidationRequest,
     ValidationResult,
     ValidationError,
     ScenarioSummary,
 )
-from scenario_schema import Scenario
-from ui_validation import validate_scenario_yaml
+from backend.core.scenario_schema import Scenario
+from backend.core.ui_validation import validate_scenario_yaml
 
 router = APIRouter()
 
-# Path from api/routes/scenarios.py -> project_root/scenarios
-SCENARIOS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scenarios")
+# Path from backend/app/routes/scenarios.py -> project_root/scenarios
+SCENARIOS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "scenarios")
 
 
 @router.get("/", response_model=List[ScenarioSummary])

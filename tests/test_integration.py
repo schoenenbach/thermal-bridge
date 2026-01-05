@@ -1,9 +1,9 @@
 import pytest
 import numpy as np
-from declarative_geometry import DeclarativeGeometry
-from mesh import UniformMesh
-from geometry import build_material_grid
-from solver import calculate_conductances_uniform, solve, calculate_thermal_results
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.mesh import UniformMesh
+from backend.core.geometry import build_material_grid
+from backend.core.solver import calculate_conductances_uniform, solve, calculate_thermal_results
 
 def test_full_simulation_pipeline(solver_lib):
     """Run a minimal full simulation integration test."""

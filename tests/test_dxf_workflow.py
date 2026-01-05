@@ -7,9 +7,9 @@ import pytest
 # Add current dir to path
 sys.path.insert(0, os.getcwd())
 
-from dxf_importer import DXFImporter
-from declarative_geometry import DeclarativeGeometry
-from elements import Factory
+from backend.core.dxf_importer import DXFImporter
+from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.elements import Factory
 
 def test_dxf_to_scenario_flow():
     dxf_path = "Testing_Plan/sample_dxf/03016.dxf"

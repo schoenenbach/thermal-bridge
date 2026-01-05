@@ -1,6 +1,6 @@
 import os
 import pytest
-from report_generator import generate_pdf_report
+from backend.core.report_generator import generate_pdf_report
 
 def test_generate_pdf_report(tmp_path):
     # Setup

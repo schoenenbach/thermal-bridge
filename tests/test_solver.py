@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from solver import (
+from backend.core.solver import (
     calculate_conductances, 
     calculate_conductances_uniform,
     solve,

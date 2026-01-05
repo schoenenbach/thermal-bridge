@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Query
 from pydantic.json_schema import GenerateJsonSchema
 
-from scenario_schema import Scenario
-from api.ui_schema import UI_HINTS, get_element_hints
+from backend.core.scenario_schema import Scenario
+from backend.app.ui_schema import UI_HINTS, get_element_hints
 
 router = APIRouter()
 
@@ -28,7 +28,7 @@ async def get_scenario_schema(
     # Generate fresh schema from Pydantic models
     schema = Scenario.model_json_schema()
     
-    # Match title from schema_export.py
+    # Match title from backend.core.schema_export.py
     schema["title"] = "Thermal Bridge Scenario"
     
     if ui_hints:

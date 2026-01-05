@@ -7,8 +7,8 @@ Uses absolute coordinates (mm).
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
-from geometry import SketchGeometry, MaterialID
-from config import (
+from backend.core.geometry import SketchGeometry, MaterialID
+from backend.core.config import (
     MAT_WALL, MAT_INSULATION, MAT_STYRODUR, 
     MAT_FRAME_EQ, MAT_GLASS_UG11, MAT_REVEAL_INSULATION,
     MAT_ALUMINUM, MAT_AIR_EXT, MAT_AIR_INT

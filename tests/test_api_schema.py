@@ -3,7 +3,7 @@ Tests for Schema API endpoints.
 """
 
 from fastapi.testclient import TestClient
-from api.main import app
+from backend.app.main import app
 
 client = TestClient(app)
 

@@ -10,7 +10,7 @@ Tests for the scenario schema to ensure:
 
 import pytest
 import json
-from scenario_schema import (
+from backend.core.scenario_schema import (
     Scenario, MaterialDef, CanvasConfig, ElementBase,
     RectParams, WallParams, InsulationTaperedParams, WindowDetailParams
 )

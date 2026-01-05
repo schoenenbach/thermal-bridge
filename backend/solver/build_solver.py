@@ -3,6 +3,10 @@ import os
 
 def build():
     print("Building C++ Thermal Solver...")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cpp_file = os.path.join(script_dir, "thermal_solver_core.cpp")
+    so_file = os.path.join(script_dir, "thermal_solver_core.so")
+    
     cmd = [
         "g++",
         "-O3",
@@ -13,9 +17,9 @@ def build():
         "-shared",
         "-fPIC",
         "-fopenmp",
-        "thermal_solver_core.cpp",
+        cpp_file,
         "-o",
-        "thermal_solver_core.so"
+        so_file
     ]
     
     try:
