@@ -4,14 +4,15 @@ Simulation Engine for Thermal Bridge Calculations
 Provides scenario definitions and solving workflow for window reveal geometries.
 """
 
+import argparse
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE, RSI_CORNER, MAT_WALL, MAT_INSULATION
 from geometry import build_material_grid, MaterialID
 from geometries.window_reveal import WindowRevealGeometry
-from mesh import UniformMesh
-from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map
+from mesh import UniformMesh, AdaptiveMesh
+from solver import get_solver_lib, solve, calculate_conductances_uniform, plot_temperature_map, plot_geometry
 
 # --- Scenarios ---
 def get_scenarios():
@@ -95,8 +96,11 @@ def solve_scenario(scenario_def):
     
     # 1. Geometry & Mesh
     geom = WindowRevealGeometry(cfg)
-    mesh = UniformMesh(geom, grid_size_mm=cfg.grid_size_mm)
+    # Switch to AdaptiveMesh for better efficiency
+    from mesh import AdaptiveMesh
+    mesh = AdaptiveMesh(geom)
     mesh.generate()
+    print(f"  {mesh.info()}")
     
     # 2. Material Grid & Conductivity
     grid_map, cond = build_material_grid(geom, mesh.xc, mesh.yc)
@@ -105,16 +109,43 @@ def solve_scenario(scenario_def):
     mask_int = (grid_map == MaterialID.AIR_INT)
     mask_ext = (grid_map == MaterialID.AIR_EXT)
     
-    # K_eff for Surface Resistance
-    dx_m = mesh.grid_size_mm / 1000.0
-    k_eff_int = dx_m / (2 * RSI_WALL)
-    k_eff_ext = dx_m / (2 * RSE)
+    # K_eff for Surface Resistance (Using local dx/dy would be best, but mesh arrays are 1D)
+    # For adaptive mesh, we should check surface resistance locally, but simplified here:
+    # Use average or min dx for safety, or better: apply resistance inside conductance calc?
+    # Actually, build_material_grid applies K for solid materials.
+    # Air nodes are fixed to Temp, so K doesn't matter for them *except* near boundary.
+    # But wait, the standard way (ISO 10211) is that the surface resistance is a layer.
+    # In FDM, we often adjust the conductivity of the boundary cell or use a ghost node.
+    # Here, we set K of the air node to be K_eff = dx / (2 * Rsi). This assumes node is centered?
+    # With Adaptive Mesh, dx varies. We need to be careful.
     
-    cond[mask_int] = k_eff_int
-    cond[mask_ext] = k_eff_ext
+    # Let's iterate over boundary cells or use the mesh arrays.
+    # mesh.dx_array is 1D (nx columns), mesh.dy_array is 1D (ny rows).
+    # cond is (ny, nx).
     
-    # 4. Conductance Matrices (uniform grid: G = k_harmonic)
-    Gh, Gv = calculate_conductances_uniform(cond)
+    # Vectorized K_eff calculation
+    # k_eff = dx / (2 * R) where dx is the width of the cell
+    dx_grid = np.tile(mesh.dx_array, (mesh.ny, 1))
+    
+    # This logic assumes vertical walls (using dx) for horizontal flux?
+    # This "Simple" Boundary Condition handling in the original code:
+    # k_eff_int = dx_m / (2 * RSI_WALL)
+    # cond[mask_int] = k_eff_int
+    
+    # This implies that for ALL air nodes, we set this K. 
+    # This is slightly wrong for internal air nodes far from wall, but they are Dirichlet fixed anyway
+    # so their K doesn't affect the solution, ONLY the flux calculation at the boundary.
+    # So yes, we can set K for all air nodes based on their local dx.
+    
+    k_eff_int = (dx_grid / 1000.0) / (2 * RSI_WALL)
+    k_eff_ext = (dx_grid / 1000.0) / (2 * RSE)
+    
+    cond[mask_int] = k_eff_int[mask_int]
+    cond[mask_ext] = k_eff_ext[mask_ext]
+    
+    # 4. Conductance Matrices (Use general calculation for non-uniform mesh)
+    from solver import calculate_conductances
+    Gh, Gv = calculate_conductances(cond, mesh.dx_array, mesh.dy_array)
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
     mask = mask_int | mask_ext
@@ -126,10 +157,12 @@ def solve_scenario(scenario_def):
     temp[mask_int] = TEMP_INT
     temp[mask_ext] = TEMP_EXT
     
+    # Pre-check convergence using tolerance from config if available, or default
     temp_res = solve(temp, Gh, Gv, mask, values, max_iter=100000, tol=1e-7, 
                      batch_size=5000, verbose=False)
     
     # 6. Calculate Results - Total Flux L2D
+    # Flux calculation needs to handle variable dy/dx
     dt_h = temp_res[:, :-1] - temp_res[:, 1:]
     flow_h = Gh[:, :-1] * dt_h
     m_curr = mask_int[:, :-1]
@@ -163,11 +196,12 @@ def solve_scenario(scenario_def):
     psi = l2d - ref_flow
     
     # fRsi Pass (Rsi=0.25)
-    k_eff_int_rsi25 = dx_m / (2 * RSI_CORNER)
+    # Recalculate K_eff for interior with new Rsi
+    k_eff_int_rsi25 = (dx_grid / 1000.0) / (2 * RSI_CORNER)
     cond_frsi = cond.copy()
-    cond_frsi[mask_int] = k_eff_int_rsi25
+    cond_frsi[mask_int] = k_eff_int_rsi25[mask_int]
     
-    Gh_frsi, Gv_frsi = calculate_conductances_uniform(cond_frsi)
+    Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, mesh.dx_array, mesh.dy_array)
     
     temp_frsi = temp_res.copy()
     temp_frsi = solve(temp_frsi, Gh_frsi, Gv_frsi, mask, values, max_iter=100000, 
@@ -183,7 +217,12 @@ def solve_scenario(scenario_def):
             return TEMP_INT
         k_solid = k_field[y, x]
         t_node = t_field[y, x]
-        r1 = dx_m / (2*k_solid)
+        
+        # Use local cell width for surface resistance calc
+        # mesh.dx_array is in mm, convert to meters
+        dx_local_m = mesh.dx_array[x] / 1000.0
+        
+        r1 = dx_local_m / (2*k_solid)
         r2 = rsi_used
         t_si = (TEMP_INT * r1 + t_node * r2) / (r1 + r2)
         return np.min(t_si)
@@ -195,14 +234,15 @@ def solve_scenario(scenario_def):
     print(f"  fRsi: {frsi:.4f} (MinT: {min_temp:.2f}C)")
     
     # Plot
-    plot_temperature_map(
-        temp_grid=temp_res,
-        width_mm=mesh.width_mm,
-        height_mm=mesh.height_mm,
-        filename=f"result_{suffix}.png",
-        title=f"{scenario_def['name']}\nPsi={psi:.3f}, fRsi={frsi:.3f}, MinT={min_temp:.1f}C",
-        grid_size_mm=mesh.grid_size_mm
-    )
+    plot_temperature_map(temp_frsi, 
+                         geom.get_canvas_config().width_mm, 
+                         geom.get_canvas_config().height_mm,
+                         f"result_{scenario_def['name']}.png", 
+                         title=scenario_def['name'],
+                         wall_thick_mm=cfg.wall_thickness_mm,
+                         grid_size_mm=getattr(mesh, 'grid_size_mm', None),
+                         x_coords=mesh.x_coords,
+                         y_coords=mesh.y_coords)
     
     return {
         "name": scenario_def['name'],
@@ -231,6 +271,49 @@ def run_all():
         print(f"{r['name']:<40} | {r['Psi']:<10.4f} | {r['fRsi']:<10.4f} | {r['MinT']:<10.2f}")
 
 
+def generate_geometries():
+    """Generate and save geometry plots for all scenarios (Simulation Skipped)."""
+    scenarios = get_scenarios()
+    print(f"Generating geometry plots for {len(scenarios)} scenarios...")
+    
+    for sc in scenarios:
+        name = sc['name']
+        print(f"  Processing {name}...")
+        
+        cfg = sc['cfg']
+        
+        # Instantiate
+        geom = WindowRevealGeometry(cfg)
+        mesh = AdaptiveMesh(geom)
+        mesh.generate()
+        
+        # Build Grid
+        grid_map, _ = build_material_grid(geom, mesh.xc, mesh.yc)
+        
+        # Filename
+        safe_name = name.replace(":", "").replace(" ", "_").replace("(", "").replace(")", "").replace("__", "_")
+        filename = f"geometry_check_{safe_name}.png"
+        
+        print(f"    Mesh: {mesh.info()}")
+        
+        plot_geometry(grid_map, 
+                      geom.get_canvas_config().width_mm, 
+                      geom.get_canvas_config().height_mm,
+                      filename=filename,
+                      x_coords=mesh.x_coords,
+                      y_coords=mesh.y_coords)
+        print(f"    Saved {filename}")
+
+
 if __name__ == "__main__":
-    run_all()
+    parser = argparse.ArgumentParser(description="Thermal Bridge Simulation Engine")
+    parser.add_argument("--geometries-only", action="store_true", help="Generate geometry plots only, skip simulation")
+    parser.add_argument("--run-all", action="store_true", help="Run all scenarios (Default)")
+    
+    args = parser.parse_args()
+    
+    if args.geometries_only:
+        generate_geometries()
+    else:
+        run_all()
 

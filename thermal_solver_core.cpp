@@ -387,11 +387,18 @@ double solve_red_black(double *temp, const double *cond, const int *fixed_mask,
  * @param temp Pointer to temperature grid (Input/Output)
  * @param cond_h Pointer to Horizontal Conductance (r,c) -> (r,c+1)
  * @param cond_v Pointer to Vertical Conductance (r,c) -> (r+1,c)
+ * @param fixed_mask Pointer to integer mask (1 = Fixed/Dirichlet, 0 = Variable)
+ * @param fixed_values Pointer to values to enforce where mask is 1
+ * @param rows Number of rows
+ * @param cols Number of columns
+ * @param iterations Number of iterations to perform
+ * @param omega Relaxation factor
+ * @param tol Convergence tolerance for early exit
  */
 double solve_general_conductance(double *temp, const double *cond_h,
                                  const double *cond_v, const int *fixed_mask,
                                  const double *fixed_values, int rows, int cols,
-                                 int iterations, double omega) {
+                                 int iterations, double omega, double tol) {
   double max_diff = 0.0;
 
   for (int iter = 0; iter < iterations; ++iter) {
@@ -407,6 +414,8 @@ double solve_general_conductance(double *temp, const double *cond_h,
         if ((r + c_start) % 2 != color)
           c_start++;
 
+// Manual vectorization hint
+#pragma omp simd
         for (int c = c_start; c < cols - 1; c += 2) {
           int idx = r * cols + c;
 
@@ -477,6 +486,11 @@ double solve_general_conductance(double *temp, const double *cond_h,
         temp[idx] = temp[idx - cols];
       else
         temp[idx] = fixed_values[idx];
+    }
+
+    // Check convergence
+    if (max_diff < tol) {
+      return max_diff;
     }
   }
   return max_diff;

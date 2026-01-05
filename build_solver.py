@@ -6,6 +6,10 @@ def build():
     cmd = [
         "g++",
         "-O3",
+        "-march=native",
+        "-ffast-math",
+        "-funroll-loops",
+        "-flto",
         "-shared",
         "-fPIC",
         "-fopenmp",

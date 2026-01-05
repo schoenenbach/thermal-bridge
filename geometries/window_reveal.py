@@ -9,7 +9,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from geometry import SketchGeometry, RefinementZone, MaterialID
+from geometry import SketchGeometry, RefinementZone, MaterialID, CanvasConfig
 from config import CalculationConfig, SpacerType, TEMP_INT, TEMP_EXT, RSI_WALL, RSE
 from config import (
     MAT_WALL, MAT_INSULATION, MAT_REVEAL_INSULATION, MAT_FRAME_EQ, MAT_GLASS_UG11,
@@ -264,6 +264,25 @@ class WindowRevealGeometry(SketchGeometry):
                         0.0, self.y_top, 
                         grid_mm=config.grid_size_mm)
                         
+    def get_canvas_config(self) -> CanvasConfig:
+        # Calculate bounds (duplicate of __init__ logic)
+        buffer_width = 150.0 
+        if self.cfg.insulation_thick_max_mm > 0:
+            required_width = float(self.cfg.insulation_thick_max_mm) + 50.0
+            buffer_width = max(buffer_width, required_width)
+        x_dom_max = self.x_wall_ext + buffer_width
+        
+        # Optimize Adaptive Mesh: 
+        # Use coarse background (10mm) to reduce node count away from critical areas.
+        # Use fine grid (0.5mm) in refinement zones.
+        return CanvasConfig(
+            x_min_mm=0.0, x_max_mm=x_dom_max,
+            y_min_mm=0.0, y_max_mm=self.y_top, 
+            default_dx_mm=10.0, default_dy_mm=10.0,
+            fine_dx_mm=0.5, fine_dy_mm=0.5,
+            ultra_dx_mm=0.25, ultra_dy_mm=0.25
+        )
+
     def get_refinement_zones(self) -> List[RefinementZone]:
         config = self.get_canvas_config()
         zones = []

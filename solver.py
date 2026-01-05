@@ -42,7 +42,8 @@ def get_solver_lib():
             ctypes.c_int,                     # rows
             ctypes.c_int,                     # cols
             ctypes.c_int,                     # iterations
-            ctypes.c_double                   # omega (SOR)
+            ctypes.c_double,                  # omega (SOR)
+            ctypes.c_double                   # tol
         ]
         _lib.solve_general_conductance.restype = ctypes.c_double
         
@@ -180,7 +181,7 @@ def solve(temp: np.ndarray,
     for k in range(0, max_iter, batch_size):
         diff = lib.solve_general_conductance(
             p_temp, p_gh, p_gv, p_mask, p_val,
-            rows, cols, batch_size, omega
+            rows, cols, batch_size, omega, tol
         )
         
         step = k + batch_size
@@ -271,23 +272,25 @@ def plot_temperature_map(temp_grid: np.ndarray,
                          filename: str,
                          title: str,
                          wall_thick_mm: Optional[float] = None,
-                         grid_size_mm: Optional[float] = None):
+                         grid_size_mm: Optional[float] = None,
+                         x_coords: Optional[np.ndarray] = None,
+                         y_coords: Optional[np.ndarray] = None):
     """
     Plot temperature distribution with isotherm contour lines.
-    
-    Args:
-        temp_grid: 2D numpy array of temperatures [°C]
-        width_mm: Physical width of domain [mm]
-        height_mm: Physical height of domain [mm]
-        filename: Output filename
-        title: Plot title
-        wall_thick_mm: Optional wall thickness for annotation
-        grid_size_mm: Optional grid size for annotation
+    Supports both uniform (imshow) and adaptive (pcolormesh) grids.
     """
     plt.figure(figsize=(10, 8))
     
-    im = plt.imshow(temp_grid, cmap='jet', origin='lower',
-                    extent=[0, width_mm, 0, height_mm])
+    if x_coords is not None and y_coords is not None:
+        # Adaptive Mesh: Use pcolormesh
+        # x_coords, y_coords are face coordinates (len+1)
+        X, Y = np.meshgrid(x_coords, y_coords)
+        im = plt.pcolormesh(X, Y, temp_grid, cmap='jet', shading='flat')
+    else:
+        # Uniform Mesh: Use imshow
+        im = plt.imshow(temp_grid, cmap='jet', origin='lower',
+                        extent=[0, width_mm, 0, height_mm])
+                        
     plt.colorbar(im, label='Temperature [°C]')
     
     # Add isotherms
@@ -297,30 +300,44 @@ def plot_temperature_map(temp_grid: np.ndarray,
     
     if max_t > min_t:
         levels = np.arange(np.ceil(min_t), np.floor(max_t) + 1, step)
-        
-        # Add critical 12.6°C isotherm for mold risk
         if min_t < 12.6 < max_t:
             levels = np.sort(np.append(levels, 12.6))
         
         if len(levels) > 0:
-            CS = plt.contour(temp_grid, levels=levels, origin='lower',
-                             extent=[0, width_mm, 0, height_mm],
-                             colors='black', linewidths=0.5, alpha=0.7)
+            if x_coords is not None and y_coords is not None:
+                # Contour needs centers for accurate lines, or it can handle X, Y faces?
+                # Contour X, Y must match Z shape usually.
+                # If Z is (ny, nx), X, Y should be centers (ny, nx) or dimensions.
+                xc = (x_coords[:-1] + x_coords[1:]) / 2.0
+                yc = (y_coords[:-1] + y_coords[1:]) / 2.0
+                X_cen, Y_cen = np.meshgrid(xc, yc)
+                CS = plt.contour(X_cen, Y_cen, temp_grid, levels=levels, 
+                                 colors='black', linewidths=0.5, alpha=0.7)
+            else:
+                CS = plt.contour(temp_grid, levels=levels, origin='lower',
+                                 extent=[0, width_mm, 0, height_mm],
+                                 colors='black', linewidths=0.5, alpha=0.7)
+            
             plt.clabel(CS, inline=True, fontsize=8, fmt='%1.1f')
     
-    # Construct title
+    # Title
     full_title = title
-    if wall_thick_mm is not None or grid_size_mm is not None:
-        extras = []
-        if wall_thick_mm:
-            extras.append(f"Thick: {wall_thick_mm}mm")
-        if grid_size_mm:
-            extras.append(f"Grid: {grid_size_mm}mm")
+    extras = []
+    if wall_thick_mm is not None:
+        extras.append(f"Thick: {wall_thick_mm}mm")
+    if grid_size_mm is not None:
+        extras.append(f"Grid: {grid_size_mm}mm")
+    if extras:
         full_title += f"\n({', '.join(extras)})"
     
     plt.title(full_title)
     plt.xlabel('Depth [mm]')
     plt.ylabel('Facade Length [mm]')
+    
+    # Set axis limits to match domain (pcolormesh doesn't auto-set tight??)
+    plt.xlim(0, width_mm)
+    plt.ylim(0, height_mm)
+    
     plt.savefig(filename, dpi=150)
     plt.close()
 
@@ -328,25 +345,32 @@ def plot_temperature_map(temp_grid: np.ndarray,
 def plot_geometry(grid_map: np.ndarray,
                   width_mm: float,
                   height_mm: float,
-                  filename: str = "geometry_debug.png"):
+                  filename: str = "geometry_debug.png",
+                  x_coords: Optional[np.ndarray] = None,
+                  y_coords: Optional[np.ndarray] = None):
     """
     Plot material ID map for geometry verification.
-    
-    Args:
-        grid_map: 2D material ID array
-        width_mm: Physical width [mm]
-        height_mm: Physical height [mm]
-        filename: Output filename
     """
     plt.figure(figsize=(12, 10))
     
     cmap = plt.get_cmap('tab10', 10)
-    plt.imshow(grid_map, cmap=cmap, origin='lower',
-               extent=[0, width_mm, 0, height_mm], interpolation='nearest')
-    plt.colorbar(label='Material ID')
+    
+    if x_coords is not None and y_coords is not None:
+        X, Y = np.meshgrid(x_coords, y_coords)
+        im = plt.pcolormesh(X, Y, grid_map, cmap=cmap, shading='flat', vmin=0, vmax=9)
+    else:
+        im = plt.imshow(grid_map, cmap=cmap, origin='lower',
+                        extent=[0, width_mm, 0, height_mm], 
+                        interpolation='nearest', vmin=0, vmax=9)
+                        
+    plt.colorbar(im, label='Material ID')
     plt.title(f'Geometry: {filename}')
     plt.xlabel('Depth [mm]')
     plt.ylabel('Facade Length [mm]')
+    
+    plt.xlim(0, width_mm)
+    plt.ylim(0, height_mm)
+    
     plt.grid(True, color='white', alpha=0.3)
     plt.savefig(filename, dpi=150)
     plt.close()
