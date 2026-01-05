@@ -119,24 +119,35 @@ class DeclarativeGeometry(SketchGeometry):
 
     def _resolve_material(self, mat_val):
         """Resolve material ID/Lambda from string or int."""
-        # Map of string names to (ID, Lambda)
-        MAT_MAP = {
-            "WALL": (MaterialID.WALL, MAT_WALL),
-            "INSULATION": (MaterialID.INSULATION, MAT_INSULATION),
-            "REVEAL_INS": (MaterialID.REVEAL_INS, MAT_REVEAL_INSULATION),
-            "STYRODUR": (MaterialID.STYRODUR, MAT_STYRODUR),
-            "CONCRETE": (MaterialID.CONCRETE, 1.15),
-            "WOOD": (MaterialID.WOOD, 0.12),
-            "FRAME": (MaterialID.FRAME, MAT_FRAME_EQ),
-            "GLASS": (MaterialID.GLASS, MAT_GLASS_UG11),
-            "ALUMINUM": (MaterialID.ALUMINUM, MAT_ALUMINUM),
-            "AIR_INT": (MaterialID.AIR_INT, 0.025),
-            "AIR_EXT": (MaterialID.AIR_EXT, 0.025),
-            "CAVITY": (MaterialID.CAVITY, MAT_CAVITY_ISO)
-        }
+        # 1. Try Registry
+        from library.material_registry import MaterialRegistry
+        registry = MaterialRegistry.get()
         
         if isinstance(mat_val, str):
+            # Try exact match in registry
+            prop = registry.get_by_id(mat_val)
+            if prop:
+                # We need to decide what ID to pass to solver.
+                # The registry manages solver_id mapping.
+                return (prop.solver_id, prop.lambda_val)
+            
+            # 2. Legacy Map (Backward Compatibility)
             mat_upper = mat_val.upper()
+            MAT_MAP = {
+                "WALL": (MaterialID.WALL, MAT_WALL),
+                "INSULATION": (MaterialID.INSULATION, MAT_INSULATION),
+                "REVEAL_INS": (MaterialID.REVEAL_INS, MAT_REVEAL_INSULATION),
+                "STYRODUR": (MaterialID.STYRODUR, MAT_STYRODUR),
+                "CONCRETE": (MaterialID.CONCRETE, 1.15),
+                "WOOD": (MaterialID.WOOD, 0.12),
+                "FRAME": (MaterialID.FRAME, MAT_FRAME_EQ),
+                "GLASS": (MaterialID.GLASS, MAT_GLASS_UG11),
+                "ALUMINUM": (MaterialID.ALUMINUM, MAT_ALUMINUM),
+                "AIR_INT": (MaterialID.AIR_INT, 0.025),
+                "AIR_EXT": (MaterialID.AIR_EXT, 0.025),
+                "CAVITY": (MaterialID.CAVITY, MAT_CAVITY_ISO)
+            }
+            
             if mat_upper in MAT_MAP:
                 return MAT_MAP[mat_upper]
             else:

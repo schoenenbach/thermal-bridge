@@ -1,0 +1,82 @@
+[
+    {
+        "id": "wall_generic",
+        "name": "Brick / Masonry",
+        "category": "Masonry",
+        "lambda": 0.81,
+        "density": 1800,
+        "heat_capacity": 1000,
+        "color": "#A0522D",
+        "source": "Process Standard"
+    },
+    {
+        "id": "concrete_reinforced",
+        "name": "Reinforced Concrete",
+        "category": "Masonry",
+        "lambda": 2.3,
+        "density": 2400,
+        "heat_capacity": 1000,
+        "color": "#808080",
+        "source": "DIN 4108"
+    },
+    {
+        "id": "insulation_generic",
+        "name": "Standard ETICS Insulation (WLS 035)",
+        "category": "Insulation",
+        "lambda": 0.035,
+        "density": 20,
+        "heat_capacity": 1400,
+        "color": "#FFFF00",
+        "source": "Process Standard"
+    },
+    {
+        "id": "insulation_styrodur",
+        "name": "XPS / Styrodur (WLS 025)",
+        "category": "Insulation",
+        "lambda": 0.025,
+        "density": 35,
+        "heat_capacity": 1450,
+        "color": "#9ACD32",
+        "source": "Vendor Data"
+    },
+    {
+        "id": "wood_soft",
+        "name": "Softwood (Spruce/Pine)",
+        "category": "Wood",
+        "lambda": 0.13,
+        "density": 500,
+        "heat_capacity": 1600,
+        "color": "#DEB887",
+        "source": "DIN 4108"
+    },
+    {
+        "id": "steel_generic",
+        "name": "Steel",
+        "category": "Metal",
+        "lambda": 50.0,
+        "density": 7800,
+        "heat_capacity": 450,
+        "color": "#404040",
+        "source": "Generic"
+    },
+    {
+        "id": "aluminum_generic",
+        "name": "Aluminum",
+        "category": "Metal",
+        "lambda": 160.0,
+        "density": 2700,
+        "heat_capacity": 900,
+        "color": "#C0C0C0",
+        "source": "Generic"
+    },
+    {
+        "id": "air_cavity_unventilated",
+        "name": "Unventilated Air Cavity",
+        "category": "Air",
+        "lambda": 0.25,
+        "density": 1.2,
+        "heat_capacity": 1000,
+        "color": "#E0FFFF",
+        "source": "ISO 6946 Eq"
+    }
+]

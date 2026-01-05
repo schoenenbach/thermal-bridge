@@ -1,11 +1,22 @@
 from dataclasses import dataclass
 
+import os
+from library.material_registry import MaterialRegistry
+
 # --- Configuration & Constants ---
-# Materials (Lambda in W/mK)
-MAT_WALL = 0.81  # Brick/Masonry (Standard Vollziegel 1800kg/m3)
-MAT_INSULATION = 0.035  # ETICS WLS 035
-MAT_REVEAL_INSULATION = 0.035
-MAT_STYRODUR = 0.025 # Styrodur / XPS WLS 025
+
+# Initialize Registry
+# Assuming the script runs from root or we find the library relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LIB_DIR = os.path.join(BASE_DIR, "library", "materials")
+registry = MaterialRegistry.get()
+registry.initialize(LIB_DIR)
+
+# Materials (Lambda in W/mK) - Fetched from Registry with fallbacks
+MAT_WALL = registry.get_lambda("wall_generic", 0.81)
+MAT_INSULATION = registry.get_lambda("insulation_generic", 0.035)
+MAT_REVEAL_INSULATION = registry.get_lambda("insulation_generic", 0.035) # Using same generic for now
+MAT_STYRODUR = registry.get_lambda("insulation_styrodur", 0.025)
 
 # Boundary Conditions (Temperature in C, Resistance in m2K/W)
 TEMP_INT = 20.0
@@ -38,10 +49,10 @@ MAT_GLASS_UG11 = 0.024 / (1.0/1.1 - RSI_WALL - RSE)
 # Spacers (Effective Lamdba for a solid block simulation of the edge)
 # Values approx from ISO 10077-2 / Passive House Institute Data
 MAT_SPACER_SWISS_ULTIMATE = 0.14
-MAT_SPACER_STAINLESS = 0.60  # Typical stainless steel box
-MAT_SPACER_ALUMINUM = 10.0 # High internal conductivity
-MAT_ALUMINUM = 160.0
-MAT_CAVITY_ISO = 0.25      # Equivalent lambda for unventilated cavity
+MAT_SPACER_STAINLESS = registry.get_lambda("steel_generic", 0.60)  # Approx
+MAT_SPACER_ALUMINUM = registry.get_lambda("aluminum_generic", 10.0)
+MAT_ALUMINUM = registry.get_lambda("aluminum_generic", 160.0)
+MAT_CAVITY_ISO = registry.get_lambda("air_cavity_unventilated", 0.25)
 MAT_EPDM = 0.25
 
 class SpacerType:
