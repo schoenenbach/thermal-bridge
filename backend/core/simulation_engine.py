@@ -735,7 +735,7 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None,
         cb1 = lambda s, t, d: progress_callback("Pass 1: Psi-Value", s, t, d)
 
     temp_res = solve(temp, Gh, Gv, mask, values, max_iter=500000, tol=1e-7, 
-                     batch_size=10000, verbose=True, progress_callback=cb1)
+                     batch_size=1000, verbose=True, progress_callback=cb1)
     
     # 6. Calculate Results - Total Flux L2D
     # Flux calculation needs to handle variable dy/dx
