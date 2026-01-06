@@ -13,36 +13,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import subprocess
+import json
+import sys
 import os
 
-def build():
-    print("Building C++ Thermal Solver...")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    cpp_file = os.path.join(script_dir, "thermal_solver_core.cpp")
-    so_file = os.path.join(script_dir, "thermal_solver_core.so")
+# Add project root to path
+sys.path.append(os.getcwd())
+
+from backend.core.scenario_schema import Scenario
+
+def generate_schema(output_path="scenario_schema.json"):
+    """Generates the JSON schema for the Scenario model."""
+    schema = Scenario.model_json_schema()
     
-    cmd = [
-        "g++",
-        "-O3",
-        "-march=native",
-        "-ffast-math",
-        "-funroll-loops",
-        "-flto",
-        "-shared",
-        "-fPIC",
-        "-fopenmp",
-        cpp_file,
-        "-o",
-        so_file
-    ]
+    with open(output_path, 'w') as f:
+        json.dump(schema, f, indent=2)
     
-    try:
-        subprocess.check_call(cmd)
-        print("Build successful: thermal_solver_core.so created.")
-    except subprocess.CalledProcessError as e:
-        print(f"Build failed: {e}")
-        exit(1)
+    print(f"✅ Schema generated at: {os.path.abspath(output_path)}")
 
 if __name__ == "__main__":
-    build()
+    generate_schema()

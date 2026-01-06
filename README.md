@@ -213,3 +213,8 @@ The output plots will display the actual temperatures used (`Ti` and `Te`) in th
 uvicorn backend.app.main:app --reload --port 8000
 
 npm run dev in frontend folder
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+See the [LICENSE](LICENSE) file for details.
