@@ -50,29 +50,29 @@ variables:
   taper_len: 150.0
   win_pos: 150.0
   rebate_overlap: 50.0
-  
+
   # Offsets
   off_x: 50.0
   off_y: 250.0
-  
+
   # Canvas
   grid_size: 2.5
-  
+
   # Derived
   x_wall_int: 50.0
   x_wall_ext: 410.0
   x_win_outer: 260.0
-  
+
   y_bottom: 0.0
   y_reveal: 250.0
   y_top: 500.0
-  
+
   x_f_start: 190.0
   y_sash_start: 310.0
   y_sash_end: 380.0
   x_sash_start: 160.0
   x_glass_start: 183.0
-  
+
   # Reveal Shift (10mm)
   reveal_shift: 10.0
   y_reveal_shifted: 240.0
@@ -87,21 +87,26 @@ variables:
   glass_thick: 24.0
 
 canvas:
-  bounds: [0, 660, 0, 500] 
+  bounds: [0, 660, 0, 500]
   grid: ${grid_size}
 
 boundary_conditions:
   convective:
-    internal: {T: 20.0, R: 0.13}
-    external: {T: -5.0, R: 0.04}
-    internal_check: {R: 0.25}
+    internal: { T: 20.0, R: 0.13 }
+    external: { T: -5.0, R: 0.04 }
+    internal_check: { R: 0.25 }
 
 measurements:
   surface_metrics:
-    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
+    - {
+        name: "MinT_Wall",
+        type: min,
+        boundary: internal,
+        materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD],
+      }
     - { name: "MinT_Frame", type: min, boundary: internal, materials: [FRAME] }
     - { name: "MinT_Glass", type: min, boundary: internal, materials: [GLASS] }
-  
+
   derived:
     - { name: "Psi", formula: psi_value }
     - { name: "fRsi", formula: frsi }
@@ -124,11 +129,17 @@ points:
   RevIns_TR: [503.33, 300.0] # 510 - 6.666
   RevIns_TL: ["${x_win_outer}", 300.0]
 
+  # Tapered Wall Insulation Points
+  InsTaper_BL: ["${x_wall_ext}", 140.0]
+  InsTaper_BR: [610.0, 140.0]
+  InsTaper_TR: [510.0, 290.0]
+  InsTaper_TL: ["${x_wall_ext}", 290.0]
+
 elements:
   - type: polygon
     name: "Interior Air Polygon"
     material: AIR_INT
-    points: 
+    points:
       - AirInt_BL
       - Wall_BL
       - Wall_TL
@@ -145,7 +156,7 @@ elements:
     params:
       x: ${x_wall_int}
       y: ${y_bottom}
-      width: 210.0 
+      width: 210.0
       height: ${y_reveal}
 
   - type: wall
@@ -153,7 +164,7 @@ elements:
     params:
       x: ${x_win_outer}
       y: ${y_bottom}
-      width: 150.0 
+      width: 150.0
       height: ${y_reveal_shifted}
 
   - type: rect
@@ -162,20 +173,25 @@ elements:
     params:
       x: ${x_win_outer}
       y: ${y_reveal_shifted}
-      width: 150.0 
+      width: 150.0
       height: ${rebate_overlap}
 
-  # STYRODUR Insulation (Taper Start calc: 290 - 150 = 140)
-  - type: insulation_tapered
-    material: STYRODUR
+  # Main Insulation - Untapered part: WLS 035
+  - type: rect
+    name: "Insulation_Main"
+    material: INSULATION
     params:
-      x_base: ${x_wall_ext}
-      y_bottom: ${y_bottom}
-      y_top: 290.0
-      thick_main: ${ins_thick_max}
-      thick_taper: ${ins_thick_min}
-      taper_start_y: 140.0
-      
+      x: ${x_wall_ext}
+      y: ${y_bottom}
+      width: ${ins_thick_max}
+      height: 140.0
+
+  # Tapered Insulation: STYRODUR (WLS 025) - same as reveal
+  - type: polygon
+    name: "Insulation_Tapered"
+    material: STYRODUR
+    points: [InsTaper_BL, InsTaper_BR, InsTaper_TR, InsTaper_TL]
+
   - type: polygon
     name: "Reveal Insulation"
     material: STYRODUR
@@ -195,46 +211,46 @@ elements:
       y_top: ${y_top}
       mat_frame_lambda: 0.13
       mat_glass_lambda: 0.0325
-      
+
   # Shutter Rails
   - type: rect
     name: "ISG_Alu"
     material: ALUMINUM
     params:
-       x: 260.0
-       y: 303.0
-       width: 22.0
-       height: 53.0
+      x: 260.0
+      y: 303.0
+      width: 22.0
+      height: 53.0
   - type: rect
     name: "ISG_Air"
     material: CAVITY
     params:
-       x: 262.0
-       y: 305.0
-       width: 18.0
-       height: 49.0
+      x: 262.0
+      y: 305.0
+      width: 18.0
+      height: 49.0
   - type: rect
     name: "ISG_Seal"
     material: AIR_EXT
     lambda: 0.25
     params:
-       x: 282.0
-       y: 303.0
-       width: 1.0
-       height: 53.0
+      x: 282.0
+      y: 303.0
+      width: 1.0
+      height: 53.0
   - type: rect
     name: "Shutter_Alu"
     material: ALUMINUM
     params:
-       x: 283.0
-       y: 303.0
-       width: 22.0
-       height: 53.0
+      x: 283.0
+      y: 303.0
+      width: 22.0
+      height: 53.0
   - type: rect
     name: "Shutter_Air"
     material: CAVITY
     params:
-       x: 285.0
-       y: 305.0
-       width: 18.0
-       height: 49.0
+      x: 285.0
+      y: 305.0
+      width: 18.0
+      height: 49.0

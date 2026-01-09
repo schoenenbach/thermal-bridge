@@ -1,0 +1,316 @@
+name: "Pipe Penetration: Floor to Cellar (Renovated)"
+description: "Thermal bridge analysis: Cold water pipe through floor to unheated cellar. Post-renovation with PIR insulation and floor heating."
+
+# Material Definitions
+materials:
+  - id: BRICK
+    lambda: 0.8
+    color: "#B35C44"
+    description: "Historical brick vault (~1900 Reichsformat)"
+  - id: SAND_FILL
+    lambda: 1.0
+    color: "#D4B896"
+    description: "Sand and stone fill (compacted)"
+  - id: CONCRETE
+    lambda: 2.0
+    color: "#999999"
+    description: "Concrete screed (old layer)"
+  - id: PIR
+    lambda: 0.023
+    color: "#FFCC00"
+    description: "PIR insulation (WLS 023)"
+  - id: SCREED_HEATING
+    lambda: 1.4
+    color: "#CCCCCC"
+    description: "Floor heating screed"
+  - id: WOOD_FLOOR
+    lambda: 0.15
+    color: "#8B4513"
+    description: "Wood flooring (parquet/laminate)"
+  - id: STEEL
+    lambda: 50.0
+    color: "#4A4A4A"
+    description: "Steel pipe wall"
+  - id: WATER
+    lambda: 0.6
+    color: "#4A90D9"
+    description: "Cold water inside pipe"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+    description: "Interior air"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+    description: "External air (cellar, unheated)"
+
+variables:
+  # Canvas setup
+  grid_size: 2.5
+
+  # Layer thicknesses (mm)
+  t_vault: 240.0
+  t_sand: 250.0
+  t_concrete_old: 20.0
+  t_pir: 100.0
+  t_screed: 60.0
+  t_wood: 15.0
+
+  # Pipe dimensions (mm)
+  pipe_outer_d: 25.0
+  pipe_wall: 2.5
+  pipe_inner_d: 20.0
+
+  # Derived: Total floor height
+  # vault + sand + concrete + pir + screed + wood = 240+250+20+100+60+15 = 685mm
+  total_height: 685.0
+
+  # Model width: 300mm on each side of pipe center
+  model_width: 600.0
+  pipe_center_x: 300.0
+
+  # Y coordinates (from bottom up)
+  y_bottom: 0.0
+  y_vault_top: 240.0 # 0 + 240
+  y_sand_top: 490.0 # 240 + 250
+  y_concrete_top: 510.0 # 490 + 20
+  y_pir_top: 610.0 # 510 + 100
+  y_screed_top: 670.0 # 610 + 60
+  y_wood_top: 685.0 # 670 + 15
+
+  # Pipe X coords
+  pipe_left_outer: 287.5 # 300 - 12.5
+  pipe_right_outer: 312.5 # 300 + 12.5
+  pipe_left_inner: 290.0 # 300 - 10
+  pipe_right_inner: 310.0 # 300 + 10
+
+  # Air boundaries
+  air_int_height: 250.0 # 200mm pipe extension + 50mm margin
+  air_cellar_height: 50.0
+  y_top: 935.0 # 685 + 250 (interior air space)
+  pipe_top: 885.0 # 685 + 200mm extension into room
+
+# Adaptive mesh refinement around pipe penetration
+refinement_zones:
+  # Fine mesh around steel pipe walls (2.5mm thick)
+  - x_min: 270
+    x_max: 330
+    y_min: -550
+    y_max: 935
+    target_dx: 1.25
+    target_dy: 2.5
+    priority: 10
+    grading: 1.15
+
+canvas:
+  bounds: [0, 600, -550, 935]
+  grid: ${grid_size}
+
+boundary_conditions:
+  convective:
+    internal: { T: 20.0, R: 0.17 } # Floor Rsi
+    external: { T: 7.5, R: 0.17 } # Cellar (treated as external)
+    internal_check: { R: 0.25 }
+  # Note: Pipe water at ~10°C will be handled as a material with fixed temp boundary
+
+measurements:
+  surface_metrics:
+    - {
+        name: "MinT_Floor",
+        type: min,
+        boundary: internal,
+        materials: [WOOD_FLOOR, SCREED_HEATING, PIR],
+      }
+  derived:
+    - { name: "Psi", formula: psi_value }
+    - { name: "fRsi", formula: frsi }
+
+# Named points for complex shapes
+points:
+  # Pipe outer wall (left side)
+  PipeOuterL_Bottom: [287.5, 0.0]
+  PipeOuterL_Top: [287.5, 685.0]
+
+  # Pipe inner wall (left side)
+  PipeInnerL_Bottom: [290.0, 0.0]
+  PipeInnerL_Top: [290.0, 685.0]
+
+  # Pipe inner wall (right side)
+  PipeInnerR_Bottom: [310.0, 0.0]
+  PipeInnerR_Top: [310.0, 685.0]
+
+  # Pipe outer wall (right side)
+  PipeOuterR_Bottom: [312.5, 0.0]
+  PipeOuterR_Top: [312.5, 685.0]
+
+elements:
+  # === CELLAR AIR (external boundary at bottom) ===
+  - type: rect
+    name: "Cellar Air"
+    material: AIR_EXT
+    params:
+      x: 0.0
+      y: -550.0
+      width: 600.0
+      height: 550.0 # 500mm pipe extension + 50mm margin
+
+  # === BRICK VAULT (bottom layer) ===
+  # Left of pipe
+  - type: rect
+    name: "Vault Left"
+    material: BRICK
+    params:
+      x: 0.0
+      y: 0.0
+      width: 287.5
+      height: 240.0
+  # Right of pipe
+  - type: rect
+    name: "Vault Right"
+    material: BRICK
+    params:
+      x: 312.5
+      y: 0.0
+      width: 287.5
+      height: 240.0
+
+  # === SAND/GRAVEL FILL ===
+  # Left of pipe
+  - type: rect
+    name: "Sand Fill Left"
+    material: SAND_FILL
+    params:
+      x: 0.0
+      y: 240.0
+      width: 287.5
+      height: 250.0
+  # Right of pipe
+  - type: rect
+    name: "Sand Fill Right"
+    material: SAND_FILL
+    params:
+      x: 312.5
+      y: 240.0
+      width: 287.5
+      height: 250.0
+
+  # === OLD CONCRETE SCREED ===
+  # Left of pipe
+  - type: rect
+    name: "Concrete Left"
+    material: CONCRETE
+    params:
+      x: 0.0
+      y: 490.0
+      width: 287.5
+      height: 20.0
+  # Right of pipe
+  - type: rect
+    name: "Concrete Right"
+    material: CONCRETE
+    params:
+      x: 312.5
+      y: 490.0
+      width: 287.5
+      height: 20.0
+
+  # === PIR INSULATION ===
+  # Left of pipe
+  - type: rect
+    name: "PIR Left"
+    material: PIR
+    params:
+      x: 0.0
+      y: 510.0
+      width: 287.5
+      height: 100.0
+  # Right of pipe
+  - type: rect
+    name: "PIR Right"
+    material: PIR
+    params:
+      x: 312.5
+      y: 510.0
+      width: 287.5
+      height: 100.0
+
+  # === FLOOR HEATING SCREED ===
+  # Left of pipe
+  - type: rect
+    name: "Screed Left"
+    material: SCREED_HEATING
+    params:
+      x: 0.0
+      y: 610.0
+      width: 287.5
+      height: 60.0
+  # Right of pipe
+  - type: rect
+    name: "Screed Right"
+    material: SCREED_HEATING
+    params:
+      x: 312.5
+      y: 610.0
+      width: 287.5
+      height: 60.0
+
+  # === WOOD FLOORING ===
+  # Left of pipe
+  - type: rect
+    name: "Wood Left"
+    material: WOOD_FLOOR
+    params:
+      x: 0.0
+      y: 670.0
+      width: 287.5
+      height: 15.0
+  # Right of pipe
+  - type: rect
+    name: "Wood Right"
+    material: WOOD_FLOOR
+    params:
+      x: 312.5
+      y: 670.0
+      width: 287.5
+      height: 15.0
+
+  # === INTERIOR AIR (must be before pipe so pipe draws on top) ===
+  - type: rect
+    name: "Interior Air"
+    material: AIR_INT
+    params:
+      x: 0.0
+      y: 685.0
+      width: 600.0
+      height: 250.0
+
+  # === STEEL PIPE WALLS ===
+  # Left pipe wall (full height through floor + extensions)
+  - type: rect
+    name: "Pipe Wall Left"
+    material: STEEL
+    params:
+      x: 287.5
+      y: -500.0 # 500mm into cellar
+      width: 2.5
+      height: 1385.0 # -500 to 885 (total 1385mm)
+  # Right pipe wall
+  - type: rect
+    name: "Pipe Wall Right"
+    material: STEEL
+    params:
+      x: 310.0
+      y: -500.0 # 500mm into cellar
+      width: 2.5
+      height: 1385.0 # -500 to 885 (total 1385mm)
+
+  # === WATER INSIDE PIPE ===
+  # Modeled as a material (actual temp boundary would need special handling)
+  - type: rect
+    name: "Water Column"
+    material: WATER
+    params:
+      x: 290.0
+      y: -500.0 # 500mm into cellar
+      width: 20.0
+      height: 1385.0 # -500 to 885 (total 1385mm)

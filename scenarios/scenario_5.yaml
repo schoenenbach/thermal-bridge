@@ -47,14 +47,14 @@ variables:
   taper_len: 150.0
   win_pos: 150.0
   rebate_overlap: 50.0
-  
+
   # Offsets
   off_x: 50.0
   off_y: 250.0
-  
+
   # Canvas
   grid_size: 2.5
-  
+
   # Derived (Calculated by user/generator, not auto-calc in YAML yet)
   # x_wall_int = 50
   # x_wall_ext = 410 (50+360)
@@ -62,11 +62,11 @@ variables:
   x_wall_int: 50.0
   x_wall_ext: 410.0
   x_win_outer: 260.0
-  
+
   y_bottom: 0.0
   y_reveal: 250.0
   y_top: 500.0 # 250 + 250
-  
+
   # Window details
   f_depth: 70.0
   f_width: 70.0
@@ -75,12 +75,12 @@ variables:
   sash_width: 70.0
   sash_recess: 30.0
   glass_thick: 24.0
-  
+
   # Calculated window helpers
   # x_f_end = x_win_outer = 260
   # x_f_start = 260 - 70 = 190
   x_f_start: 190.0
-  
+
   # Sash coords for Air Polygon
   # y_f_end = 250 + 70 = 320
   # y_sash_start = 320 - 10 = 310
@@ -93,7 +93,7 @@ variables:
   y_sash_end: 380.0
   x_sash_start: 160.0
   x_glass_start: 183.0
-  
+
   # Reveal Shift (30mm insulation -> shift wall down by 30mm)
   reveal_shift: 30.0
   y_reveal_shifted: 220.0 # 250 - 30
@@ -104,16 +104,21 @@ canvas:
 
 boundary_conditions:
   convective:
-    internal: {T: 20.0, R: 0.13}
-    external: {T: -5.0, R: 0.04}
-    internal_check: {R: 0.25}
+    internal: { T: 20.0, R: 0.13 }
+    external: { T: -5.0, R: 0.04 }
+    internal_check: { R: 0.25 }
 
 measurements:
   surface_metrics:
-    - { name: "MinT_Wall",  type: min, boundary: internal, materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD] }
+    - {
+        name: "MinT_Wall",
+        type: min,
+        boundary: internal,
+        materials: [WALL, INSULATION, REVEAL_INS, CONCRETE, WOOD],
+      }
     - { name: "MinT_Frame", type: min, boundary: internal, materials: [FRAME] }
     - { name: "MinT_Glass", type: min, boundary: internal, materials: [GLASS] }
-  
+
   derived:
     - { name: "Psi", formula: psi_value }
     - { name: "fRsi", formula: frsi }
@@ -140,14 +145,24 @@ points:
   # x_end_bottom = 410 + 100 = 510
   # x_end_top = 510 - 20 = 490
   # y_masonry_top = 220 + 50 = 270
-  
+
   RevIns_BL: ["${x_win_outer}", 270.0]
   RevIns_BR: [510.0, 270.0]
   RevIns_TR: [490.0, 300.0] # 270 + 30
   RevIns_TL: ["${x_win_outer}", 300.0]
 
+  # Tapered Wall Insulation Points
+  # BL: x_wall_ext (410), taper_start_y (120)
+  # BR: x_wall_ext + ins_thick_max (410+200=610), taper_start_y (120)
+  # TR: x_wall_ext + ins_thick_min (410+100=510), y_ins_top (270)
+  # TL: x_wall_ext (410), y_ins_top (270)
+  InsTaper_BL: ["${x_wall_ext}", 120.0]
+  InsTaper_BR: [610.0, 120.0]
+  InsTaper_TR: [510.0, 270.0]
+  InsTaper_TL: ["${x_wall_ext}", 270.0]
+
 elements:
-  # 1. Interior Air (Define FIRST so it's background/lowest priority? 
+  # 1. Interior Air (Define FIRST so it's background/lowest priority?
   # Actually SketchGeometry renders in order, so later overrides earlier in MaterialGrid?
   # Wait, existing code uses Painter's algorithm?
   # build_material_grid initializes with AIR_EXT (0).
@@ -159,7 +174,7 @@ elements:
   - type: polygon
     name: "Interior Air Polygon"
     material: AIR_INT
-    points: 
+    points:
       - AirInt_BL
       - Wall_BL
       - Wall_TL
@@ -196,23 +211,29 @@ elements:
     params:
       x: ${x_win_outer}
       y: ${y_reveal_shifted}
-      width: 150.0 
+      width: 150.0
       height: ${rebate_overlap}
 
-  # 5. External Insulation (Main + Tapered)
-  # y_taper_start = (220+50) - 150 = 120 (since taper_len=150, Rebate Top=270)
-  # Wait: y_ins_top = y_reveal_shifted + rebate = 220 + 50 = 270
-  # y_taper_start = 270 - 150 = 120
-  - type: insulation_tapered
+  # 5. External Insulation - Main (untapered) part: WLS 035
+  # y_taper_start = 120 (see calculation below)
+  - type: rect
+    name: "Insulation_Main"
     material: INSULATION
     params:
-      x_base: ${x_wall_ext}
-      y_bottom: ${y_bottom}
-      y_top: 270.0
-      thick_main: ${ins_thick_max}
-      thick_taper: ${ins_thick_min}
-      taper_start_y: 120.0
-      
+      x: ${x_wall_ext}
+      y: ${y_bottom}
+      width: ${ins_thick_max}
+      height: 120.0 # From y_bottom (0) to taper_start_y (120)
+
+  # 5b. External Insulation - Tapered part: Same material as reveal insulation
+  # y_taper_start = (220+50) - 150 = 120 (since taper_len=150, Rebate Top=270)
+  # y_ins_top = y_reveal_shifted + rebate = 220 + 50 = 270
+  # Polygon points: BL(410,120), BR(610,120), TR(510,270), TL(410,270)
+  - type: polygon
+    name: "Insulation_Tapered"
+    material: REVEAL_INS
+    points: [InsTaper_BL, InsTaper_BR, InsTaper_TR, InsTaper_TL]
+
   # 6. Reveal Insulation (Tapered Polygon)
   - type: polygon
     name: "Reveal Insulation"
@@ -234,59 +255,59 @@ elements:
       y_top: ${y_top}
       mat_frame_lambda: 0.13
       mat_glass_lambda: 0.0325
-      
+
   # 8. Shutter Rails (Manual Rects for now)
   # ISG (53x22) at x=260, y=303 (250+53)
   # Y offset: 53.0
   # x_isg_start: 260.0
   # y_isg_start: 250 + 53 = 303
-  
+
   # Outer Alu
   - type: rect
     name: "ISG_Alu"
     material: ALUMINUM
     params:
-       x: 260.0
-       y: 303.0
-       width: 22.0
-       height: 53.0
-       
+      x: 260.0
+      y: 303.0
+      width: 22.0
+      height: 53.0
+
   # Inner Cavity (2mm wall)
   - type: rect
     name: "ISG_Air"
     material: CAVITY
     params:
-       x: 262.0
-       y: 305.0
-       width: 18.0
-       height: 49.0
-       
+      x: 262.0
+      y: 305.0
+      width: 18.0
+      height: 49.0
+
   # Seal (1mm)
   - type: rect
     name: "ISG_Seal"
     material: AIR_EXT # EPDM/Spacer
     lambda: 0.25
     params:
-       x: 282.0
-       y: 303.0
-       width: 1.0
-       height: 53.0
-       
+      x: 282.0
+      y: 303.0
+      width: 1.0
+      height: 53.0
+
   # Shutter Rail
   - type: rect
     name: "Shutter_Alu"
     material: ALUMINUM
     params:
-       x: 283.0 # 282+1
-       y: 303.0
-       width: 22.0
-       height: 53.0
-       
+      x: 283.0 # 282+1
+      y: 303.0
+      width: 22.0
+      height: 53.0
+
   - type: rect
     name: "Shutter_Air"
     material: CAVITY
     params:
-       x: 285.0
-       y: 305.0
-       width: 18.0
-       height: 49.0
+      x: 285.0
+      y: 305.0
+      width: 18.0
+      height: 49.0
