@@ -18,8 +18,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import StageCanvas from './StageCanvas';
 import ShapeFactory from './ShapeFactory';
+import HeatmapCanvas from './HeatmapCanvas';
 import { ScenarioElement } from './types';
 import { ScenariosService, SimulationService } from '../../api/client';
+import { TemperatureData } from '../../api/models';
 import { Inspector } from '../Inspector';
 import { transformElements } from './transformers';
 
@@ -288,7 +290,27 @@ const GeometryEditor: React.FC<GeometryEditorProps> = ({ filename }) => {
                                     </table>
                                 </div>
 
-                                {simResult.temperature_map_url && (
+                                {/* Temperature visualization - prefer interactive canvas */}
+                                {simResult.temperature_data ? (
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <HeatmapCanvas
+                                                temperatureData={simResult.temperature_data}
+                                                width={280}
+                                                height={180}
+                                            />
+                                            <div style={{ fontSize: '0.8em', color: '#666', marginTop: '5px' }}>
+                                                Temperature (hover to probe)
+                                            </div>
+                                        </div>
+                                        {simResult.mold_risk_map_url && (
+                                            <div style={{ textAlign: 'center' }}>
+                                                <img src={simResult.mold_risk_map_url} alt="Mold Risk" style={{ height: '180px', border: '1px solid #eee' }} />
+                                                <div style={{ fontSize: '0.8em', color: '#666' }}>Mold Risk</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : simResult.temperature_map_url && (
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <div style={{ textAlign: 'center' }}>
                                             <img src={simResult.temperature_map_url} alt="Temperature Map" style={{ height: '180px', border: '1px solid #eee' }} />

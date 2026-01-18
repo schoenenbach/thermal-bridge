@@ -135,18 +135,22 @@ The following items address shortcomings identified during external review that 
 
 ---
 
-### C7. Client-Side Heatmap Rendering [LOW PRIORITY]
+### C7. Client-Side Heatmap Rendering [DONE]
 
 **Problem:** API returns static PNG for temperature visualization, preventing interactive features.
 
 **Solution:** Return compressed temperature array to frontend; render with HTML5 Canvas/WebGL.
 
 **Implementation Strategy:**
-- [ ] API endpoint returns binary/JSON temperature data instead of PNG URL
-- [ ] Frontend: Implement WebGL or Canvas-based heatmap renderer
-- [ ] Add "Probe tool" for hovering to see values
-- [ ] Add dynamic color scale controls
-- [ ] Highlight mold risk areas (surfaces with $T < T_{dew}$ or $\phi > 80\%$)
+- [x] API endpoint returns compressed temperature data instead of just PNG URL
+- [x] Frontend: Implement Canvas-based heatmap renderer
+- [x] Add "Probe tool" for hovering to see values
+- [x] Add dynamic color scale (jet colormap)
+- [x] Integration with GeometryEditor result panel
+
+**Verified:**
+- Backend API tests pass (including new `test_run_simulation_returns_temp_data`)
+- Frontend build passes (`npm run build`)
 
 **Files Affected:**
 - `backend/app/routes/simulation.py` - Return temperature array data

@@ -28,16 +28,56 @@ from backend.app.models import (
     SimulationRequest,
     SimulationResult,
     SimulationMetrics,
+    TemperatureData,
     OptimizationRequest,
     OptimizationResult,
     OptimizationPoint,
 )
+import numpy as np
 
 router = APIRouter()
 
 # Results storage directory
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def compress_temperature_data(temp_array: np.ndarray, canvas_width: float, 
+                               canvas_height: float, max_resolution: int = 200) -> TemperatureData:
+    """
+    Downsample and compress temperature array for frontend rendering.
+    
+    Args:
+        temp_array: 2D numpy array of temperatures
+        canvas_width: Canvas width in mm
+        canvas_height: Canvas height in mm
+        max_resolution: Maximum grid dimension (larger grids are downsampled)
+    
+    Returns:
+        TemperatureData model ready for JSON serialization
+    """
+    rows, cols = temp_array.shape
+    
+    # Downsample if too large
+    if max(rows, cols) > max_resolution:
+        step_r = max(1, rows // max_resolution)
+        step_c = max(1, cols // max_resolution)
+        downsampled = temp_array[::step_r, ::step_c]
+    else:
+        downsampled = temp_array
+    
+    # Round to 2 decimal places to reduce JSON size
+    data = np.round(downsampled, 2).tolist()
+    
+    return TemperatureData(
+        data=data,
+        width=float(canvas_width),
+        height=float(canvas_height),
+        temp_min=float(np.min(temp_array)),
+        temp_max=float(np.max(temp_array)),
+        rows=len(data),
+        cols=len(data[0]) if data else 0
+    )
 
 
 @router.post("/run", response_model=SimulationResult)
@@ -80,12 +120,24 @@ async def run_simulation(request: SimulationRequest):
             computation_time_ms=elapsed_ms
         )
         
+        # Prepare temperature data for client-side rendering
+        temp_data = None
+        if 'temp' in results and results['temp'] is not None:
+            canvas = scenario.get('canvas', {})
+            bounds = canvas.get('bounds', [0, 500, 0, 500])
+            canvas_width = bounds[1] - bounds[0]
+            canvas_height = bounds[3] - bounds[2]
+            temp_data = compress_temperature_data(
+                results['temp'], canvas_width, canvas_height
+            )
+        
         return SimulationResult(
             success=True,
             metrics=metrics,
             temperature_map_url=results.get('temperature_map'),
             geometry_map_url=results.get('geometry_map'),
             mold_risk_map_url=results.get('mold_map') if request.mold_analysis else None,
+            temperature_data=temp_data,
             measurements=results.get('measurements', {})
         )
         
@@ -213,12 +265,24 @@ async def _run_simulation_task(job_id: str, request: SimulationRequest):
             computation_time_ms=elapsed_ms
         )
         
+        # Prepare temperature data for client-side rendering
+        temp_data = None
+        if 'temp' in results and results['temp'] is not None:
+            canvas = scenario.get('canvas', {})
+            bounds = canvas.get('bounds', [0, 500, 0, 500])
+            canvas_width = bounds[1] - bounds[0]
+            canvas_height = bounds[3] - bounds[2]
+            temp_data = compress_temperature_data(
+                results['temp'], canvas_width, canvas_height
+            )
+        
         final_result = SimulationResult(
             success=True,
             metrics=metrics,
             temperature_map_url=results.get('temperature_map'),
             geometry_map_url=results.get('geometry_map'),
             mold_risk_map_url=results.get('mold_map') if request.mold_analysis else None,
+            temperature_data=temp_data,
             measurements=results.get('measurements', {})
         )
         

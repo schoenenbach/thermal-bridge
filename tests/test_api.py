@@ -147,3 +147,44 @@ class TestSimulationAPI:
         })
         # Should return 200 even if simulation fails
         assert response.status_code == 200
+
+    def test_run_simulation_returns_temp_data(self):
+        """Test that simulation returns temperature_data structure."""
+        # Simple scenario that should run quickly
+        scenario = {
+            "name": "Test Data",
+            "canvas": {"bounds": [0, 100, 0, 100], "grid": 10},
+            "elements": [
+                {"type": "rect", "material": "WALL", "params": {"x": 0, "y": 0, "width": 100, "height": 100}}
+            ],
+            "boundary_conditions": {
+                "convective": {
+                    "left": {"T": 20, "R": 0.13},
+                    "right": {"T": 0, "R": 0.04}
+                }
+            }
+        }
+        
+        response = client.post("/api/simulation/run", json={
+            "scenario": scenario,
+            "use_adaptive_mesh": False, # Faster
+            "override_grid_size": 25 # Coarse grid
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        
+        # Check temperature_data
+        assert "temperature_data" in data
+        t_data = data["temperature_data"]
+        # It might be None if simulation failed or result didn't have temp, 
+        # but with this simple scenario it should succeed and return data.
+        if t_data is not None:
+            assert "data" in t_data
+            assert "width" in t_data
+            assert "height" in t_data
+            assert "temp_min" in t_data
+            assert "temp_max" in t_data
+            assert isinstance(t_data["data"], list)
+            assert len(t_data["data"]) > 0

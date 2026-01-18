@@ -50,6 +50,16 @@ export interface MaterialInfo {
     source?: string;
 }
 
+export interface TemperatureData {
+    data: number[][];
+    width: number;
+    height: number;
+    temp_min: number;
+    temp_max: number;
+    rows: number;
+    cols: number;
+}
+
 export interface ScenarioDetail {
     filename: string;
     yaml_content: string;

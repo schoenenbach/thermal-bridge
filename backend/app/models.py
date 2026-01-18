@@ -98,6 +98,17 @@ class SimulationMetrics(BaseModel):
     computation_time_ms: Optional[float] = None
 
 
+class TemperatureData(BaseModel):
+    """Compressed temperature array for client-side rendering."""
+    data: List[List[float]]  # 2D temperature grid (downsampled)
+    width: float             # Canvas width in mm
+    height: float            # Canvas height in mm
+    temp_min: float          # Min temperature for color scale
+    temp_max: float          # Max temperature for color scale
+    rows: int                # Number of rows in data
+    cols: int                # Number of columns in data
+
+
 class SimulationResult(BaseModel):
     """Result of a simulation run."""
     success: bool
@@ -106,6 +117,7 @@ class SimulationResult(BaseModel):
     temperature_map_url: Optional[str] = None
     geometry_map_url: Optional[str] = None
     mold_risk_map_url: Optional[str] = None
+    temperature_data: Optional[TemperatureData] = None  # For client-side rendering
     measurements: Dict[str, Any] = Field(default_factory=dict)
 
 
