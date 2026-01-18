@@ -297,6 +297,10 @@ class ConvectiveBCParams(BaseModel):
 
 class BoundaryConditions(BaseModel):
     """Boundary conditions for the simulation."""
+    room_type: Optional[str] = Field(
+        None, 
+        description="Room profile ID (e.g., 'living_room', 'bathroom'). Auto-populates convective BCs."
+    )
     dirichlet: Dict[str, float] = Field(default_factory=dict, description="Fixed temperature BCs")
     adiabatic: List[str] = Field(default_factory=list, description="Adiabatic boundary names")
     convective: Dict[str, Union[ConvectiveBCParams, Dict[str, float]]] = Field(

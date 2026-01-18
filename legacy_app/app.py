@@ -35,6 +35,7 @@ from backend.core.geometry_builder import generate_scenario, COLOR_MAP, scenario
 
 from streamlit_drawable_canvas import st_canvas
 from backend.core.mold_analysis import calculate_surface_humidity, plot_mold_risk_map
+from library.room_profile_registry import RoomProfileRegistry
 
 # ... (Previous imports)
 
@@ -317,6 +318,40 @@ with tab_studio:
                                            help="Set > 0 to override YAML grid size. Larger = Faster, Less Accurate.")
             
         with st.expander("🌡️ Simulation Settings", expanded=True):
+             # Room Type Selector (auto-populates boundary conditions)
+             room_registry = RoomProfileRegistry.get()
+             room_profiles = room_registry.list_all()
+             room_options = ["(Manual)"] + [p.name for p in room_profiles]
+             
+             selected_room = st.selectbox(
+                 "Room Type", 
+                 room_options, 
+                 key="room_type_selector",
+                 help="Select room type to auto-populate boundary conditions"
+             )
+             
+             # Show profile info if selected
+             if selected_room != "(Manual)":
+                 profile = room_registry.get_by_name(selected_room)
+                 if profile:
+                     st.info(f"📊 T={profile.temperature}°C, RH={profile.relative_humidity*100:.0f}%, Class {profile.humidity_class}")
+                     
+                     # Auto-populate boundary conditions in active_data
+                     if active_data:
+                         profile_bc = room_registry.get_boundary_conditions(profile.id)
+                         if 'boundary_conditions' not in active_data:
+                             active_data['boundary_conditions'] = {}
+                         # Merge profile BCs (user explicit values override later if needed)
+                         if 'convective' not in active_data['boundary_conditions']:
+                             active_data['boundary_conditions']['convective'] = {}
+                         if 'internal' not in active_data['boundary_conditions']['convective']:
+                             active_data['boundary_conditions']['convective']['internal'] = profile_bc['convective']['internal']
+                         
+                         # Also update indoor_rh for mold analysis
+                         indoor_rh = int(profile.relative_humidity * 100)
+             
+             st.markdown("---")
+             
              # Transient
              transient_enabled = st.checkbox("Enable Transient Simulation", value=active_data.get('transient', {}).get('enabled', False) if active_data else False, key="transient_enable_chk")
              

@@ -290,16 +290,30 @@ uvicorn api.main:app --reload
     *   **Isopleth Diagram:** T/RH scatter plot with LIM (Lowest Isopleth for Mould) curves.
     *   **Mould Index History:** Time-series chart of index evolution (0-6 scale).
 
-## 16. Usage Scenarios & Room Classes [PLANNED]
+## 16. Usage Scenarios & Room Classes [DONE]
 
 **Objective:** Simplify boundary condition setup by providing standard room profiles.
 
-**Implementation Strategy:**
-*   **Room Directory:** Define presets for "Bedroom", "Living Room", "Bathroom", "Kitchen".
-*   **Boundary Conditions:**
-    *   Map room types to specific Temperature and Humidity profiles (DIN 4108 / EN 15026).
-    *   Support daily cycles (e.g., bathroom peaks, bedroom night moisture).
-*   **UI Integration:** Dropdown to select "Room Type" which auto-populates BCs.
+**Completed Tasks:**
+- [x] **Room Profile Registry**: `library/room_profile_registry.py` (singleton pattern)
+- [x] **Profile Data**: `library/room_profiles/room_profiles.json` with 8 presets
+    - Living Room, Bedroom, Bathroom, Kitchen, Office, Warehouse, Swimming Pool, Laundry
+    - T/RH values per DIN 4108-2 / EN ISO 13788
+    - Humidity classes 1-5 per ISO 13788 Table 2
+- [x] **Schema Update**: Added `room_type` field to `BoundaryConditions` in `scenario_schema.py`
+- [x] **Streamlit UI**: Room Type dropdown in Inspector panel
+- [x] **Unit Tests**: 15 tests in `tests/test_room_profiles.py`
+
+**Files Added:**
+- `library/room_profiles/room_profiles.json` - Room profile presets
+- `library/room_profile_registry.py` - Registry singleton
+- `tests/test_room_profiles.py` - Unit tests
+
+**Run Tests:**
+```bash
+python3 -m pytest tests/test_room_profiles.py -v
+```
+
 
 ## 17. Extended Validation & Benchmarks [DONE]
 

@@ -193,6 +193,21 @@ boundary_conditions:
 ### Visualizing Results
 The output plots will display the actual temperatures used (`Ti` and `Te`) in the title, allowing you to instantly verify if your overrides were applied correctly. Note that metric results like **fRsi** and **Psi-value** are generally invariant to the absolute temperature difference, so check absolute temperatures (e.g., `MinT`) to confirm changes.
 
+### Room Profiles (Presets)
+Instead of manually specifying temperatures, you can select a **Room Type** from the Inspector panel:
+
+| Room Type | Temperature | RH | Humidity Class |
+|-----------|------------|-----|----------------|
+| Living Room | 20°C | 50% | 3 |
+| Bedroom | 18°C | 50% | 3 |
+| Bathroom | 24°C | 70% | 4 |
+| Kitchen | 20°C | 65% | 4 |
+| Office | 20°C | 45% | 2 |
+| Warehouse | 15°C | 40% | 1 |
+
+Values follow **DIN 4108-2** and **EN ISO 13788**. Humidity classes (1-5) are per ISO 13788 Table 2.
+
+
 ## Project Structure
 
 -   `simulation_engine.py`: Main entry point for running window simulations.

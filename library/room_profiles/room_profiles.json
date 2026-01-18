@@ -1,0 +1,98 @@
+[
+    {
+        "id": "living_room",
+        "name": "Living Room (Standard)",
+        "category": "Residential",
+        "temperature": 20.0,
+        "relative_humidity": 0.50,
+        "humidity_class": 3,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Standard living space with normal occupancy (DIN 4108-2: Wohnzimmer, Schlafzimmer, Flur)",
+        "source": "DIN 4108-2 / EN ISO 13788"
+    },
+    {
+        "id": "bedroom",
+        "name": "Bedroom",
+        "category": "Residential",
+        "temperature": 18.0,
+        "relative_humidity": 0.50,
+        "humidity_class": 3,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Sleeping area with reduced heating, normal moisture production",
+        "source": "DIN 4108-2 / EN ISO 13788"
+    },
+    {
+        "id": "bathroom",
+        "name": "Bathroom (High Humidity)",
+        "category": "Residential - High Humidity",
+        "temperature": 24.0,
+        "relative_humidity": 0.70,
+        "humidity_class": 4,
+        "surface_resistance_int": 0.10,
+        "surface_resistance_ext": 0.04,
+        "description": "High humidity zone with frequent moisture generation (showering, bathing)",
+        "source": "DIN 4108-2 / EN ISO 13788"
+    },
+    {
+        "id": "kitchen",
+        "name": "Kitchen",
+        "category": "Residential - High Humidity",
+        "temperature": 20.0,
+        "relative_humidity": 0.65,
+        "humidity_class": 4,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Cooking area with elevated moisture from steam and dishwashing",
+        "source": "DIN 4108-2 / EN ISO 13788"
+    },
+    {
+        "id": "office",
+        "name": "Office / Commercial",
+        "category": "Commercial",
+        "temperature": 20.0,
+        "relative_humidity": 0.45,
+        "humidity_class": 2,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Office or shop environment with controlled ventilation, low moisture production",
+        "source": "EN ISO 13788 Table 2"
+    },
+    {
+        "id": "warehouse",
+        "name": "Storage / Warehouse",
+        "category": "Industrial",
+        "temperature": 15.0,
+        "relative_humidity": 0.40,
+        "humidity_class": 1,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Storage building with minimal occupancy and low moisture production",
+        "source": "EN ISO 13788 Table 2"
+    },
+    {
+        "id": "swimming_pool",
+        "name": "Swimming Pool / Spa",
+        "category": "Special - Very High Humidity",
+        "temperature": 28.0,
+        "relative_humidity": 0.80,
+        "humidity_class": 5,
+        "surface_resistance_int": 0.10,
+        "surface_resistance_ext": 0.04,
+        "description": "Indoor pool or spa with very high moisture generation (requires vapor barriers)",
+        "source": "EN ISO 13788 Table 2"
+    },
+    {
+        "id": "laundry",
+        "name": "Laundry Room",
+        "category": "Residential - High Humidity",
+        "temperature": 20.0,
+        "relative_humidity": 0.70,
+        "humidity_class": 5,
+        "surface_resistance_int": 0.13,
+        "surface_resistance_ext": 0.04,
+        "description": "Laundry with drying clothes and washing machine moisture",
+        "source": "EN ISO 13788 / DIN 4108-2"
+    }
+]
