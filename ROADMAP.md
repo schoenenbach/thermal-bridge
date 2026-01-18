@@ -27,22 +27,26 @@ The following items address shortcomings identified during external review that 
 
 ---
 
-### C2. Refactor Boundary Condition Assembly [HIGH PRIORITY]
+### C2. Refactor Boundary Condition Assembly [DONE]
 
-**Problem:** Surface resistance ($R_{si}$, $R_{se}$) application is currently hardcoded in `run_iso_tests.py` (test script), not in the core solver. This means general user scenarios cannot properly apply boundary conditions.
+**Problem:** Surface resistance ($R_{si}$, $R_{se}$) application was previously hardcoded in `run_iso_tests.py` (test script), not in the core solver. This meant general user scenarios could not properly apply boundary conditions.
 
-**Solution:** Move boundary condition assembly into `mesh.py` or a dedicated `boundary.py` module.
+**Solution:** Created dedicated `boundary.py` module with centralized boundary condition assembly logic.
 
-**Implementation Strategy:**
-- [ ] Create boundary condition detection in mesh layer (identify boundary cells)
-- [ ] Apply film coefficient ($h = 1/R$) to conductance matrix during assembly
-- [ ] Support interior ($R_{si}$) and exterior ($R_{se}$) surfaces per ISO standards
-- [ ] Remove manual patches from `run_iso_tests.py`
-- [ ] Validate: ISO 10211 Cases must pass using core logic only
+**Completed Tasks:**
+- [x] Create `BoundaryConditionAssembler` class with interface detection and film coefficient application
+- [x] Implement `apply_film_coefficients()` for surface resistance application per ISO 10211
+- [x] Implement `pad_domain_for_convective_bc()` for convective BC support
+- [x] Refactor `simulation_engine.py` to use new boundary module (removed 80-line inline function)
+- [x] Add 12 unit tests in `tests/test_boundary.py`
+- [x] Validate: ISO 10211 Cases 1 & 2 pass with refactored code
 
-**Files Affected:**
-- `backend/core/mesh.py` - Add boundary detection and BC assembly
-- `backend/core/run_iso_tests.py` - Remove manual conductance patches (lines 315-329)
+**Files Added:**
+- `backend/core/boundary.py` - Centralized boundary condition module
+- `tests/test_boundary.py` - Unit tests (12 tests)
+
+**Files Changed:**
+- `backend/core/simulation_engine.py` - Uses `apply_film_coefficients()` from boundary module
 
 ---
 

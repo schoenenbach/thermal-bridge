@@ -35,6 +35,12 @@ from backend.core.geometry import build_material_grid, build_transient_grid, Mat
 from backend.core.mesh import UniformMesh, AdaptiveMesh
 from backend.core.solver import get_solver_lib, solve, solve_transient, calculate_conductances_uniform, plot_temperature_map, plot_geometry
 from backend.core.declarative_geometry import DeclarativeGeometry
+from backend.core.boundary import (
+    BoundaryConditionAssembler,
+    apply_film_coefficients,
+    pad_domain_for_convective_bc,
+    apply_convective_boundary_conductances,
+)
 import yaml
 
 # --- Scenarios ---
@@ -585,95 +591,21 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None,
         # Left/Right boundaries (if needed in future)
         # For now ISO Case 2 only uses top/bottom
     
-    # Correction for Anisotropic Mesh at Boundaries
-    def apply_boundary_conductances(Gh, Gv, rsi, mask_air):
-
-        # Horizontal Interfaces: (i, j) connects j and j+1
-        # 1. Air at Left (j), Solid at Right (j+1)
-        # mask is (ny, nx), Gh is (ny, nx) [last col unused usually or periodic]
-        # We perform vectorized update.
-        
-        # Use padded arrays from local scope
-        dx_m = dx_array / 1000.0
-        dy_m = dy_array / 1000.0
-        
-        # --- Horizontal ---
-        # Find interfaces
-        is_air = mask_air
-        is_solid = (~mask_air) & (grid_map != MaterialID.AIR_EXT) & (grid_map != MaterialID.AIR_INT)
-        
-        # Left Air, Right Solid
-        # shift solid mask to left to align with Gh index (which is "left" of the link)
-        # link (j) connects j and j+1.
-        # IF is_air[:, :-1] AND is_solid[:, 1:]
-        mask_lr = is_air[:, :-1] & is_solid[:, 1:]
-        
-        if np.any(mask_lr):
-            # For these links, resistance is R_solid_half + RSI
-            # Solid is at right (j+1)
-            # We need k_solid and dx_solid from j+1
-            # k is in cond.
-            
-            # Indices
-            y_idx, x_idx = np.where(mask_lr)
-            # x_idx corresponds to j. j+1 is solid.
-            
-            k_s = cond[y_idx, x_idx + 1]
-            dx_s = dx_m[x_idx + 1]
-            dy = dy_m[y_idx]
-            
-            # G = Area / R_tot = dy / (dx_s/(2*k_s) + RSI)
-            Gh_new = dy / ( (dx_s / (2*k_s)) + rsi )
-            Gh[y_idx, x_idx] = Gh_new
-
-        # Left Solid, Right Air
-        # IF is_solid[:, :-1] AND is_air[:, 1:]
-        mask_rl = is_solid[:, :-1] & is_air[:, 1:]
-        
-        if np.any(mask_rl):
-            # Solid is at left (j)
-            y_idx, x_idx = np.where(mask_rl)
-            k_s = cond[y_idx, x_idx]
-            dx_s = dx_m[x_idx]
-            dy = dy_m[y_idx]
-            
-            Gh_new = dy / ( (dx_s / (2*k_s)) + rsi )
-            Gh[y_idx, x_idx] = Gh_new
-            
-        # --- Vertical ---
-        # Vertical Interfaces: (i, j) connects i and i+1
-        # Top Air (i), Bottom Solid (i+1)
-        
-        # Top Air, Bottom Solid
-        mask_ud = is_air[:-1, :] & is_solid[1:, :]
-        if np.any(mask_ud):
-            y_idx, x_idx = np.where(mask_ud)
-            # Solid is i+1
-            k_s = cond[y_idx + 1, x_idx]
-            dy_s = dy_m[y_idx + 1]
-            dx = dx_m[x_idx]
-            
-            # G = Area / R_tot = dx / (dy_s/(2*k_s) + RSI)
-            Gv_new = dx / ( (dy_s / (2*k_s)) + rsi )
-            Gv[y_idx, x_idx] = Gv_new
-            
-        # Top Solid, Bottom Air
-        mask_du = is_solid[:-1, :] & is_air[1:, :]
-        if np.any(mask_du):
-            y_idx, x_idx = np.where(mask_du)
-            # Solid is i
-            k_s = cond[y_idx, x_idx]
-            dy_s = dy_m[y_idx]
-            dx = dx_m[x_idx]
-            
-            Gv_new = dx / ( (dy_s / (2*k_s)) + rsi )
-            Gv[y_idx, x_idx] = Gv_new
-            
-    # Apply corrections for Interior and Exterior
+    # Apply surface resistance corrections for air-solid interfaces
+    # Uses the new boundary module for centralized BC logic
     # Skip if we have padding - explicit conductances already set above
     if not has_padding:
-        apply_boundary_conductances(Gh, Gv, rsi_design, mask_int)
-        apply_boundary_conductances(Gh, Gv, rse, mask_ext)
+        surface_resistances = {
+            MaterialID.AIR_INT: rsi_design,
+            MaterialID.AIR_EXT: rse,
+        }
+        apply_film_coefficients(
+            Gh, Gv,
+            grid_map, cond,
+            dx_array, dy_array,
+            surface_resistances
+        )
+
 
     
     # 5. Solve (Pass 1: Rsi=0.13 for Psi)
@@ -823,9 +755,17 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None,
         
         Gh_frsi, Gv_frsi = calculate_conductances(cond_frsi, dx_array, dy_array)
         
-        # Corrections
-        apply_boundary_conductances(Gh_frsi, Gv_frsi, rsi_check, mask_int)
-        apply_boundary_conductances(Gh_frsi, Gv_frsi, rse, mask_ext)
+        # Apply surface resistance corrections using boundary module
+        surface_resistances_frsi = {
+            MaterialID.AIR_INT: rsi_check,
+            MaterialID.AIR_EXT: rse,
+        }
+        apply_film_coefficients(
+            Gh_frsi, Gv_frsi,
+            grid_map, cond_frsi,
+            dx_array, dy_array,
+            surface_resistances_frsi
+        )
         
         print(f"  [PASS 2] Solving for fRsi/MinT (Rsi={rsi_check})...")
         
