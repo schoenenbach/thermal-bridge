@@ -16,6 +16,10 @@
  */
 
 import React from 'react';
+import Box from '@mui/material/Box';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Typography from '@mui/material/Typography';
 
 interface SimulationSettingsProps {
     transientEnabled: boolean;
@@ -31,37 +35,48 @@ export const SimulationSettings: React.FC<SimulationSettingsProps> = ({
     onMoldAnalysisChange
 }) => {
     return (
-        <div className="inspector-section">
-            <h4>🌡️ Simulation Settings</h4>
-            <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center' }}>
-                    <input
-                        type="checkbox"
+        <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                🌡️ Simulation Settings
+            </Typography>
+
+            <FormControlLabel
+                control={
+                    <Checkbox
                         checked={transientEnabled}
                         onChange={(e) => onTransientChange(e.target.checked)}
-                        style={{ marginRight: '8px' }}
+                        size="small"
                     />
-                    Transient Simulation
-                </label>
-                <small style={{ color: '#666', display: 'block', marginLeft: '20px' }}>
-                    Time-dependent heat flow.
-                </small>
-            </div>
+                }
+                label={
+                    <Box>
+                        <Typography variant="body2">Transient Simulation</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            Time-dependent heat flow.
+                        </Typography>
+                    </Box>
+                }
+                sx={{ alignItems: 'flex-start', mb: 1 }}
+            />
 
-            <div className="inspector-field">
-                <label style={{ display: 'flex', alignItems: 'center' }}>
-                    <input
-                        type="checkbox"
+            <FormControlLabel
+                control={
+                    <Checkbox
                         checked={moldAnalysisEnabled}
                         onChange={(e) => onMoldAnalysisChange(e.target.checked)}
-                        style={{ marginRight: '8px' }}
+                        size="small"
                     />
-                    Mold Analysis
-                </label>
-                <small style={{ color: '#666', display: 'block', marginLeft: '20px' }}>
-                    ISO 13788 risk check.
-                </small>
-            </div>
-        </div>
+                }
+                label={
+                    <Box>
+                        <Typography variant="body2">Mold Analysis</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            ISO 13788 risk check.
+                        </Typography>
+                    </Box>
+                }
+                sx={{ alignItems: 'flex-start' }}
+            />
+        </Box>
     );
 };

@@ -16,6 +16,10 @@
  */
 
 import React from 'react';
+import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import InputAdornment from '@mui/material/InputAdornment';
 
 interface GlobalSettingsProps {
     gridSize: number;
@@ -24,22 +28,22 @@ interface GlobalSettingsProps {
 
 export const GlobalSettings: React.FC<GlobalSettingsProps> = ({ gridSize, onGridSizeChange }) => {
     return (
-        <div className="inspector-section">
-            <h4>⚙️ Settings</h4>
-            <div className="inspector-field">
-                <label>Grid Size (mm)</label>
-                <input
-                    type="number"
-                    value={gridSize}
-                    onChange={(e) => onGridSizeChange(parseFloat(e.target.value) || 0)}
-                    step="0.5"
-                    min="0"
-                    style={{ width: '100%' }}
-                />
-                <small style={{ color: '#666', fontSize: '0.8em' }}>
-                    Set {'>'} 0 to override YAML grid.
-                </small>
-            </div>
-        </div>
+        <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                ⚙️ Settings
+            </Typography>
+            <TextField
+                fullWidth
+                label="Grid Size"
+                type="number"
+                value={gridSize}
+                onChange={(e) => onGridSizeChange(parseFloat(e.target.value) || 0)}
+                inputProps={{ step: 0.5, min: 0 }}
+                InputProps={{
+                    endAdornment: <InputAdornment position="end">mm</InputAdornment>,
+                }}
+                helperText="Set > 0 to override YAML grid."
+            />
+        </Box>
     );
 };

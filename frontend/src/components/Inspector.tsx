@@ -16,6 +16,17 @@
  */
 
 import React from 'react';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import Divider from '@mui/material/Divider';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InputAdornment from '@mui/material/InputAdornment';
+
 import { GlobalSettings } from './inspector/GlobalSettings';
 import { SimulationSettings } from './inspector/SimulationSettings';
 import { VariableEditor } from './inspector/VariableEditor';
@@ -64,117 +75,147 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
 
     return (
-        <div style={{
-            width: '300px',
-            padding: '15px',
-            borderLeft: '1px solid #ddd',
-            backgroundColor: '#f9f9f9',
-            height: '100vh',
-            overflowY: 'auto'
-        }}>
-            <h3 style={{ marginTop: 0 }}>🔍 Inspector</h3>
+        <Paper
+            elevation={0}
+            sx={{
+                width: 320,
+                height: '100%',
+                borderLeft: 1,
+                borderColor: 'divider',
+                overflowY: 'auto',
+                backgroundColor: 'background.default',
+            }}
+        >
+            <Box sx={{ p: 2 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    🔍 Inspector
+                </Typography>
 
-            <GlobalSettings
-                gridSize={gridSize}
-                onGridSizeChange={onGridSizeChange}
-            />
+                {/* Simulation Controls - Always visible at top */}
+                <SimulationControls
+                    onRun={onRunSimulation}
+                    isRunning={isSimulationRunning}
+                    progress={simulationProgress}
+                    statusMessage={simulationStatus}
+                />
 
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #eee' }} />
+                <Divider sx={{ my: 2 }} />
 
-            <SimulationControls
-                onRun={onRunSimulation}
-                isRunning={isSimulationRunning}
-                progress={simulationProgress}
-                statusMessage={simulationStatus}
-            />
+                {/* Collapsible Sections */}
+                <Accordion defaultExpanded disableGutters elevation={0}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="subtitle2">Grid Settings</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <GlobalSettings
+                            gridSize={gridSize}
+                            onGridSizeChange={onGridSizeChange}
+                        />
+                    </AccordionDetails>
+                </Accordion>
 
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #eee' }} />
+                <Accordion defaultExpanded disableGutters elevation={0}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="subtitle2">Simulation Options</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <SimulationSettings
+                            transientEnabled={transientEnabled}
+                            onTransientChange={onTransientChange}
+                            moldAnalysisEnabled={moldAnalysisEnabled}
+                            onMoldAnalysisChange={onMoldAnalysisChange}
+                        />
+                    </AccordionDetails>
+                </Accordion>
 
-            <SimulationSettings
-                transientEnabled={transientEnabled}
-                onTransientChange={onTransientChange}
-                moldAnalysisEnabled={moldAnalysisEnabled}
-                onMoldAnalysisChange={onMoldAnalysisChange}
-            />
+                <Accordion disableGutters elevation={0}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="subtitle2">Variables</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <VariableEditor
+                            variables={variables}
+                            onUpdateVariable={onUpdateVariable}
+                            onAddVariable={onAddVariable}
+                        />
+                    </AccordionDetails>
+                </Accordion>
 
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #eee' }} />
+                <Accordion defaultExpanded disableGutters elevation={0}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="subtitle2">Element Properties</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        {selectedElement && selectedElement.id ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">ID</Typography>
+                                    <Typography variant="body2">{selectedElement.id}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Type</Typography>
+                                    <Typography variant="body2">{selectedElement.type}</Typography>
+                                </Box>
 
-            <VariableEditor
-                variables={variables}
-                onUpdateVariable={onUpdateVariable}
-                onAddVariable={onAddVariable}
-            />
+                                <TextField
+                                    label="Material"
+                                    value={selectedElement.material || ""}
+                                    onChange={(e) => handleUpdate({ material: e.target.value })}
+                                    fullWidth
+                                />
 
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #eee' }} />
+                                <TextField
+                                    label="X"
+                                    type="number"
+                                    value={selectedElement.simX ?? selectedElement.x}
+                                    onChange={(e) => handleUpdate({ simX: parseFloat(e.target.value), x: parseFloat(e.target.value) })}
+                                    InputProps={{
+                                        endAdornment: <InputAdornment position="end">mm</InputAdornment>,
+                                    }}
+                                    fullWidth
+                                />
 
-            <div className="inspector-section">
-                <h4>Element Properties</h4>
-                {selectedElement && selectedElement.id ? (
-                    <div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <strong>ID:</strong> {selectedElement.id}
-                        </div>
-                        <div style={{ marginBottom: '10px' }}>
-                            <strong>Type:</strong> {selectedElement.type}
-                        </div>
+                                <TextField
+                                    label="Y"
+                                    type="number"
+                                    value={selectedElement.simY ?? selectedElement.y}
+                                    onChange={(e) => handleUpdate({ simY: parseFloat(e.target.value), y: parseFloat(e.target.value) })}
+                                    InputProps={{
+                                        endAdornment: <InputAdornment position="end">mm</InputAdornment>,
+                                    }}
+                                    fullWidth
+                                />
 
-                        {/* Material Selection - TODO: Fetch from API */}
-                        <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Material</label>
-                            <input
-                                type="text"
-                                value={selectedElement.material || ""}
-                                onChange={(e) => handleUpdate({ material: e.target.value })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
+                                <TextField
+                                    label="Width"
+                                    type="number"
+                                    value={selectedElement.width}
+                                    onChange={(e) => handleUpdate({ width: parseFloat(e.target.value) })}
+                                    InputProps={{
+                                        endAdornment: <InputAdornment position="end">mm</InputAdornment>,
+                                    }}
+                                    fullWidth
+                                />
 
-                        <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>X (mm)</label>
-                            <input
-                                type="number"
-                                value={selectedElement.simX ?? selectedElement.x}
-                                onChange={(e) => handleUpdate({ simX: parseFloat(e.target.value), x: parseFloat(e.target.value) })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-
-                        <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Y (mm)</label>
-                            <input
-                                type="number"
-                                value={selectedElement.simY ?? selectedElement.y}
-                                onChange={(e) => handleUpdate({ simY: parseFloat(e.target.value), y: parseFloat(e.target.value) })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-
-                        <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Width (mm)</label>
-                            <input
-                                type="number"
-                                value={selectedElement.width}
-                                onChange={(e) => handleUpdate({ width: parseFloat(e.target.value) })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-
-                        <div className="inspector-field" style={{ marginBottom: '10px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Height (mm)</label>
-                            <input
-                                type="number"
-                                value={selectedElement.height}
-                                onChange={(e) => handleUpdate({ height: parseFloat(e.target.value) })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-                    </div>
-                ) : (
-                    <div style={{ color: '#888', fontStyle: 'italic' }}>
-                        Select an element to view properties.
-                    </div>
-                )}
-            </div>
-        </div>
+                                <TextField
+                                    label="Height"
+                                    type="number"
+                                    value={selectedElement.height}
+                                    onChange={(e) => handleUpdate({ height: parseFloat(e.target.value) })}
+                                    InputProps={{
+                                        endAdornment: <InputAdornment position="end">mm</InputAdornment>,
+                                    }}
+                                    fullWidth
+                                />
+                            </Box>
+                        ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                Select an element to view properties.
+                            </Typography>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
+            </Box>
+        </Paper>
     );
 };

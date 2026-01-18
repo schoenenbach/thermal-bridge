@@ -16,7 +16,17 @@
  */
 
 import React, { useState } from 'react';
-import './App.css';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Container from '@mui/material/Container';
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
+
+import theme from './theme';
 import { ScenarioList } from './components/ScenarioList';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import GeometryEditor from './components/editor/GeometryEditor';
@@ -32,7 +42,7 @@ function App() {
 
   const handleBack = () => {
     if (view === 'editor') {
-      setView('detail'); // Back to detail from editor
+      setView('detail');
     } else {
       setSelectedScenario(null);
       setView('list');
@@ -44,42 +54,60 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header className="App-header" style={{
-        backgroundColor: '#282c34',
-        minHeight: '60px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 'calc(10px + 2vmin)',
-        color: 'white',
-        padding: '20px'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>Thermal Bridge Simulator</h1>
-        <p style={{ margin: '5px 0 0', fontSize: '14px', opacity: 0.8 }}>Frontend Migration (Phase 3A)</p>
-      </header>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <AppBar position="static" sx={{ backgroundColor: '#282c34' }}>
+          <Toolbar>
+            {view !== 'list' && (
+              <Button
+                color="inherit"
+                startIcon={<ArrowBackIcon />}
+                onClick={handleBack}
+                sx={{ mr: 2 }}
+              >
+                Back
+              </Button>
+            )}
+            <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
+              Thermal Bridge Simulator
+            </Typography>
+            {view === 'detail' && (
+              <Button
+                color="inherit"
+                startIcon={<EditIcon />}
+                onClick={handleOpenEditor}
+              >
+                Open Editor
+              </Button>
+            )}
+          </Toolbar>
+        </AppBar>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', height: 'calc(100vh - 100px)' }}>
-        {view === 'list' && (
-          <ScenarioList onSelectScenario={handleSelectScenario} />
-        )}
+        <Container
+          maxWidth="xl"
+          sx={{
+            flexGrow: 1,
+            py: 2,
+            height: view === 'editor' ? 'calc(100vh - 64px)' : 'auto',
+          }}
+        >
+          {view === 'list' && (
+            <ScenarioList onSelectScenario={handleSelectScenario} />
+          )}
 
-        {view === 'detail' && selectedScenario && (
-          <div>
-            <button onClick={handleOpenEditor} style={{ marginBottom: '10px' }}>Open Visual Editor</button>
+          {view === 'detail' && selectedScenario && (
             <ScenarioDetail filename={selectedScenario} onBack={handleBack} />
-          </div>
-        )}
+          )}
 
-        {view === 'editor' && (
-          <div style={{ height: '100%' }}>
-            <button onClick={handleBack} style={{ margin: '10px' }}>Back to Detail</button>
-            <GeometryEditor filename={selectedScenario!} />
-          </div>
-        )}
-      </main>
-    </div>
+          {view === 'editor' && selectedScenario && (
+            <Box sx={{ height: '100%' }}>
+              <GeometryEditor filename={selectedScenario} />
+            </Box>
+          )}
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 }
 

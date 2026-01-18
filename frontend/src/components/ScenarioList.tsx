@@ -16,6 +16,17 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardActionArea from '@mui/material/CardActionArea';
+import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import LayersIcon from '@mui/icons-material/Layers';
+import StraightenIcon from '@mui/icons-material/Straighten';
+
 import { ScenariosService } from '../api/client';
 import { ScenarioSummary } from '../api/models';
 
@@ -41,35 +52,65 @@ export const ScenarioList: React.FC<ScenarioListProps> = ({ onSelectScenario }) 
             });
     }, []);
 
-    if (loading) return <div>Loading scenarios...</div>;
-    if (error) return <div style={{ color: 'red' }}>{error}</div>;
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return <Alert severity="error">{error}</Alert>;
+    }
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h2>Available Scenarios</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+        <Box>
+            <Typography variant="h5" component="h2" sx={{ mb: 3 }}>
+                Available Scenarios
+            </Typography>
+            <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: 2
+            }}>
                 {scenarios.map(scenario => (
-                    <div
-                        key={scenario.filename}
-                        style={{
-                            border: '1px solid #ddd',
-                            padding: '15px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            backgroundColor: '#fff',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                        }}
-                        onClick={() => onSelectScenario(scenario.filename)}
-                    >
-                        <h3 style={{ margin: '0 0 10px 0' }}>{scenario.name}</h3>
-                        <p style={{ fontSize: '0.9em', color: '#666' }}>{scenario.filename}</p>
-                        {scenario.description && <p>{scenario.description}</p>}
-                        <div style={{ fontSize: '0.85em', marginTop: '10px', color: '#888' }}>
-                            Elements: {scenario.element_count} | Measurements: {scenario.has_measurements ? 'Yes' : 'No'}
-                        </div>
-                    </div>
+                    <Card elevation={2} key={scenario.filename}>
+                        <CardActionArea onClick={() => onSelectScenario(scenario.filename)}>
+                            <CardContent>
+                                <Typography variant="h6" component="h3" gutterBottom>
+                                    {scenario.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    {scenario.filename}
+                                </Typography>
+                                {scenario.description && (
+                                    <Typography variant="body2" sx={{ mt: 1 }}>
+                                        {scenario.description}
+                                    </Typography>
+                                )}
+                                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                                    <Chip
+                                        icon={<LayersIcon />}
+                                        label={`${scenario.element_count} elements`}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                    {scenario.has_measurements && (
+                                        <Chip
+                                            icon={<StraightenIcon />}
+                                            label="Measurements"
+                                            size="small"
+                                            color="primary"
+                                            variant="outlined"
+                                        />
+                                    )}
+                                </Box>
+                            </CardContent>
+                        </CardActionArea>
+                    </Card>
                 ))}
-            </div>
-        </div>
+            </Box>
+        </Box>
     );
 };

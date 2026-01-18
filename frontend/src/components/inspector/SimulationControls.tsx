@@ -16,6 +16,12 @@
  */
 
 import React from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import LinearProgress from '@mui/material/LinearProgress';
+import Typography from '@mui/material/Typography';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 
 interface SimulationControlsProps {
     onRun: () => void;
@@ -31,47 +37,38 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
     statusMessage
 }) => {
     return (
-        <div className="inspector-section">
-            <h4>▶️ Simulation</h4>
+        <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                ▶️ Simulation
+            </Typography>
 
-            <button
+            <Button
+                fullWidth
+                variant="contained"
+                color={isRunning ? 'inherit' : 'success'}
                 onClick={onRun}
                 disabled={isRunning}
-                style={{
-                    width: '100%',
-                    padding: '10px',
-                    backgroundColor: isRunning ? '#ccc' : '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold'
-                }}
+                startIcon={isRunning ? <HourglassTopIcon /> : <PlayArrowIcon />}
             >
                 {isRunning ? 'Running...' : 'Run Simulation'}
-            </button>
+            </Button>
 
             {isRunning && (
-                <div style={{ marginTop: '10px' }}>
-                    <div style={{
-                        height: '6px',
-                        width: '100%',
-                        backgroundColor: '#eee',
-                        borderRadius: '3px',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            height: '100%',
-                            width: `${progress}%`,
-                            backgroundColor: '#2196F3',
-                            transition: 'width 0.3s ease'
-                        }} />
-                    </div>
-                    <small style={{ display: 'block', marginTop: '5px', color: '#666', textAlign: 'center' }}>
+                <Box sx={{ mt: 2 }}>
+                    <LinearProgress
+                        variant="determinate"
+                        value={progress}
+                        sx={{ height: 8, borderRadius: 4 }}
+                    />
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mt: 0.5, textAlign: 'center' }}
+                    >
                         {statusMessage} ({Math.round(progress)}%)
-                    </small>
-                </div>
+                    </Typography>
+                </Box>
             )}
-        </div>
+        </Box>
     );
 };

@@ -16,6 +16,13 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+
 import { ScenariosService } from '../api/client';
 import { ScenarioDetail as ScenarioDetailType } from '../api/models';
 
@@ -43,50 +50,75 @@ export const ScenarioDetail: React.FC<ScenarioDetailProps> = ({ filename, onBack
             });
     }, [filename]);
 
-    if (loading) return <div>Loading details...</div>;
-    if (error) return <div style={{ color: 'red' }}>
-        {error} <br />
-        <button onClick={onBack}>Back to List</button>
-    </div>;
-    if (!detail) return <div>No data</div>;
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return <Alert severity="error">{error}</Alert>;
+    }
+
+    if (!detail) {
+        return <Alert severity="warning">No data available</Alert>;
+    }
 
     return (
-        <div style={{ padding: '20px' }}>
-            <button onClick={onBack} style={{ marginBottom: '20px' }}>&larr; Back to List</button>
+        <Box sx={{ py: 2 }}>
+            <Typography variant="h5" component="h2" sx={{ mb: 3 }}>
+                {detail.data.name || detail.filename}
+            </Typography>
 
-            <h2>{detail.data.name || detail.filename}</h2>
-
-            <div style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 150px)' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <h3>YAML Content</h3>
-                    <textarea
-                        readOnly
+            <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
+                {/* YAML Editor */}
+                <Paper sx={{ flex: 1, p: 2, display: 'flex', flexDirection: 'column' }}>
+                    <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                        YAML Content
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
                         value={detail.yaml_content}
-                        style={{
+                        InputProps={{ readOnly: true }}
+                        sx={{
                             flex: 1,
-                            fontFamily: 'monospace',
-                            padding: '10px',
-                            backgroundColor: '#f5f5f5',
-                            border: '1px solid #ccc'
+                            '& .MuiInputBase-root': {
+                                fontFamily: 'monospace',
+                                fontSize: '0.875rem',
+                                height: '100%',
+                                alignItems: 'flex-start',
+                            },
+                            '& .MuiInputBase-input': {
+                                height: '100% !important',
+                                overflow: 'auto !important',
+                            },
                         }}
                     />
-                </div>
+                </Paper>
 
-                <div style={{ flex: 1 }}>
-                    <h3>Preview</h3>
-                    <div style={{
-                        padding: '20px',
-                        border: '1px solid #dashed',
-                        backgroundColor: '#f0f8ff',
-                        height: '100%',
+                {/* Preview Panel */}
+                <Paper
+                    sx={{
+                        flex: 1,
+                        p: 2,
                         display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
-                        <p>Click "Open Visual Editor" above to view and edit the geometry.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        justifyContent: 'center',
+                        backgroundColor: '#f0f8ff',
+                    }}
+                >
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Preview
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Click "Open Editor" in the toolbar to view and edit the geometry.
+                    </Typography>
+                </Paper>
+            </Box>
+        </Box>
     );
 };
