@@ -168,6 +168,152 @@ def calculate_conductances_uniform(cond: np.ndarray) -> Tuple[np.ndarray, np.nda
     return Gh, Gv
 
 
+# --- Sparse Matrix Assembly ---
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+
+
+def build_sparse_system(Gh: np.ndarray, 
+                        Gv: np.ndarray, 
+                        fixed_mask: np.ndarray, 
+                        fixed_values: np.ndarray) -> Tuple[sparse.csr_matrix, np.ndarray]:
+    """
+    Build sparse matrix system Ax = b for steady-state heat equation.
+    
+    The discretized equation for node (i,j) is:
+        Sum(G_neighbor * (T_neighbor - T_ij)) = 0
+    
+    Rearranging:
+        T_ij * Sum(G_neighbors) = Sum(G_neighbor * T_neighbor)
+    
+    For Dirichlet (fixed) nodes: row is identity, RHS is fixed value.
+    
+    Args:
+        Gh: Horizontal conductance matrix (i,j) -> (i,j+1)
+        Gv: Vertical conductance matrix (i,j) -> (i+1,j)
+        fixed_mask: Boolean mask of fixed temperature nodes
+        fixed_values: Fixed temperature values
+        
+    Returns:
+        Tuple of (A, b) where A is sparse CSR matrix, b is RHS vector
+    """
+    rows, cols = Gh.shape
+    n = rows * cols
+    
+    # Prepare sparse matrix entries using COO format
+    row_idx = []
+    col_idx = []
+    data = []
+    
+    b = np.zeros(n)
+    
+    def idx(r, c):
+        return r * cols + c
+    
+    for r in range(rows):
+        for c in range(cols):
+            i = idx(r, c)
+            
+            if fixed_mask[r, c]:
+                # Dirichlet condition: T_i = fixed_value
+                row_idx.append(i)
+                col_idx.append(i)
+                data.append(1.0)
+                b[i] = fixed_values[r, c]
+            else:
+                # Interior/adiabatic node: balance equation
+                # Collect conductances to neighbors
+                g_sum = 0.0
+                
+                # Left neighbor (c-1)
+                if c > 0:
+                    g_left = Gh[r, c-1]  # Conductance from (r,c-1) to (r,c)
+                    g_sum += g_left
+                    row_idx.append(i)
+                    col_idx.append(idx(r, c-1))
+                    data.append(-g_left)
+                
+                # Right neighbor (c+1)
+                if c < cols - 1:
+                    g_right = Gh[r, c]  # Conductance from (r,c) to (r,c+1)
+                    g_sum += g_right
+                    row_idx.append(i)
+                    col_idx.append(idx(r, c+1))
+                    data.append(-g_right)
+                
+                # Bottom neighbor (r-1)
+                if r > 0:
+                    g_bottom = Gv[r-1, c]  # Conductance from (r-1,c) to (r,c)
+                    g_sum += g_bottom
+                    row_idx.append(i)
+                    col_idx.append(idx(r-1, c))
+                    data.append(-g_bottom)
+                
+                # Top neighbor (r+1)
+                if r < rows - 1:
+                    g_top = Gv[r, c]  # Conductance from (r,c) to (r+1,c)
+                    g_sum += g_top
+                    row_idx.append(i)
+                    col_idx.append(idx(r+1, c))
+                    data.append(-g_top)
+                
+                # Diagonal entry (sum of conductances)
+                row_idx.append(i)
+                col_idx.append(i)
+                data.append(g_sum if g_sum > 0 else 1.0)  # Avoid zero diagonal
+                
+                b[i] = 0.0
+    
+    # Build sparse matrix in COO format, then convert to CSR for efficient solving
+    A = sparse.coo_matrix((data, (row_idx, col_idx)), shape=(n, n)).tocsr()
+    
+    return A, b
+
+
+def solve_sparse(Gh: np.ndarray,
+                 Gv: np.ndarray,
+                 fixed_mask: np.ndarray,
+                 fixed_values: np.ndarray,
+                 verbose: bool = True) -> np.ndarray:
+    """
+    Solve steady-state heat equation using sparse direct solver (spsolve).
+    
+    This is faster and more robust than iterative SOR for stiff systems.
+    
+    Args:
+        Gh: Horizontal conductance matrix
+        Gv: Vertical conductance matrix
+        fixed_mask: Boolean mask of fixed temperature nodes
+        fixed_values: Fixed temperature values
+        verbose: Print timing info
+        
+    Returns:
+        2D temperature field
+    """
+    import time
+    
+    rows, cols = Gh.shape
+    
+    if verbose:
+        print(f"  Building sparse system ({rows}x{cols} = {rows*cols} nodes)...")
+    
+    t0 = time.perf_counter()
+    A, b = build_sparse_system(Gh, Gv, fixed_mask, fixed_values)
+    t_build = time.perf_counter() - t0
+    
+    if verbose:
+        print(f"  Matrix assembly: {t_build*1000:.1f}ms, nnz={A.nnz}")
+    
+    t0 = time.perf_counter()
+    T_flat = spsolve(A, b)
+    t_solve = time.perf_counter() - t0
+    
+    if verbose:
+        print(f"  Direct solve: {t_solve*1000:.1f}ms")
+    
+    return T_flat.reshape(rows, cols)
+
+
 # --- Solving ---
 def solve(temp: np.ndarray,
           Gh: np.ndarray,
@@ -179,26 +325,37 @@ def solve(temp: np.ndarray,
           omega: float = 1.90,
           batch_size: int = 5000,
           verbose: bool = True,
-          progress_callback=None) -> np.ndarray:
+          progress_callback=None,
+          backend: str = "sparse") -> np.ndarray:
     """
-    Solve the temperature field using C++ accelerated SOR solver.
+    Solve the temperature field for steady-state heat conduction.
     
     Args:
-        temp: Initial temperature field (modified in place)
+        temp: Initial temperature field (used as initial guess for SOR, ignored for sparse)
         Gh: Horizontal conductance matrix
         Gv: Vertical conductance matrix
         fixed_mask: Boolean mask of fixed temperature nodes
         fixed_values: Fixed temperature values
-        max_iter: Maximum iterations
-        tol: Convergence tolerance
-        omega: SOR relaxation factor (1.85-1.95 typical)
-        batch_size: Iterations per batch for progress checking
+        max_iter: Maximum iterations (SOR only)
+        tol: Convergence tolerance (SOR only)
+        omega: SOR relaxation factor 1.85-1.95 typical (SOR only)
+        batch_size: Iterations per batch for progress checking (SOR only)
         verbose: Print progress updates
-        progress_callback: Optional callable(step, max_iter, diff)
+        progress_callback: Optional callable(step, max_iter, diff) (SOR only)
+        backend: Solver backend - "sparse" (default, direct solve) or "sor" (legacy iterative)
         
     Returns:
         Solved temperature field
     """
+    # Use sparse direct solver by default
+    if backend == "sparse":
+        return solve_sparse(Gh, Gv, fixed_mask, fixed_values, verbose=verbose)
+    
+    # Legacy SOR solver path
+    if backend != "sor":
+        import warnings
+        warnings.warn(f"Unknown backend '{backend}', falling back to 'sor'")
+    
     lib = get_solver_lib()
     
     # Prepare contiguous arrays for C++

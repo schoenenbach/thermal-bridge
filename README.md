@@ -4,7 +4,7 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
 
 ## Features
 
--   **Hybrid Solver**: Core thermal conduction logic implemented in C++ (OpenMP parallelized) for high speed, wrapped in Python for ease of use.
+-   **Dual Solver Backend**: Direct sparse solver (scipy) by default for fast steady-state results; C++ SOR solver (OpenMP parallelized) for transient simulations.
 -   **Declarative Geometries**: Define simulation scenarios using simple **YAML** files. No Python coding required for new geometries.
     -   Support for Points, Polygons, and parametric Variables.
     -   Built-in macros for Walls, Insulation, Window Frames, and Shutter Rails.

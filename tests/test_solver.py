@@ -91,7 +91,7 @@ def test_solve_linear_gradient(solver_lib):
     temp[-1, :] = 10.0
     
     # Solve
-    solve(temp, Gh, Gv, fixed_mask, fixed_values, 
+    temp = solve(temp, Gh, Gv, fixed_mask, fixed_values, 
           max_iter=5000, tol=1e-6, verbose=False)
     
     # Check middle row (index 4.5 -> 5 approx)
