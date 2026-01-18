@@ -97,19 +97,24 @@ The following items address shortcomings identified during external review that 
 
 ---
 
-### C5. Material Averaging (Anti-Aliasing) for Diagonal Lines [MEDIUM PRIORITY]
+### C5. Material Averaging (Anti-Aliasing) for Diagonal Lines [DONE]
 
 **Problem:** The current mesher assigns discrete material IDs per cell, causing "staircase effects" on diagonal geometry boundaries.
 
-**Solution:** Implement sub-cell material averaging.
+**Solution:** Implemented sub-cell material averaging with configurable sampling density.
 
-**Implementation Strategy:**
-- [ ] For cells intersecting multiple materials, calculate area-weighted average $\lambda$
-- [ ] Use sub-sampling (e.g., 4×4 grid within each cell) for coverage estimation
-- [ ] Apply weighted harmonic mean for series conductivity, arithmetic mean for parallel
+**Completed Tasks:**
+- [x] Implemented `compute_cell_coverage()` for NxN sub-sampling within each cell
+- [x] Implemented `build_material_grid_averaged()` with weighted harmonic mean conductivity
+- [x] Default 4×4 (16 sub-samples) for coverage estimation
+- [x] Harmonic mean for series conductivity at material interfaces
+- [x] Added 10 unit tests in `tests/test_material_averaging.py`
 
-**Files Affected:**
-- `backend/core/geometry.py` - Add sub-cell sampling in `build_material_grid`
+**Files Changed:**
+- `backend/core/geometry.py` - Added `compute_cell_coverage()`, `build_material_grid_averaged()`
+
+**Files Added:**
+- `tests/test_material_averaging.py` - Unit tests for material averaging
 
 ---
 

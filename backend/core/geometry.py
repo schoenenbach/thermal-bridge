@@ -439,3 +439,163 @@ def build_transient_grid(geometry: GeometryBuilder,
         cp[mask] = geometry.get_material_heat_capacity(mid)
         
     return rho, cp
+
+
+def compute_cell_coverage(
+    x_center: float, 
+    y_center: float, 
+    dx: float, 
+    dy: float, 
+    regions: List[GeometryRegion],
+    n_samples: int = 4
+) -> Dict[int, float]:
+    """
+    Compute fractional coverage of each material within a cell using sub-sampling.
+    
+    Args:
+        x_center: Cell center X coordinate
+        y_center: Cell center Y coordinate
+        dx: Cell width
+        dy: Cell height
+        regions: List of geometry regions (checked in order, last wins)
+        n_samples: Number of sample points per dimension (NxN grid)
+        
+    Returns:
+        Dictionary mapping material_id -> fractional coverage (0.0 to 1.0)
+    """
+    # Generate sub-sample points within the cell
+    half_dx = dx / 2
+    half_dy = dy / 2
+    
+    # Create NxN sample grid
+    x_offsets = np.linspace(-half_dx + dx/(2*n_samples), half_dx - dx/(2*n_samples), n_samples)
+    y_offsets = np.linspace(-half_dy + dy/(2*n_samples), half_dy - dy/(2*n_samples), n_samples)
+    
+    sample_x = x_center + x_offsets
+    sample_y = y_center + y_offsets
+    X_sub, Y_sub = np.meshgrid(sample_x, sample_y)
+    
+    # Initialize all samples as AIR_EXT
+    sample_materials = np.full((n_samples, n_samples), MaterialID.AIR_EXT, dtype=int)
+    
+    # Apply regions in order (last region wins for overlapping areas)
+    for region in regions:
+        mask = region.contains(X_sub, Y_sub)
+        sample_materials[mask] = region.material_id
+    
+    # Count occurrences of each material
+    total_samples = n_samples * n_samples
+    unique, counts = np.unique(sample_materials, return_counts=True)
+    
+    coverage = {}
+    for mat_id, count in zip(unique, counts):
+        coverage[int(mat_id)] = count / total_samples
+        
+    return coverage
+
+
+def build_material_grid_averaged(
+    geometry: GeometryBuilder, 
+    xc: np.ndarray, 
+    yc: np.ndarray,
+    n_samples: int = 4
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Build material ID and conductivity grids with sub-cell averaging for boundary cells.
+    
+    For cells that span multiple materials (diagonal boundaries), computes the
+    harmonic mean of conductivities weighted by coverage fraction. This is 
+    appropriate for heat flow perpendicular to the interface (series resistance).
+    
+    Args:
+        geometry: GeometryBuilder instance providing regions and material properties
+        xc: 1D array of cell center X coordinates
+        yc: 1D array of cell center Y coordinates
+        n_samples: Sub-sampling grid size per dimension (default 4 = 16 samples)
+        
+    Returns:
+        Tuple of (grid_map, cond, is_averaged):
+        - grid_map: 2D array of dominant material IDs (ny, nx)
+        - cond: 2D array of conductivity values (W/mK), averaged at boundaries
+        - is_averaged: 2D boolean array marking cells where averaging was applied
+    """
+    ny, nx = len(yc), len(xc)
+    
+    grid_map = np.zeros((ny, nx), dtype=int)
+    cond = np.zeros((ny, nx), dtype=float)
+    is_averaged = np.zeros((ny, nx), dtype=bool)
+    
+    # Get cell sizes (assumes uniform grid; use average for non-uniform)
+    if nx > 1:
+        dx = np.mean(np.diff(xc))
+    else:
+        dx = 1.0
+    if ny > 1:
+        dy = np.mean(np.diff(yc))
+    else:
+        dy = 1.0
+        
+    regions = geometry.get_regions()
+    
+    for j in range(ny):
+        for i in range(nx):
+            x_c = xc[i]
+            y_c = yc[j]
+            
+            # Compute coverage for this cell
+            coverage = compute_cell_coverage(x_c, y_c, dx, dy, regions, n_samples)
+            
+            if len(coverage) == 0:
+                # Shouldn't happen, but fallback to AIR_EXT
+                grid_map[j, i] = MaterialID.AIR_EXT
+                cond[j, i] = geometry.get_material_conductivity(MaterialID.AIR_EXT)
+                
+            elif len(coverage) == 1:
+                # Single material - direct assignment (no averaging needed)
+                mat_id = list(coverage.keys())[0]
+                grid_map[j, i] = mat_id
+                
+                # Get conductivity from region if specified, else from geometry
+                lambda_val = None
+                for region in regions:
+                    if region.material_id == mat_id and region.lambda_w_mk is not None:
+                        lambda_val = region.lambda_w_mk
+                        break
+                        
+                if lambda_val is not None:
+                    cond[j, i] = lambda_val
+                else:
+                    cond[j, i] = geometry.get_material_conductivity(mat_id)
+                    
+            else:
+                # Multiple materials - use weighted harmonic mean
+                is_averaged[j, i] = True
+                
+                # Dominant material for grid_map (highest coverage)
+                dominant_mat = max(coverage, key=coverage.get)
+                grid_map[j, i] = dominant_mat
+                
+                # Compute harmonic mean: 1/λ_eff = Σ(f_i / λ_i)
+                inv_lambda_sum = 0.0
+                for mat_id, frac in coverage.items():
+                    # Get conductivity for this material
+                    lambda_val = None
+                    for region in regions:
+                        if region.material_id == mat_id and region.lambda_w_mk is not None:
+                            lambda_val = region.lambda_w_mk
+                            break
+                    
+                    if lambda_val is None:
+                        lambda_val = geometry.get_material_conductivity(mat_id)
+                    
+                    # Add to harmonic mean calculation
+                    if lambda_val > 0:
+                        inv_lambda_sum += frac / lambda_val
+                        
+                # Compute effective conductivity
+                if inv_lambda_sum > 0:
+                    cond[j, i] = 1.0 / inv_lambda_sum
+                else:
+                    cond[j, i] = geometry.get_material_conductivity(dominant_mat)
+    
+    return grid_map, cond, is_averaged
