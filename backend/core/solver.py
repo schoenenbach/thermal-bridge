@@ -314,6 +314,111 @@ def solve_sparse(Gh: np.ndarray,
     return T_flat.reshape(rows, cols)
 
 
+def solve_with_cavity_iteration(
+    cond: np.ndarray,
+    grid_map: np.ndarray,
+    dx_m: float,
+    dy_m: float,
+    fixed_mask: np.ndarray,
+    fixed_values: np.ndarray,
+    cavity_material_id: int = 8,
+    max_cavity_iterations: int = 10,
+    cavity_tol: float = 0.01,
+    eps_hot: float = 0.9,
+    eps_cold: float = 0.9,
+    verbose: bool = True
+) -> Tuple[np.ndarray, list]:
+    """
+    Solve with iterative λ_eq recalculation for air cavities per ISO 10077-2.
+    
+    The solver performs the following iteration:
+    1. Detect all cavity regions via flood-fill
+    2. Solve temperature field with current λ_eq values
+    3. Calculate new λ_eq from surface temperatures for each cavity
+    4. Update conductivity array with new λ_eq
+    5. Repeat 2-4 until max surface temperature change < cavity_tol
+    
+    Args:
+        cond: Initial conductivity array (will be modified)
+        grid_map: Material ID array
+        dx_m: Grid cell width (m)
+        dy_m: Grid cell height (m)
+        fixed_mask: Boolean mask of fixed temperature nodes
+        fixed_values: Fixed temperature values
+        cavity_material_id: Material ID for cavity cells (default: 8 = CAVITY)
+        max_cavity_iterations: Maximum outer iterations (default: 10)
+        cavity_tol: Convergence tolerance for temperature change (K)
+        eps_hot: Emissivity of hot (interior) cavity surface
+        eps_cold: Emissivity of cold (exterior) cavity surface
+        verbose: Print iteration progress
+        
+    Returns:
+        Tuple of (temperature_field, lambda_eq_history) where lambda_eq_history
+        is a list of λ_eq values per iteration for each cavity
+    """
+    from backend.core.cavity import (
+        detect_cavities,
+        update_cavity_conductivities,
+        get_cavity_surface_temperatures
+    )
+    
+    # Detect cavities
+    cavities = detect_cavities(grid_map, dx_m, dy_m, cavity_material_id)
+    
+    if not cavities:
+        if verbose:
+            print("[cavity] No cavities detected, using standard solve")
+        Gh, Gv = calculate_conductances(cond, 
+                                        np.full(cond.shape[1], dx_m * 1000),  # Convert to mm
+                                        np.full(cond.shape[0], dy_m * 1000))
+        temp = solve_sparse(Gh, Gv, fixed_mask, fixed_values, verbose=verbose)
+        return temp, []
+    
+    if verbose:
+        print(f"[cavity] Detected {len(cavities)} cavity region(s)")
+        for i, cav in enumerate(cavities):
+            print(f"  Cavity {i+1}: d={cav.d*1000:.1f}mm, b={cav.b*1000:.1f}mm, cells={len(cav.cells)}")
+    
+    lambda_history = []
+    temp_prev = None
+    
+    for iteration in range(max_cavity_iterations):
+        # Calculate conductances with current λ values
+        dx_mm = np.full(cond.shape[1], dx_m * 1000)
+        dy_mm = np.full(cond.shape[0], dy_m * 1000)
+        Gh, Gv = calculate_conductances(cond, dx_mm, dy_mm)
+        
+        # Solve temperature field
+        temp = solve_sparse(Gh, Gv, fixed_mask, fixed_values, verbose=False)
+        
+        # Update cavity conductivities based on new temperatures
+        cond, lambda_list = update_cavity_conductivities(
+            cond, cavities, temp, eps_hot, eps_cold
+        )
+        lambda_history.append(lambda_list)
+        
+        if verbose:
+            lambda_str = ", ".join([f"{l:.4f}" for l in lambda_list])
+            print(f"  Iter {iteration+1}: λ_eq = [{lambda_str}] W/mK")
+        
+        # Check convergence (max temperature change)
+        if temp_prev is not None:
+            max_delta_T = np.max(np.abs(temp - temp_prev))
+            if verbose:
+                print(f"    ΔT_max = {max_delta_T:.4f}K")
+            if max_delta_T < cavity_tol:
+                if verbose:
+                    print(f"[cavity] Converged in {iteration+1} iterations")
+                break
+        
+        temp_prev = temp.copy()
+    else:
+        if verbose:
+            print(f"[cavity] Warning: Did not converge in {max_cavity_iterations} iterations")
+    
+    return temp, lambda_history
+
+
 # --- Solving ---
 def solve(temp: np.ndarray,
           Gh: np.ndarray,

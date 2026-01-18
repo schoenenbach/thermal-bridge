@@ -7,7 +7,8 @@
         "density": 1800,
         "heat_capacity": 1000,
         "color": "#A0522D",
-        "source": "Process Standard"
+        "source": "Process Standard",
+        "emissivity": 0.90
     },
     {
         "id": "concrete_reinforced",
@@ -17,7 +18,8 @@
         "density": 2400,
         "heat_capacity": 1000,
         "color": "#808080",
-        "source": "DIN 4108"
+        "source": "DIN 4108",
+        "emissivity": 0.88
     },
     {
         "id": "insulation_generic",
@@ -27,7 +29,8 @@
         "density": 20,
         "heat_capacity": 1400,
         "color": "#FFFF00",
-        "source": "Process Standard"
+        "source": "Process Standard",
+        "emissivity": 0.90
     },
     {
         "id": "insulation_styrodur",
@@ -37,7 +40,8 @@
         "density": 35,
         "heat_capacity": 1450,
         "color": "#9ACD32",
-        "source": "Vendor Data"
+        "source": "Vendor Data",
+        "emissivity": 0.90
     },
     {
         "id": "wood_soft",
@@ -47,7 +51,8 @@
         "density": 500,
         "heat_capacity": 1600,
         "color": "#DEB887",
-        "source": "DIN 4108"
+        "source": "DIN 4108",
+        "emissivity": 0.90
     },
     {
         "id": "steel_generic",
@@ -57,7 +62,8 @@
         "density": 7800,
         "heat_capacity": 450,
         "color": "#404040",
-        "source": "Generic"
+        "source": "Generic",
+        "emissivity": 0.80
     },
     {
         "id": "aluminum_generic",
@@ -67,7 +73,8 @@
         "density": 2700,
         "heat_capacity": 900,
         "color": "#C0C0C0",
-        "source": "Generic"
+        "source": "Generic",
+        "emissivity": 0.05
     },
     {
         "id": "air_cavity_unventilated",
@@ -77,6 +84,7 @@
         "density": 1.2,
         "heat_capacity": 1000,
         "color": "#E0FFFF",
-        "source": "ISO 6946 Eq"
+        "source": "ISO 6946 Eq",
+        "emissivity": 0.90
     }
 ]

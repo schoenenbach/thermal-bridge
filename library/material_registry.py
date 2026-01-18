@@ -30,6 +30,7 @@ class MaterialProp:
     color: str = "#808080"
     source: str = "Unknown"
     solver_id: int = 0
+    emissivity: float = 0.9  # Surface emissivity (0-1), default for most building materials
 
 class MaterialRegistry:
     _instance = None
@@ -84,7 +85,8 @@ class MaterialRegistry:
             heat_capacity=float(data.get('heat_capacity', 1000.0)),
             color=data.get('color', '#808080'),
             source=data.get('source', ''),
-            solver_id=solver_id
+            solver_id=solver_id,
+            emissivity=float(data.get('emissivity', 0.9))
         )
         
         self.materials[mat_id] = prop
@@ -99,6 +101,11 @@ class MaterialRegistry:
     def get_lambda(self, mat_id: str, default=1.0) -> float:
         m = self.materials.get(mat_id)
         return m.lambda_val if m else default
+
+    def get_emissivity(self, mat_id: str, default=0.9) -> float:
+        """Get surface emissivity for a material (0-1)."""
+        m = self.materials.get(mat_id)
+        return m.emissivity if m else default
         
     def get_solver_id(self, mat_id: str) -> int:
         m = self.materials.get(mat_id)

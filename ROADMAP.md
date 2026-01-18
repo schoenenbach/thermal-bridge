@@ -50,26 +50,31 @@ The following items address shortcomings identified during external review that 
 
 ---
 
-### C3. Implement ISO 10077-2 Air Cavity Iteration [MEDIUM PRIORITY]
+### C3. Implement ISO 10077-2 Air Cavity Iteration [DONE]
 
 **Problem:** Air cavities currently use a static conductivity (`MAT_CAVITY_ISO = 0.25` in `config.py`). ISO 10077-2 mandates iterative calculation where $\lambda_{eq}$ depends on cavity aspect ratio and surface temperature difference (radiation + convection).
 
-**Solution:** Implement an iterative cavity solver wrapper.
+**Solution:** Implemented iterative cavity solver with flood-fill detection and temperature-dependent λ_eq.
 
-**Implementation Strategy:**
-- [ ] Pre-process: Detect connected air cells via flood-fill to identify distinct cavities
-- [ ] Calculate cavity geometry (dimensions, aspect ratio)
-- [ ] Implement $\lambda_{eq}$ formula per ISO 10077-2:
-  - Convective: $h_a = max(0.025/d, 0.73 \cdot (Ra^{0.25}))$
+**Completed Tasks:**
+- [x] Pre-process: Detect connected air cells via flood-fill to identify distinct cavities
+- [x] Calculate cavity geometry (dimensions, aspect ratio)
+- [x] Implement $\lambda_{eq}$ formula per ISO 10077-2:
+  - Convective: $h_a = max(0.025/d, 0.73 \cdot (\Delta T^{0.25}))$
   - Radiative: $h_r = 4\sigma T_m^3 / (1/\epsilon_1 + 1/\epsilon_2 - 1)$
   - $\lambda_{eq} = d \cdot (h_a + h_r)$
-- [ ] Outer solve loop: Run thermal solve → recalculate $\lambda_{eq}$ → update matrix → repeat until convergence
-- [ ] Add emissivity property to MaterialRegistry
+- [x] Outer solve loop: Run thermal solve → recalculate $\lambda_{eq}$ → update matrix → repeat until convergence
+- [x] Add emissivity property to MaterialRegistry
+- [x] Add 17 unit tests (16 passed, 1 slow skipped)
 
-**Files Affected:**
-- `backend/core/config.py` - Remove static `MAT_CAVITY_ISO`
-- `backend/core/solver.py` - Add iterative wrapper
-- `library/materials/` - Add emissivity to material definitions
+**Files Added:**
+- `backend/core/cavity.py` - Cavity detection and λ_eq calculation module
+- `tests/test_cavity.py` - Unit tests for cavity module
+
+**Files Changed:**
+- `library/material_registry.py` - Added emissivity field and getter
+- `library/materials/iso_materials.json` - Added emissivity values to materials
+- `backend/core/solver.py` - Added `solve_with_cavity_iteration()` function
 
 ---
 
