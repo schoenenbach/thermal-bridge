@@ -50,7 +50,7 @@ This workflow wraps up the work done during this chat session by updating docume
 7. **Write commit message following Chris Beams' rules**:
    - **Subject line**: Start with gitmoji, then imperative mood summary (max 50 chars after emoji)
    - **Blank line** between subject and body
-   - **Body** (if needed): Explain *what* and *why*, not *how*. Wrap at 72 characters.
+   - **Body** (if needed): Explain *what* and *why*, not *how*. Wrap at 72 characters. Put most effort on the why of the change. What is the driver of changing something.
    
    Example format:
    ```

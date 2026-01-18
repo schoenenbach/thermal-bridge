@@ -1,6 +1,152 @@
 # Project Roadmap & Implementation Strategy
 
-This document outlines the strategic roadmap for the Thermal Bridge Simulation project. It details ten key feature proposals designed to transition the tool from a developer-focused prototype to a professional-grade engineering application.
+This document outlines the strategic roadmap for the Thermal Bridge Simulation project. It details key feature proposals designed to transition the tool from a developer-focused prototype to a professional-grade engineering application.
+
+---
+
+## Critical Improvements (External Review Feedback)
+
+The following items address shortcomings identified during external review that prevent the tool from being "certification-grade" (comparable to Flixo or Psi-Therm).
+
+### C1. Replace SOR Solver with Sparse Direct Solver [HIGH PRIORITY]
+
+**Problem:** The C++ SOR solver scales poorly ($O(N^{1.5})$ to $O(N^2)$) and struggles with stiff matrices (e.g., Steel λ=50 next to Insulation λ=0.035). Additionally, `thermal_solver_core.cpp` allocates a `std::vector<double>` inside `solve_step`, causing heap allocation on every call.
+
+**Solution:** Replace the C++ extension with `scipy.sparse.linalg.spsolve` (SuperLU/UMFPACK backend).
+
+**Implementation Strategy:**
+- [ ] Build sparse matrix $A$ from conductance arrays in `solver.py`
+- [ ] Replace iterative `solve()` with direct `spsolve(A, b)`
+- [ ] Remove or deprecate C++ `thermal_solver_ext` module
+- [ ] Validate: ISO 10211 Cases 1 & 2 must still pass
+- [ ] Benchmark: Expect millisecond-scale solve times for <200k nodes
+
+**Files Affected:**
+- `backend/core/solver.py` - New sparse matrix assembly and direct solve
+- `backend/solver/thermal_solver_core.cpp` - Deprecate or remove
+
+---
+
+### C2. Refactor Boundary Condition Assembly [HIGH PRIORITY]
+
+**Problem:** Surface resistance ($R_{si}$, $R_{se}$) application is currently hardcoded in `run_iso_tests.py` (test script), not in the core solver. This means general user scenarios cannot properly apply boundary conditions.
+
+**Solution:** Move boundary condition assembly into `mesh.py` or a dedicated `boundary.py` module.
+
+**Implementation Strategy:**
+- [ ] Create boundary condition detection in mesh layer (identify boundary cells)
+- [ ] Apply film coefficient ($h = 1/R$) to conductance matrix during assembly
+- [ ] Support interior ($R_{si}$) and exterior ($R_{se}$) surfaces per ISO standards
+- [ ] Remove manual patches from `run_iso_tests.py`
+- [ ] Validate: ISO 10211 Cases must pass using core logic only
+
+**Files Affected:**
+- `backend/core/mesh.py` - Add boundary detection and BC assembly
+- `backend/core/run_iso_tests.py` - Remove manual conductance patches (lines 315-329)
+
+---
+
+### C3. Implement ISO 10077-2 Air Cavity Iteration [MEDIUM PRIORITY]
+
+**Problem:** Air cavities currently use a static conductivity (`MAT_CAVITY_ISO = 0.25` in `config.py`). ISO 10077-2 mandates iterative calculation where $\lambda_{eq}$ depends on cavity aspect ratio and surface temperature difference (radiation + convection).
+
+**Solution:** Implement an iterative cavity solver wrapper.
+
+**Implementation Strategy:**
+- [ ] Pre-process: Detect connected air cells via flood-fill to identify distinct cavities
+- [ ] Calculate cavity geometry (dimensions, aspect ratio)
+- [ ] Implement $\lambda_{eq}$ formula per ISO 10077-2:
+  - Convective: $h_a = max(0.025/d, 0.73 \cdot (Ra^{0.25}))$
+  - Radiative: $h_r = 4\sigma T_m^3 / (1/\epsilon_1 + 1/\epsilon_2 - 1)$
+  - $\lambda_{eq} = d \cdot (h_a + h_r)$
+- [ ] Outer solve loop: Run thermal solve → recalculate $\lambda_{eq}$ → update matrix → repeat until convergence
+- [ ] Add emissivity property to MaterialRegistry
+
+**Files Affected:**
+- `backend/core/config.py` - Remove static `MAT_CAVITY_ISO`
+- `backend/core/solver.py` - Add iterative wrapper
+- `library/materials/` - Add emissivity to material definitions
+
+---
+
+### C4. Tighten Verification Tolerance [MEDIUM PRIORITY]
+
+**Problem:** Current ISO 10211 Case 2 flux tolerance is 5% (`abs(flux - 9.5) < 0.5`), which is too loose. ISO validation typically requires <1% precision.
+
+**Solution:** Tighten tolerance to 1% (0.1 W/m) and improve flux summation accuracy.
+
+**Implementation Strategy:**
+- [ ] Change `run_iso_tests.py` line 356: `flux_passed = abs(flux_in - 9.5) < 0.1`
+- [ ] Review half-cell control volume handling in flux calculation
+- [ ] If test fails with tighter tolerance, increase mesh resolution or refine numerics
+- [ ] Document required mesh density for ISO compliance
+
+**Files Affected:**
+- `backend/core/run_iso_tests.py` - Tighten tolerance
+
+---
+
+### C5. Material Averaging (Anti-Aliasing) for Diagonal Lines [MEDIUM PRIORITY]
+
+**Problem:** The current mesher assigns discrete material IDs per cell, causing "staircase effects" on diagonal geometry boundaries.
+
+**Solution:** Implement sub-cell material averaging.
+
+**Implementation Strategy:**
+- [ ] For cells intersecting multiple materials, calculate area-weighted average $\lambda$
+- [ ] Use sub-sampling (e.g., 4×4 grid within each cell) for coverage estimation
+- [ ] Apply weighted harmonic mean for series conductivity, arithmetic mean for parallel
+
+**Files Affected:**
+- `backend/core/geometry.py` - Add sub-cell sampling in `build_material_grid`
+
+---
+
+### C6. Scenario-First Architecture [LOW PRIORITY]
+
+**Problem:** `geometry_builder.py` attempts to reverse-engineer semantic Scenario from Canvas JSON objects (fragile "round-trip" conversion).
+
+**Solution:** Make the YAML Scenario the single source of truth. Canvas should render the Scenario, not generate it.
+
+**Implementation Strategy:**
+- [ ] When user edits geometry in Canvas, update Scenario state first
+- [ ] Re-render Canvas from updated Scenario
+- [ ] Remove reverse-engineering logic from `geometry_builder.py`
+
+**Files Affected:**
+- `backend/core/geometry_builder.py`
+- `frontend/src/components/editor/` - Update state flow
+
+---
+
+### C7. Client-Side Heatmap Rendering [LOW PRIORITY]
+
+**Problem:** API returns static PNG for temperature visualization, preventing interactive features.
+
+**Solution:** Return compressed temperature array to frontend; render with HTML5 Canvas/WebGL.
+
+**Implementation Strategy:**
+- [ ] API endpoint returns binary/JSON temperature data instead of PNG URL
+- [ ] Frontend: Implement WebGL or Canvas-based heatmap renderer
+- [ ] Add "Probe tool" for hovering to see values
+- [ ] Add dynamic color scale controls
+- [ ] Highlight mold risk areas (surfaces with $T < T_{dew}$ or $\phi > 80\%$)
+
+**Files Affected:**
+- `backend/app/routes/simulation.py` - Return temperature array data
+- `frontend/src/components/` - New heatmap component
+
+---
+
+## Recommended Priority Order
+
+1. **C1** (Solver) + **C2** (Boundary Conditions) - Foundation for accurate results
+2. **C4** (Tolerance) - Quick win, validates improved numerics
+3. **C3** (Air Cavities) - Required for ISO 10077-2 compliance
+4. **C5** (Material Averaging) - Improves geometric accuracy
+5. **C6** + **C7** (UX) - Usability improvements
+
+---
 
 ## 1. Extensible Material Database [DONE]
 
