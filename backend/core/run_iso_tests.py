@@ -353,7 +353,7 @@ def run_case_2(use_adaptive=False):
     print(f"  Target:     9.5000 W/m")
     print(f"  Deviation:  {abs(flux_in - 9.5):.4f} W ({abs(flux_in - 9.5)/9.5*100:.2f}%)")
     
-    flux_passed = abs(flux_in - 9.5) < 0.5
+    flux_passed = abs(flux_in - 9.5) < 0.1
     if not flux_passed:
          print(f"  -> FLUX FAIL (Diff: {abs(flux_in - 9.5):.4f})")
     

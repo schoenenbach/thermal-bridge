@@ -115,7 +115,7 @@ measurements:
         name: "Interior Heat Flux",
         boundary: bottom,
         expected: 9.5,
-        tolerance: 0.5,
+        tolerance: 0.1,
       }
 
 elements:
