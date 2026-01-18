@@ -212,20 +212,43 @@ uvicorn api.main:app --reload
 - [x] Update imports and Dockerfile
 
 ### Phase 3: Frontend Implementation (React + Vite)
-**Phase 3A: Setup & Proof of Concept**
+**Phase 3A: Setup & Proof of Concept [DONE]**
 - [x] Initialize React Project
 - [x] Generate TypeScript Client from OpenAPI (Manual Fallback)
 - [x] Implement Basic Scenario List & View
 
-**Phase 3B: Interactive Geometry Editor (The Deep Dive)**
+**Phase 3B: Interactive Geometry Editor (The Deep Dive) [DONE]**
 - [x] Implement Canvas with `react-konva`
 - [x] Implement Scene Graph <-> Schema synchronization (via local state)
 - [x] Drag-and-Drop and Resize interactions
 
-**Phase 3C: Full Application Replacement**
-- [ ] Re-implement Inspector Panel
-- [ ] Re-implement Simulation Results (Plotly)
-- [ ] Feature Parity with Legacy App
+**Phase 3C: Professional UI & UX [DONE]**
+*Objective:* Adopt a professional UI library to match the "engineered" look of the legacy app.
+- [x] **Adopt UI Library**: Integrated **MUI (Material UI) v7** for consistent styling.
+    - Replaced raw CSS buttons/inputs with MUI components.
+    - Created `theme.ts` with compact density settings.
+- [x] **Inspector Panel Refactor**: Re-implemented `Inspector.tsx` using MUI Accordion.
+    - Collapsible sections for Grid, Simulation, Variables, and Element Properties.
+    - MUI TextField with InputAdornments for units.
+
+**Phase 3D: Performance & Optimization**
+*Objective:* Ensure the app runs smoothly even during heavy simulations.
+- [ ] **Simulation Throttling**:
+    - Debounce WebSocket progress updates (max 10fps).
+    - Throttle geometry canvas re-renders during drag operations.
+- [ ] **React Optimization**:
+    - Use `React.memo` for heavy components (GeometryEditor).
+    - Virtualize the Scenario List if it gets too long.
+
+**Phase 3E: Feature Parity & Completion**
+*Objective:* Restore all features from the legacy Streamlit app.
+- [ ] **Results Visualization**:
+    - Re-implement "Temperature Map" using a canvas or simplified image overlay.
+    - Re-implement "Mold Risk" traffic light view.
+- [ ] **Material Browser**:
+    - Frontend UI for searching/filtering the material API.
+- [ ] **PDF Export**:
+    - Trigger backend PDF generation and handle file download.
 
 ---
 
@@ -251,3 +274,101 @@ uvicorn api.main:app --reload
 └────────────┴──────────────┴─────────────┘
 ```
 
+
+---
+
+## 15. Advanced Mold Risk Assessment (VTT & Isopleths) [PLANNED]
+
+**Objective:** Upgrade mold analysis from a simple stationary threshold to professional-grade hygrothermal assessment, leveraging the transient outputs of the new HAM solver.
+
+**Implementation Strategy:**
+*   **Dependency:** Requires **Hygrothermal Solver Engine** (Item 19) for accurate internal T/RH history.
+*   **Material Sensitivity:** Add `mould_sensitivity` (Sensitive/Medium/Resistant) to `MaterialRegistry`.
+*   **Bio-Hygrothermal Model:** Implement VTT Mould Index calculation:
+    *   $M = f(T, RH, t, material)$
+*   **Visualizations:**
+    *   **Isopleth Diagram:** T/RH scatter plot with LIM (Lowest Isopleth for Mould) curves.
+    *   **Mould Index History:** Time-series chart of index evolution (0-6 scale).
+
+## 16. Usage Scenarios & Room Classes [PLANNED]
+
+**Objective:** Simplify boundary condition setup by providing standard room profiles.
+
+**Implementation Strategy:**
+*   **Room Directory:** Define presets for "Bedroom", "Living Room", "Bathroom", "Kitchen".
+*   **Boundary Conditions:**
+    *   Map room types to specific Temperature and Humidity profiles (DIN 4108 / EN 15026).
+    *   Support daily cycles (e.g., bathroom peaks, bedroom night moisture).
+*   **UI Integration:** Dropdown to select "Room Type" which auto-populates BCs.
+
+## 17. Extended Validation & Benchmarks [DONE]
+
+**Objective:** Ensure physical correctness through normative test cases (Stationary & Empirical).
+
+**Completed Tasks:**
+- [x] **Glaser Method (ISO 13788)**: Implemented interstitial condensation analysis
+    - `glaser_method.py`: Layer dataclass, temperature/vapor profiles, monthly analysis
+    - Humidity class calculations per ISO 13788 Table 2
+- [x] **VTT Mould Index Model**: Implemented dynamic mold growth assessment
+    - Extended `mold_analysis.py` with Hukka & Viitanen (1999) model
+    - Material sensitivity classes (Very Sensitive → Resistant)
+    - Critical RH curves, growth/decline rates, time-series simulation
+- [x] **Test Suites**: 44 unit tests across 3 test files
+    - `test_glaser_method.py`: 16 tests for ISO 13788 compliance
+    - `test_vtt_benchmarks.py`: 25 tests for VTT model validation
+    - Verified against published empirical data
+
+**Files Added:**
+- `backend/core/glaser_method.py` - ISO 13788 Glaser method implementation
+- `tests/test_glaser_method.py` - Glaser method unit tests
+- `tests/test_vtt_benchmarks.py` - VTT Mould Index benchmarks
+
+**Run Tests:**
+```bash
+python3 -m pytest tests/test_glaser_method.py tests/test_vtt_benchmarks.py -v
+```
+
+---
+
+## 18. Material Database 2.0 (Functional Properties) [PLANNED]
+
+**Objective:** Support moisture-dependent material properties required for HAM simulation.
+
+**Implementation Strategy:**
+*   **Extended Schema:** Add support for functional definitions (tables/curves) instead of scalar constants.
+    *   **Sorption Isotherm:** $w(\phi)$
+    *   **Vapor Permeability:** $\delta(\phi)$
+    *   **Liquid Conductivity:** $K(w)$
+    *   **Thermal Conductivity:** $\lambda(w)$
+*   **Interpolation:** Implement Cubic Spline interpolation for smooth derivatives during solving.
+
+## 19. Hygrothermal Solver Engine (Coupled Heat & Moisture) [PLANNED]
+
+**Objective:** Implement the coupled PDE system for heat and moisture transport (EN 15026 compliant).
+
+**Implementation Strategy:**
+*   **Physics:**
+    *   **Mass Balance:** $\nabla \cdot (\delta_p \nabla p_v + K \nabla P_c)$
+    *   **Energy Balance:** Includes latent heat of evaporation/condensation.
+*   **Numerics:**
+    *   **Primary Variables:** Temperature ($T$) and Capillary Pressure ($P_c$).
+    *   **Time Integration:** Integrate **CVODE** (Sundials) for implicit, adaptive time-stepping to handle stiff systems.
+    *   **Jacobian:** Analytical Jacobian for performance.
+
+## 20. Advanced Boundary Conditions (Climate & Rain) [PLANNED]
+
+**Objective:** Simulate real-world climatic loading including driving rain.
+
+**Implementation Strategy:**
+*   **Climate Loader:** Parser for `.epw` (EnergyPlus) and `.wac` (WUFI) weather files.
+*   **Driving Rain:** Implement ISO 15927-3 model for wind-driven rain flux.
+*   **Boundary Switching:** Dynamic switching between Flux (raining) and Dirichlet (saturation) boundaries.
+
+## 21. Compliance Validation (HAMSTAD) [PLANNED]
+
+**Objective:** Verify physical correctness against the specialized HAMSTAD benchmarks.
+
+**Implementation Strategy:**
+*   **Benchmark 1:** Interstitial Condensation (Insulated Roof).
+*   **Benchmark 4:** Response Analysis (Driving Rain dynamics).
+*   **EN 15026 Annex A:** Automated regression test for the analytical benchmark case.
