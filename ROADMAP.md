@@ -403,11 +403,12 @@ uvicorn api.main:app --reload
 
 **Phase 3E: Feature Parity & Completion**
 *Objective:* Restore all features from the legacy Streamlit app.
-- [ ] **Results Visualization**:
-    - Re-implement "Temperature Map" using a canvas or simplified image overlay.
-    - Re-implement "Mold Risk" traffic light view.
-- [ ] **Material Browser**:
-    - Frontend UI for searching/filtering the material API.
+- [x] **Results Visualization**:
+    - Temperature Map and Mold Risk images rendered in results panel (GeometryEditor.tsx)
+- [x] **Material Browser**:
+    - Frontend UI with search and category filtering
+    - MUI Card grid with color swatches, λ values, and source references
+    - Files: `MaterialBrowser.tsx`, updated `App.tsx` navigation
 - [ ] **PDF Export**:
     - Trigger backend PDF generation and handle file download.
 

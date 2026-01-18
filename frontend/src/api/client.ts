@@ -64,6 +64,11 @@ export const MaterialsService = {
     list: async (): Promise<MaterialInfo[]> => {
         const response = await apiClient.get<MaterialInfo[]>('/materials/');
         return response.data;
+    },
+
+    listCategories: async (): Promise<string[]> => {
+        const response = await apiClient.get<{ categories: string[] }>('/materials/categories');
+        return response.data.categories;
     }
 };
 

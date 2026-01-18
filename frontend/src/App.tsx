@@ -25,14 +25,16 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 
 import theme from './theme';
 import { ScenarioList } from './components/ScenarioList';
 import { ScenarioDetail } from './components/ScenarioDetail';
 import GeometryEditor from './components/editor/GeometryEditor';
+import MaterialBrowser from './components/MaterialBrowser';
 
 function App() {
-  const [view, setView] = useState<'list' | 'detail' | 'editor'>('list');
+  const [view, setView] = useState<'list' | 'detail' | 'editor' | 'materials'>('list');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
 
   const handleSelectScenario = (filename: string) => {
@@ -43,10 +45,16 @@ function App() {
   const handleBack = () => {
     if (view === 'editor') {
       setView('detail');
+    } else if (view === 'materials') {
+      setView('list');
     } else {
       setSelectedScenario(null);
       setView('list');
     }
+  };
+
+  const handleOpenMaterials = () => {
+    setView('materials');
   };
 
   const handleOpenEditor = () => {
@@ -81,6 +89,15 @@ function App() {
                 Open Editor
               </Button>
             )}
+            {view === 'list' && (
+              <Button
+                color="inherit"
+                startIcon={<LibraryBooksIcon />}
+                onClick={handleOpenMaterials}
+              >
+                Materials
+              </Button>
+            )}
           </Toolbar>
         </AppBar>
 
@@ -104,6 +121,10 @@ function App() {
             <Box sx={{ height: '100%' }}>
               <GeometryEditor filename={selectedScenario} />
             </Box>
+          )}
+
+          {view === 'materials' && (
+            <MaterialBrowser />
           )}
         </Container>
       </Box>
