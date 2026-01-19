@@ -880,13 +880,16 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None,
                          x_coords=mesh.x_coords,
                          y_coords=mesh.y_coords)
     
+    # Get resolved canvas dimensions
+    canvas_config = geom.get_canvas_config()
+    
     results = {
         "name": scenario_def['name'],
         "measurements": combined_results,
         "temp": temp_for_plot,
         "psi_value": psi,
         "frsi_factor": combined_results.get('fRsi', {}).get('value'),
-        "temp_min": combined_results.get('MinT_Wall', {}).get('value'), # Approximate
+        "temp_min": combined_results.get('MinT_Wall', {}).get('value') or float(np.min(temp_res)),
         "temp_max": np.max(temp_res),
         "flux_int": l2d * (t_int - t_ext),
         # Pass solver iterations if available (we don't track total iterations easily here without callback sum)
@@ -894,7 +897,10 @@ def solve_scenario(scenario_def, use_adaptive_mesh=True, progress_callback=None,
         "mesh": {
             "x_coords": mesh.x_coords,
             "y_coords": mesh.y_coords
-        }
+        },
+        # Resolved canvas dimensions for API temperature data compression
+        "canvas_width": canvas_config.width_mm,
+        "canvas_height": canvas_config.height_mm
     }
 
     if return_plot_data:

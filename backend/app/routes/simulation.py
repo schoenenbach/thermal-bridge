@@ -121,12 +121,11 @@ async def run_simulation(request: SimulationRequest):
         )
         
         # Prepare temperature data for client-side rendering
+        # Use resolved canvas dimensions from simulation results (handles variable substitution)
         temp_data = None
         if 'temp' in results and results['temp'] is not None:
-            canvas = scenario.get('canvas', {})
-            bounds = canvas.get('bounds', [0, 500, 0, 500])
-            canvas_width = bounds[1] - bounds[0]
-            canvas_height = bounds[3] - bounds[2]
+            canvas_width = results.get('canvas_width', 500)
+            canvas_height = results.get('canvas_height', 500)
             temp_data = compress_temperature_data(
                 results['temp'], canvas_width, canvas_height
             )
@@ -266,12 +265,11 @@ async def _run_simulation_task(job_id: str, request: SimulationRequest):
         )
         
         # Prepare temperature data for client-side rendering
+        # Use resolved canvas dimensions from simulation results (handles variable substitution)
         temp_data = None
         if 'temp' in results and results['temp'] is not None:
-            canvas = scenario.get('canvas', {})
-            bounds = canvas.get('bounds', [0, 500, 0, 500])
-            canvas_width = bounds[1] - bounds[0]
-            canvas_height = bounds[3] - bounds[2]
+            canvas_width = results.get('canvas_width', 500)
+            canvas_height = results.get('canvas_height', 500)
             temp_data = compress_temperature_data(
                 results['temp'], canvas_width, canvas_height
             )

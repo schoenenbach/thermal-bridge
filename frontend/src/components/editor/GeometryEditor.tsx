@@ -236,10 +236,10 @@ const GeometryEditor: React.FC<GeometryEditorProps> = ({ filename }) => {
                     simulationStatus={simStatus}
                 />
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minHeight: 0 }}>
                         <StageCanvas
                             width={window.innerWidth - 300}
-                            height={window.innerHeight}
+                            height={simResult ? window.innerHeight - 300 : window.innerHeight - 50}
                             scale={scale}
                             onWheel={handleWheel}
                         >
