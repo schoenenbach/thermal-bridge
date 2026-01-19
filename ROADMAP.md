@@ -315,7 +315,7 @@ Upload DXF → Map Layers → Preview (with stats) → Adjust Settings → Conve
 - [x] Add 17 unit tests in `test_schema_validation.py`
 
 **Files Added:**
-- `scenario.schema.json` - JSON Schema for IDE autocomplete
+- `scenario_schema.json` - JSON Schema for IDE autocomplete
 - `schema_export.py` - Schema export utility
 - `validate_scenarios.py` - Scenario analysis tool
 - `.vscode/settings.json` - VS Code YAML extension config
@@ -372,7 +372,7 @@ uvicorn api.main:app --reload
 ```
 
 ### Phase 2: Repository Restructuring (Phase 2A) [DONE]
-- [x] Create directory structure (`backend/`, `legacy_app/`, `frontend/`)
+- [x] Create directory structure (`backend/`, `streamlit_app/`, `frontend/`)
 - [x] Separate Core Logic from API and Streamlit UI
 - [x] Update imports and Dockerfile
 

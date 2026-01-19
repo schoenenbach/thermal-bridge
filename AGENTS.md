@@ -18,8 +18,7 @@ This project is a thermal bridge simulation tool designed to calculate Psi-value
 - `geometry.py`: Base classes (`GeometryBuilder`, `SketchGeometry`) and helper functions (`build_material_grid`).
 - `mesh.py`: Mesh generation logic (`UniformMesh`, `AdaptiveMesh`).
 - `scenarios/`: Directory containing all YAML geometry definitions for simulation scenarios.
-- `legacy/geometries/`: Archived Python geometry implementations (superseded by YAML).
-- `legacy/`: Deprecated code (e.g., old `thermal_solver.py`). Do not touch unless necessary.
+- `streamlit_app/`: Streamlit-based UI for interactive simulation.
 
 ## Development & Usage
 
@@ -65,7 +64,7 @@ python3 run_iso_tests.py all
   geom = ElementBasedGeometry([build_my_scenario], canvas_bounds=(0, 600, 0, 500))
   ```
 
-- **New Geometries (Legacy):** Create a new file in `geometries/` inheriting from `SketchGeometry`. Define shape using `add_point()` and `add_shape()`.
+- **New Geometries:** Define shapes in YAML scenario files using the declarative geometry system.
 - **New Window Types:** Update `WindowConfig` in `config.py` or pass a custom `WindowConfig` object to `CalculationConfig`.
 - **Solver Improvements:** Modify `solver.py`. Ensure backward compatibility with `run_iso_tests.py`.
 - **Making changes:** The project is git versioned. Before making changes you can have a look at the git history to see what changes were made in the past. After your changes are accepted you should wrap up into a git commit and push it to the repository. Adhere to Chris Beams commit message guidelines and describe the "why" of your changes.

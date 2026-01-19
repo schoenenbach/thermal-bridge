@@ -39,4 +39,4 @@ COPY . .
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "legacy_app/app.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "streamlit_app/app.py", "--server.address=0.0.0.0"]

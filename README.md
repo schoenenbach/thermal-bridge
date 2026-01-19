@@ -221,7 +221,7 @@ Values follow **DIN 4108-2** and **EN ISO 13788**. Humidity classes (1-5) are pe
 -   `mesh.py`: Adaptive and Uniform meshing logic.
 -   `config.py`: Material properties and simulation constants.
 -   `tests/`: Unit and integration tests.
--   `legacy/`: Archived geometry scripts and legacy code.
+-   `streamlit_app/`: Streamlit-based interactive UI.
 
 ## trial js frontend/backend
 

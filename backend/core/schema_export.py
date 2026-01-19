@@ -29,7 +29,7 @@ import json
 from backend.core.scenario_schema import Scenario
 
 
-def export_schema(output_path: str = "scenario.schema.json"):
+def export_schema(output_path: str = "scenario_schema.json"):
     """Export JSON Schema from Pydantic Scenario model."""
     schema = Scenario.model_json_schema()
     
