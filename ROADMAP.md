@@ -118,20 +118,24 @@ The following items address shortcomings identified during external review that 
 
 ---
 
-### C6. Scenario-First Architecture [LOW PRIORITY]
+### C6. Scenario-First Architecture [DONE]
 
 **Problem:** `geometry_builder.py` attempts to reverse-engineer semantic Scenario from Canvas JSON objects (fragile "round-trip" conversion).
 
-**Solution:** Make the YAML Scenario the single source of truth. Canvas should render the Scenario, not generate it.
+**Solution:** Make the YAML Scenario the single source of truth. Canvas edits now update Scenario state first, then re-render from the updated state.
 
-**Implementation Strategy:**
-- [ ] When user edits geometry in Canvas, update Scenario state first
-- [ ] Re-render Canvas from updated Scenario
-- [ ] Remove reverse-engineering logic from `geometry_builder.py`
+**Completed Tasks:**
+- [x] Added `inverseTransformPosition()` to convert canvas coords → scenario coords
+- [x] Added `updateScenarioElement()` function for immutable scenario updates
+- [x] Refactored `handleChange()` in GeometryEditor to update `rawScenarioData` (source of truth)
+- [x] Canvas re-renders automatically via useEffect dependency on scenario data
+- [x] Browser verification: drag/resize correctly updates element properties and simulations
 
-**Files Affected:**
-- `backend/core/geometry_builder.py`
-- `frontend/src/components/editor/` - Update state flow
+**Files Changed:**
+- `frontend/src/components/editor/transformers.ts` - Added inverse transform functions
+- `frontend/src/components/editor/GeometryEditor.tsx` - Scenario-first state management
+
+**Note:** Backend `generate_scenario()` kept for backward compatibility but no longer used in primary flow.
 
 ---
 

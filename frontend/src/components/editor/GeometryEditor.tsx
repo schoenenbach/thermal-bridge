@@ -23,7 +23,7 @@ import { ScenarioElement } from './types';
 import { ScenariosService, SimulationService } from '../../api/client';
 import { TemperatureData } from '../../api/models';
 import { Inspector } from '../Inspector';
-import { transformElements } from './transformers';
+import { transformElements, updateScenarioElement } from './transformers';
 
 interface GeometryEditorProps {
     filename: string;
@@ -99,13 +99,37 @@ const GeometryEditor: React.FC<GeometryEditorProps> = ({ filename }) => {
     };
 
     const handleChange = (id: string, newAttrs: any) => {
-        const newElements = elements.map(el => {
-            if (el.id === id) {
-                return { ...el, ...newAttrs };
-            }
-            return el;
-        });
-        setElements(newElements);
+        // Find the element index from the id (format: "el-{index}")
+        const match = id.match(/^el-(\d+)$/);
+        if (!match || !rawScenarioData) {
+            // Fallback: just update visual state (for unsupported element types)
+            const newElements = elements.map(el => {
+                if (el.id === id) {
+                    return { ...el, ...newAttrs };
+                }
+                return el;
+            });
+            setElements(newElements);
+            return;
+        }
+
+        const elementIndex = parseInt(match[1], 10);
+
+        // Update the scenario data (source of truth) with inverse-transformed coordinates
+        const updatedScenario = updateScenarioElement(
+            rawScenarioData,
+            elementIndex,
+            {
+                x: newAttrs.x,
+                y: newAttrs.y,
+                width: newAttrs.width,
+                height: newAttrs.height
+            },
+            stageHeight
+        );
+
+        // Setting rawScenarioData triggers useEffect which re-renders elements
+        setRawScenarioData(updatedScenario);
     };
 
     const handleUpdateVariable = (name: string, value: number) => {

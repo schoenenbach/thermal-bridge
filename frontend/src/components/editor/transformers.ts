@@ -32,6 +32,64 @@ export const resolveValue = (val: any, variables: any): number => {
     return 0;
 };
 
+/**
+ * Inverse transform: Convert canvas coordinates back to scenario coordinates.
+ * Canvas has Y=0 at top, Scenario has Y=0 at bottom.
+ */
+export const inverseTransformPosition = (
+    canvasX: number,
+    canvasY: number,
+    height: number,
+    maxY: number
+): { simX: number, simY: number } => {
+    // Canvas: Y=0 is top, so element at canvasY with height h has bottom at canvasY + h
+    // Scenario: Y=0 is bottom, so simY is distance from bottom to element bottom
+    const simY = maxY - (canvasY + height);
+    return { simX: canvasX, simY };
+};
+
+/**
+ * Update scenario element with new canvas position/dimensions.
+ * Returns a new scenario object with the updated element.
+ */
+export const updateScenarioElement = (
+    scenario: any,
+    elementIndex: number,
+    updates: { x?: number, y?: number, width?: number, height?: number },
+    maxY: number
+): any => {
+    if (!scenario || !scenario.elements || elementIndex < 0 || elementIndex >= scenario.elements.length) {
+        return scenario;
+    }
+
+    const newScenario = { ...scenario };
+    newScenario.elements = [...scenario.elements];
+    const element = { ...newScenario.elements[elementIndex] };
+
+    // Get current params
+    const params = { ...(element.params || {}) };
+
+    // If position changed, apply inverse transform
+    if (updates.x !== undefined || updates.y !== undefined || updates.width !== undefined || updates.height !== undefined) {
+        const currentWidth = updates.width ?? params.width ?? 0;
+        const currentHeight = updates.height ?? params.height ?? 0;
+        const canvasX = updates.x ?? 0;
+        const canvasY = updates.y ?? 0;
+
+        const { simX, simY } = inverseTransformPosition(canvasX, canvasY, currentHeight, maxY);
+
+        if (updates.x !== undefined) params.x = simX;
+        if (updates.y !== undefined) params.y = simY;
+        if (updates.width !== undefined) params.width = updates.width;
+        if (updates.height !== undefined) params.height = updates.height;
+    }
+
+    element.params = params;
+    newScenario.elements[elementIndex] = element;
+
+    return newScenario;
+};
+
 export const transformElements = (scenarioData: any, variables: any): { elements: ScenarioElement[], stageHeight: number } => {
     // Get canvas bounds to determine logical height for Y-flipping
     let maxY = 500;
