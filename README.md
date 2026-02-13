@@ -37,7 +37,7 @@ A high-performance, hybrid Python/C++ Finite Element Method (FEM) solver for cal
 ## Usage
 
 ### Running Standard Scenarios
-The project comes with a set of pre-defined scenarios in the `scenarios/` directory (Scenario 1-9).
+The project comes with a set of pre-defined scenarios in the `scenarios/` directory (Scenario 1-12).
 
 To run all scenarios using the **Adaptive Mesh** (recommended):
 ```bash

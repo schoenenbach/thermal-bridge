@@ -1,0 +1,165 @@
+name: "Scenario 12: Wall-Ceiling Corner (360mm + 200mm Ins) / Holzbalkendecke to Attic"
+description: >
+  Thermal bridge at junction where insulated exterior wall (360mm masonry + 200mm WLS 035)
+  meets the ceiling (290mm Holzbalkendecke, U=1.14 W/m²K) transitioning to unheated attic (~5°C).
+  The attic temperature is modeled via an equivalent roof buffer layer (R=0.768 m²K/W) above
+  the ceiling, so that the ceiling-attic interface reaches ~5°C when exterior is -10°C.
+
+# Explicit Material Definitions
+materials:
+  - id: WALL
+    lambda: 0.8
+    color: "#AAAAAA"
+    description: "360mm Masonry"
+  - id: INSULATION
+    lambda: 0.035
+    color: "#FFCC00"
+    description: "WLS 035 External Insulation"
+  - id: CEILING
+    lambda: 0.428
+    color: "#C4956A"
+    description: "290mm Holzbalkendecke (effective lambda from U=1.14)"
+  - id: ROOF_BUFFER
+    lambda: 0.260
+    color: "#8B6F47"
+    description: "Equivalent attic+roof thermal resistance (R=0.768, gives ~5°C at ceiling top)"
+  - id: AIR_INT
+    lambda: 0.025
+    color: "#FFFFFF"
+  - id: AIR_EXT
+    lambda: 0.025
+    color: "#E0F7FA"
+
+variables:
+  # Geometry Dimensions
+  wall_thick: 360.0 # Wall masonry thickness
+  ins_thick: 200.0 # External insulation thickness
+  ceiling_thick: 290.0 # Holzbalkendecke thickness
+  roof_thick: 200.0 # Equivalent roof buffer thickness
+  arm_length: 1000.0 # Length of wall/ceiling arm extensions
+
+  # Coordinate System
+  # Inner corner at (0,0): wall interior surface at x=0, ceiling bottom at y=0
+  x_inner: 0.0
+  y_inner: 0.0
+
+  # Wall extends left (negative x)
+  x_wall_outer: -360.0 # -wall_thick
+  x_ins_outer: -560.0 # -wall_thick - ins_thick
+
+  # Vertical extents
+  y_ceiling_top: 290.0 # ceiling_thick
+  y_roof_top: 490.0 # ceiling_thick + roof_thick
+  y_wall_bottom: -1000.0 # -arm_length
+
+  # Ceiling arm extends to the right
+  x_ceiling_right: 1000.0 # arm_length
+
+  # Canvas bounds (with padding)
+  x_min: -610.0 # x_ins_outer - 50
+  x_max: 1000.0 # arm_length
+  y_min: -1000.0 # -arm_length
+  y_max: 540.0 # y_roof_top + 50
+
+  # Calculated dimensions
+  # Wall + insulation extend from bottom to roof_top
+  wall_full_height: 1490.0 # y_roof_top - y_wall_bottom = 490 - (-1000)
+  ins_wall_height: 1490.0 # same as wall
+
+  # Ceiling width: from wall inner surface (0) to right (1000)
+  ceiling_width: 1000.0
+
+  # Roof buffer width: same as ceiling
+  roof_width: 1000.0
+
+canvas:
+  bounds: ["${x_min}", "${x_max}", "${y_min}", "${y_max}"]
+  grid: 10.0
+
+boundary_conditions:
+  convective:
+    internal: { T: 20.0, R: 0.13 }
+    external: { T: -10.0, R: 0.04 }
+  # Cut-off boundaries (symmetry assumption at wall/ceiling arm ends)
+  adiabatic:
+    - bottom
+    - right
+
+points:
+  # Reference Points
+  Inner_Corner: ["${x_inner}", "${y_inner}"]
+  Wall_Outer_Corner: ["${x_wall_outer}", "${y_inner}"]
+  Ins_Outer_Corner: ["${x_ins_outer}", "${y_inner}"]
+
+elements:
+  # Interior Air (Room = lower-right quadrant)
+  # Fills the space from wall interior surface to the right, below ceiling
+  - type: rect
+    name: "Interior_Air"
+    material: AIR_INT
+    params:
+      x: ${x_inner}
+      y: ${y_wall_bottom}
+      width: ${x_ceiling_right} # 1000
+      height: ${arm_length} # 1000 (from -1000 to 0)
+
+  # Wall (Masonry) - vertical, full height including attic zone
+  # From x=-360 to x=0, from y=-1000 to y=490
+  - type: rect
+    name: "Wall_Masonry"
+    material: WALL
+    params:
+      x: ${x_wall_outer}
+      y: ${y_wall_bottom}
+      width: ${wall_thick} # 360
+      height: ${wall_full_height} # 1490
+
+  # Ceiling (Holzbalkendecke) - horizontal
+  # From x=0 to x=1000, from y=0 to y=290
+  - type: rect
+    name: "Ceiling_Holzbalkendecke"
+    material: CEILING
+    params:
+      x: ${x_inner}
+      y: ${y_inner}
+      width: ${ceiling_width} # 1000
+      height: ${ceiling_thick} # 290
+
+  # Roof Buffer (equivalent attic + roof thermal resistance)
+  # From x=0 to x=1000, from y=290 to y=490
+  # This ensures -10°C exterior is buffered by the roof assembly
+  # giving ~5°C at the ceiling-roof interface
+  - type: rect
+    name: "Roof_Buffer"
+    material: ROOF_BUFFER
+    params:
+      x: ${x_inner}
+      y: ${y_ceiling_top}
+      width: ${roof_width} # 1000
+      height: ${roof_thick} # 200
+
+  # External Insulation on Wall - vertical (extends into attic zone)
+  # From x=-560 to x=-360, from y=-1000 to y=490
+  - type: rect
+    name: "Insulation_Wall"
+    material: INSULATION
+    params:
+      x: ${x_ins_outer}
+      y: ${y_wall_bottom}
+      width: ${ins_thick} # 200
+      height: ${ins_wall_height} # 1490
+
+measurements:
+  surface_metrics:
+    - {
+        name: "MinT_Corner",
+        type: min,
+        boundary: internal,
+        materials: [WALL, CEILING],
+      }
+
+  point_probes:
+    - { name: "T_InnerCorner", x: 0.0, y: 0.0 }
+
+  derived:
+    - { name: "fRsi", formula: frsi }
